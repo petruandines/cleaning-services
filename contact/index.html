@@ -126,16 +126,17 @@
       <p><strong>Program:</strong><br>Luni - Vineri: 05:00 - 20:00<br>Weekend: Indisponibil</p>
     </div>
 
-    <form>
+    <form onsubmit="sendwhatsapp(); return false;">
       <h2>Formular de Contact</h2>
-      <label for="">Nume</label>
-      <input type="text" class="name" placeholder="Numele tău">
+      <label for="name">Nume</label>
+      <input type="text" id="name" class="name" placeholder="Numele tău" required>
 
-      <label for="">Telefon</label>
-      <input type="tel" class="phone" placeholder="Ex: +40 712 345 678">
+      <label for="phone">Telefon</label>
+      <input type="tel" id="phone" class="phone" placeholder="Numărul tău de telefon" required>
 
-      <label for="">Pachet</label>
-      <select class="package">
+      <label for="package">Pachet</label>
+      <select id="package" class="package" required>
+        <option value="" disabled selected>-- Selectează un pachet --</option>
         <optgroup label="One-Time">
           <option value="Quick Clean - One-Time">Quick Clean - One-Time</option>
           <option value="Deep Clean - One-Time">Deep Clean - One-Time</option>
@@ -148,10 +149,10 @@
         </optgroup>
       </select>
 
-      <label for="">Mesaj</label>
-      <textarea class="message" placeholder="Scrie mesajul aici..."></textarea>
+      <label for="message">Mesaj</label>
+      <textarea id="message" class="message" placeholder="Scrie mesajul aici..." required></textarea>
 
-      <button type="button" onclick="sendwhatsapp();">Trimite pe WhatsApp</button>
+      <button type="submit">Trimite pe WhatsApp</button>
     </form>
   </div>
 
