@@ -107,7 +107,7 @@ tbody tr:hover .check {
 	color: #8cb420;
 }
 .dollars:before {
-	content: "\f155 ";
+	content: "RON ";
 	font-family: FontAwesome;
 	padding: 0 3px;
 	vertical-align: baseline;
