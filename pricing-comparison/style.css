@@ -1,0 +1,204 @@
+@import url("https://fonts.googleapis.com/css?family=Roboto:400,500,700");
+
+@import url("https://fonts.googleapis.com/css?family=Roboto+Slab:700");
+
+body {
+	font-size: 100%;
+	font-size: 16px;
+	font-family: "Roboto", sans-serif;
+	-moz-text-size-adjust: 100%;
+	-ms-text-size-adjust: 100%;
+	-webkit-text-size-adjust: 100%;
+	box-sizing: border-box;
+}
+body * { box-sizing:inherit; }
+.sr-only,
+.uncheck span,
+.dollars span:first-child {
+	border: 0;
+	clip: rect(0 0 0 0);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	width: 1px;
+}
+table {
+	cursor: default;
+	background-color: #fff;
+	border-collapse: collapse;
+	position: relative;
+	margin: 2rem auto 0;
+}
+thead {
+	font-family: "Roboto Slab", serif;
+	border: 1px solid;
+	background: #000;
+}
+thead th {
+	background: #000;
+	color: #fff;
+	line-height: 3rem;
+	width: 13.75%;
+	font-weight: 700;
+}
+thead th:first-child {
+	text-align: left;
+	padding: 0 10px;
+	width: 58.75%;
+}
+tbody {
+	line-height: 1.925;
+	text-align: center;
+	font-weight: 400;
+}
+tbody th {
+	text-align: left;
+	font-weight: 400;
+	padding: 5px 10px;
+}
+tbody tr sup {
+	font-size: 10px;
+	line-height: 10px;
+}
+tbody th,
+tbody tr td {
+	border-width: 1px 1px 0 1px;
+	border-style: solid;
+	border-color: #c0c0c0;
+}
+tbody tr:last-child {
+	border-bottom: 1px solid #c0c0c0;
+}
+.even,
+tbody tr:nth-child(2n-1) {
+	background: #eeece1;
+}
+tbody tr * {
+	-webkit-transition: all 400ms ease;
+	transition: all 400ms ease;
+}
+tbody tr:hover th[scope="row"],
+tbody tr:hover td {
+	background: #cbe5b5;
+	border: 1px solid #8cb420;
+}
+tfoot p {
+	font-size: 12px;
+	color: #707070;
+	line-height: 1.4;
+	margin: 1.5rem .5rem;
+}
+tbody tr:hover .uncheck {
+	border: 1px solid #c0c0c0;
+	background: #eeece1;
+}
+tbody tr:hover .uncheck:last-of-type {
+	border-right: 1px solid #8cb420 !important;
+}
+tbody tr:hover .check {
+	border-left: 1px solid #8cb420;
+}
+.check:after {
+	content: "\f00c";
+	font-family: FontAwesome;
+	padding: 0 3px;
+	color: #8cb420;
+}
+.dollars:before {
+	content: "\f155 ";
+	font-family: FontAwesome;
+	padding: 0 3px;
+	vertical-align: baseline;
+	color: #333;
+}
+.dollars {
+	font-size: 1rem;
+	font-weight: 500;
+}
+
+@media only screen and (max-width: 768px),
+	only screen and (max-device-width: 768px) {
+	body {
+		font-size: 14px;
+	}
+	tbody th,
+	tbody td {
+		padding: 10px;
+		line-height: 1.333;
+	}
+	.check:after {
+		font-size: 1rem;
+	}
+	.dollars {
+		line-height: 1.333;
+		font-size: 1.25rem;
+		font-weight: 600;
+	}
+	.length,
+	.amount {
+		border: 0;
+		clip: rect(0 0 0 0);
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		padding: 0;
+		position: absolute;
+		width: 1px;
+	}
+	span[data-length]:before {
+		content: attr(data-length);
+	}
+	span[data-amount]:before {
+		content: attr(data-amount);
+	}	
+}
+
+@media only screen and (max-width: 639px),
+	only screen and (max-device-width: 639px) {
+	tbody th,
+	tbody td {
+		padding: 10px 5px;
+		line-height: 1.333;
+	}
+	tbody th[scope="row"] {
+		padding-left: 10px;
+		padding-right: 10px;
+	}
+}
+
+@media only screen and (max-width: 479px),
+	only screen and (max-device-width: 479px) {
+	body {
+		margin: 0;
+		font-size: 13px;
+	}
+	table {
+		top: 3.5rem;
+		margin: 0 0 64px;
+	}
+	thead {
+		position: fixed;
+		width: 100%;
+		top: 0;
+		z-index: 1;
+		box-shadow: 0 3px 3px rgba(0, 0, 0, 0.5);
+		border-bottom: 1px solid #666;
+	}
+	th[scope="col"] {
+		width: 21%;
+	}
+	th[scope="col"] {
+		padding: 5px;
+	}
+	th[scope="col"]:first-child {
+		padding: 5px 5px 5px 10px;
+	}
+	tbody td {
+		width: 17%;
+	}
+	tfoot p {
+		margin-top: 1rem;
+	}
+}
