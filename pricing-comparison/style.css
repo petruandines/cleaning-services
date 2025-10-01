@@ -34,10 +34,10 @@ table {
 thead {
 	font-family: "Roboto Slab", serif;
 	border: 1px solid;
-	background: #000;
+	background: #1bbc9d;
 }
 thead th {
-	background: #000;
+	background: #1bbc9d;
 	color: #fff;
 	line-height: 3rem;
 	width: 13.75%;
