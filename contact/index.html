@@ -14,7 +14,6 @@
       color: #333;
     }
 
-    /* Bara de sus */
     .top-bar {
       display: flex;
       align-items: center;
@@ -22,7 +21,6 @@
       background-color: #12bfa2;
       color: #fff;
       padding: 10px 20px;
-      font-family: 'Open Sans', sans-serif;
       font-weight: 700;
       font-size: 20px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -31,12 +29,6 @@
       z-index: 1000;
     }
 
-    .top-bar img {
-      height: 40px;
-      margin-right: 15px;
-    }
-
-    /* Container general */
     .contact-container {
       max-width: 900px;
       margin: 40px auto;
@@ -59,17 +51,6 @@
       color: #12bfa2;
     }
 
-    .contact-info p {
-      margin: 10px 0;
-      font-size: 16px;
-    }
-
-    .contact-info a {
-      color: #12bfa2;
-      text-decoration: none;
-    }
-
-    /* Formular */
     form {
       background: #fff;
       padding: 25px;
@@ -91,7 +72,8 @@
     }
 
     form input,
-    form textarea {
+    form textarea,
+    form select {
       width: 100%;
       padding: 10px;
       margin-bottom: 15px;
@@ -123,7 +105,6 @@
       transform: translateY(-2px);
     }
 
-    /* Responsive */
     @media (max-width: 768px) {
       .contact-container {
         grid-template-columns: 1fr;
@@ -133,13 +114,11 @@
 </head>
 
 <body>
-   <!-- Bara de sus cu logo și text -->
   <header class="top-bar">
     Petru & Inés
   </header>
 
   <div class="contact-container">
-    <!-- Informații de contact -->
     <div class="contact-info">
       <h2>Contact Info</h2>
       <p><strong>Telefon:</strong> <a href="tel:+40772053562">+40 772 053 562</a></p>
@@ -147,17 +126,27 @@
       <p><strong>Program:</strong><br>Luni - Vineri: 05:00 - 20:00<br>Weekend: Indisponibil</p>
     </div>
 
-    <!-- Formular de contact WhatsApp -->
     <form>
       <h2>Formular de Contact</h2>
       <label for="">Nume</label>
       <input type="text" class="name" placeholder="Numele tău">
 
-      <label for="">Email</label>
-      <input type="email" class="email" placeholder="exemplu@email.com">
+      <label for="">Telefon</label>
+      <input type="tel" class="phone" placeholder="Ex: +40 712 345 678">
 
-      <label for="">Țara</label>
-      <input type="text" class="country" placeholder="România">
+      <label for="">Pachet</label>
+      <select class="package">
+        <optgroup label="One-Time">
+          <option value="Quick Clean - One-Time">Quick Clean - One-Time</option>
+          <option value="Deep Clean - One-Time">Deep Clean - One-Time</option>
+          <option value="Premium Clean - One-Time">Premium Clean - One-Time</option>
+        </optgroup>
+        <optgroup label="Long-Term">
+          <option value="Quick Clean - Long-Term">Quick Clean - Long-Term</option>
+          <option value="Deep Clean - Long-Term">Deep Clean - Long-Term</option>
+          <option value="Premium Clean - Long-Term">Premium Clean - Long-Term</option>
+        </optgroup>
+      </select>
 
       <label for="">Mesaj</label>
       <textarea class="message" placeholder="Scrie mesajul aici..."></textarea>
@@ -170,14 +159,14 @@
     function sendwhatsapp() {
       var phonenumber = "+40772053562";
       var name = document.querySelector(".name").value;
-      var email = document.querySelector(".email").value;
-      var country = document.querySelector(".country").value;
+      var phone = document.querySelector(".phone").value;
+      var package = document.querySelector(".package").value;
       var message = document.querySelector(".message").value;
 
       var url = "https://wa.me/" + phonenumber + "?text="
         + "*Nume:* " + name + "%0a"
-        + "*Email:* " + email + "%0a"
-        + "*Țara:* " + country + "%0a"
+        + "*Telefon:* " + phone + "%0a"
+        + "*Pachet:* " + package + "%0a"
         + "*Mesaj:* " + message
         + "%0a%0a"
         + "Trimis prin formularul de contact Petru & Inés";
@@ -188,5 +177,3 @@
 </body>
 
 </html>
-
-
