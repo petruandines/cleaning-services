@@ -1414,27 +1414,27 @@
   <div class="row gy-4">
 
     <div class="col-12">
-      <input type="text" name="name" class="form-control" placeholder="Your Name" required>
+      <input type="text" name="name" class="form-control" placeholder="Numele tău" required>
     </div>
 
     <div class="col-12">
-      <input type="tel" name="phone" class="form-control" placeholder="Your Phone Number" required>
+      <input type="tel" name="phone" class="form-control" placeholder="Numărul tău de telefon" required>
     </div>
 
     <div class="col-12">
-      <input type="text" name="subject" class="form-control" placeholder="Subject" required>
+      <input type="text" name="subject" class="form-control" placeholder="Subiect" required>
     </div>
 
     <div class="col-12">
-      <textarea name="message" class="form-control" rows="6" placeholder="Message" required></textarea>
+      <textarea name="message" class="form-control" rows="6" placeholder="Mesaj" required></textarea>
     </div>
 
     <div class="col-12 text-center">
       <div class="loading">Loading</div>
       <div class="error-message"></div>
-      <div class="sent-message">Your message has been sent. Thank you!</div>
+      <div class="sent-message">Mesajul tău a fost trimis. Mulțumim!</div>
 
-      <button type="submit" class="btn btn-submit w-100">Submit Message</button>
+      <button type="submit" class="btn btn-submit w-100">Trimite mesajul pe WhatsApp</button>
     </div>
 
   </div>
@@ -1444,7 +1444,7 @@
   function sendToWhatsApp(event) {
     event.preventDefault(); // oprire trimitere clasică
 
-    var phoneNumber = "+40772053562"; // ← numărul tău WhatsApp
+    var phoneNumber = "+40772053562"; 
     var form = event.target;
 
     var name = form.querySelector('[name="name"]').value;
@@ -1453,10 +1453,10 @@
     var message = form.querySelector('[name="message"]').value;
 
     var url = "https://wa.me/" + phoneNumber + "?text="
-      + "*Name:* " + encodeURIComponent(name) + "%0a"
-      + "*Phone:* " + encodeURIComponent(phone) + "%0a"
-      + "*Subject:* " + encodeURIComponent(subject) + "%0a"
-      + "*Message:* " + encodeURIComponent(message);
+      + "*Nume:* " + encodeURIComponent(name) + "%0a"
+      + "*Telefon:* " + encodeURIComponent(phone) + "%0a"
+      + "*Subiect:* " + encodeURIComponent(subject) + "%0a"
+      + "*Mesaj:* " + encodeURIComponent(message);
 
     window.open(url, '_blank').focus();
   }
