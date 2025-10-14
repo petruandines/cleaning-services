@@ -1430,7 +1430,7 @@
     </div>
 
     <div class="col-12 text-center">
-      <div class="loading">Se trimite...</div>
+      <div class="loading" style="display:none;">Se trimite...</div>
       <div class="error-message" style="display:none;"></div>
       <div class="sent-message" style="display:none;">Mesajul tău a fost redirecționat către WhatsApp ✅</div>
 
@@ -1444,36 +1444,56 @@
   function sendToWhatsApp(event) {
     event.preventDefault();
 
-    var phoneNumber = "+40772053562";
-    var form = event.target;
+    const phoneNumber = "+40772053562";
+    const form = event.target;
 
-    var name = form.querySelector('[name="name"]').value;
-    var phone = form.querySelector('[name="phone"]').value;
-    var subject = form.querySelector('[name="subject"]').value;
-    var message = form.querySelector('[name="message"]').value;
+    const name = form.querySelector('[name="name"]').value;
+    const phone = form.querySelector('[name="phone"]').value;
+    const subject = form.querySelector('[name="subject"]').value;
+    const message = form.querySelector('[name="message"]').value;
 
-    var url = "https://wa.me/" + phoneNumber + "?text="
-      + "*Nume:* " + encodeURIComponent(name) + "%0a"
-      + "*Telefon:* " + encodeURIComponent(phone) + "%0a"
-      + "*Subiect:* " + encodeURIComponent(subject) + "%0a"
-      + "*Mesaj:* " + encodeURIComponent(message);
+    const loadingEl = form.querySelector('.loading');
+    const sentEl = form.querySelector('.sent-message');
+    const errorEl = form.querySelector('.error-message');
 
-    // Afișează mesaj de confirmare
-    var sentMsg = form.querySelector('.sent-message');
-    sentMsg.style.display = 'block';
+    // Resetăm mesajele
+    loadingEl.style.display = 'block';
+    sentEl.style.display = 'none';
+    errorEl.style.display = 'none';
 
-    // Deschide WhatsApp
-    window.open(url, '_blank').focus();
+    try {
+      const url = "https://wa.me/" + phoneNumber + "?text="
+        + "*Nume:* " + encodeURIComponent(name) + "%0a"
+        + "*Telefon:* " + encodeURIComponent(phone) + "%0a"
+        + "*Subiect:* " + encodeURIComponent(subject) + "%0a"
+        + "*Mesaj:* " + encodeURIComponent(message);
 
-    // Resetează formularul
-    form.reset();
+      // Simulăm un mic delay ca să se vadă "Se trimite..."
+      setTimeout(() => {
+        loadingEl.style.display = 'none';
+        sentEl.style.display = 'block';
 
-    // Opțional: ascunde mesajul verde după 5 secunde
-    setTimeout(() => {
-      sentMsg.style.display = 'none';
-    }, 5000);
+        // Deschide WhatsApp
+        window.open(url, '_blank').focus();
+
+        // Reset formular
+        form.reset();
+
+        // Ascunde mesajul verde după 5 secunde
+        setTimeout(() => {
+          sentEl.style.display = 'none';
+        }, 5000);
+
+      }, 800);
+
+    } catch (err) {
+      loadingEl.style.display = 'none';
+      errorEl.textContent = 'A apărut o eroare. Te rugăm să încerci din nou.';
+      errorEl.style.display = 'block';
+    }
   }
 </script>
+
 
 
 
