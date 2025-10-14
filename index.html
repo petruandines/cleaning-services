@@ -1418,7 +1418,7 @@
     </div>
 
     <div class="col-12">
-      <input type="email" name="email" class="form-control" placeholder="Your Email" required>
+      <input type="tel" name="phone" class="form-control" placeholder="Your Phone Number" required>
     </div>
 
     <div class="col-12">
@@ -1434,7 +1434,7 @@
       <div class="error-message"></div>
       <div class="sent-message">Your message has been sent. Thank you!</div>
 
-      <button type="submit" class="btn btn-submit w-100">Trimite mesajul pe WhatsApp</button>
+      <button type="submit" class="btn btn-submit w-100">Submit Message</button>
     </div>
 
   </div>
@@ -1448,19 +1448,20 @@
     var form = event.target;
 
     var name = form.querySelector('[name="name"]').value;
-    var email = form.querySelector('[name="email"]').value;
+    var phone = form.querySelector('[name="phone"]').value;
     var subject = form.querySelector('[name="subject"]').value;
     var message = form.querySelector('[name="message"]').value;
 
     var url = "https://wa.me/" + phoneNumber + "?text="
       + "*Name:* " + encodeURIComponent(name) + "%0a"
-      + "*Email:* " + encodeURIComponent(email) + "%0a"
+      + "*Phone:* " + encodeURIComponent(phone) + "%0a"
       + "*Subject:* " + encodeURIComponent(subject) + "%0a"
       + "*Message:* " + encodeURIComponent(message);
 
     window.open(url, '_blank').focus();
   }
 </script>
+
 
 
               </div>
