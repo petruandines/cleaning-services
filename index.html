@@ -1430,9 +1430,9 @@
     </div>
 
     <div class="col-12 text-center">
-      <div class="loading">Loading</div>
+      <div class="loading">Se trimite...</div>
       <div class="error-message"></div>
-      <div class="sent-message">Mesajul tău a fost trimis. Mulțumim!</div>
+      <div class="sent-message" style="display:none;">Mesajul tău a fost redirecționat către WhatsApp ✅</div>
 
       <button type="submit" class="btn btn-submit w-100">Trimite mesajul pe WhatsApp</button>
     </div>
@@ -1442,9 +1442,9 @@
 
 <script>
   function sendToWhatsApp(event) {
-    event.preventDefault(); // oprire trimitere clasică
+    event.preventDefault();
 
-    var phoneNumber = "+40772053562"; 
+    var phoneNumber = "+40772053562";
     var form = event.target;
 
     var name = form.querySelector('[name="name"]').value;
@@ -1458,9 +1458,19 @@
       + "*Subiect:* " + encodeURIComponent(subject) + "%0a"
       + "*Mesaj:* " + encodeURIComponent(message);
 
+    // Ascundem eroarea și arătăm mesajul de succes
+    form.querySelector('.error-message').style.display = 'none';
+    var sentMsg = form.querySelector('.sent-message');
+    sentMsg.style.display = 'block';
+
+    // Deschidem WhatsApp
     window.open(url, '_blank').focus();
+
+    // Resetăm formularul după trimitere
+    form.reset();
   }
 </script>
+
 
 
 
