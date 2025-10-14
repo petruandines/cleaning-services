@@ -1410,35 +1410,58 @@
             <div class="contact-form card" data-aos="fade-up" data-aos-delay="300">
               <div class="card-body p-4 p-lg-5">
 
-                <form action="forms/contact.php" method="post" class="php-email-form" data-aos="fade-up" data-aos-delay="600">
-                  <div class="row gy-4">
+                <form onsubmit="sendToWhatsApp(event)" class="php-email-form" data-aos="fade-up" data-aos-delay="600">
+  <div class="row gy-4">
 
-                    <div class="col-12">
-                      <input type="text" name="name" class="form-control" placeholder="Your Name" required="">
-                    </div>
+    <div class="col-12">
+      <input type="text" name="name" class="form-control" placeholder="Your Name" required>
+    </div>
 
-                    <div class="col-12 ">
-                      <input type="email" class="form-control" name="email" placeholder="Your Email" required="">
-                    </div>
+    <div class="col-12">
+      <input type="email" name="email" class="form-control" placeholder="Your Email" required>
+    </div>
 
-                    <div class="col-12">
-                      <input type="text" class="form-control" name="subject" placeholder="Subject" required="">
-                    </div>
+    <div class="col-12">
+      <input type="text" name="subject" class="form-control" placeholder="Subject" required>
+    </div>
 
-                    <div class="col-12">
-                      <textarea class="form-control" name="message" rows="6" placeholder="Message" required=""></textarea>
-                    </div>
+    <div class="col-12">
+      <textarea name="message" class="form-control" rows="6" placeholder="Message" required></textarea>
+    </div>
 
-                    <div class="col-12 text-center">
-                      <div class="loading">Loading</div>
-                      <div class="error-message"></div>
-                      <div class="sent-message">Your message has been sent. Thank you!</div>
+    <div class="col-12 text-center">
+      <div class="loading">Loading</div>
+      <div class="error-message"></div>
+      <div class="sent-message">Your message has been sent. Thank you!</div>
 
-                      <button type="submit" class="btn btn-submit w-100">Submit Message</button>
-                    </div>
+      <button type="submit" class="btn btn-submit w-100">Submit Message</button>
+    </div>
 
-                  </div>
-                </form>
+  </div>
+</form>
+
+<script>
+  function sendToWhatsApp(event) {
+    event.preventDefault(); // oprire trimitere clasică
+
+    var phoneNumber = "+40772053562"; // ← numărul tău WhatsApp
+    var form = event.target;
+
+    var name = form.querySelector('[name="name"]').value;
+    var email = form.querySelector('[name="email"]').value;
+    var subject = form.querySelector('[name="subject"]').value;
+    var message = form.querySelector('[name="message"]').value;
+
+    var url = "https://wa.me/" + phoneNumber + "?text="
+      + "*Name:* " + encodeURIComponent(name) + "%0a"
+      + "*Email:* " + encodeURIComponent(email) + "%0a"
+      + "*Subject:* " + encodeURIComponent(subject) + "%0a"
+      + "*Message:* " + encodeURIComponent(message);
+
+    window.open(url, '_blank').focus();
+  }
+</script>
+
 
               </div>
             </div>
