@@ -1410,7 +1410,7 @@
             <div class="contact-form card" data-aos="fade-up" data-aos-delay="300">
               <div class="card-body p-4 p-lg-5">
 
-                <form onsubmit="sendToWhatsApp(event)" class="php-email-form" data-aos="fade-up" data-aos-delay="600">
+                <form onsubmit="sendToWhatsApp(event)" class="whatsapp-form" data-aos="fade-up" data-aos-delay="600">
   <div class="row gy-4">
 
     <div class="col-12">
@@ -1431,7 +1431,7 @@
 
     <div class="col-12 text-center">
       <div class="loading">Se trimite...</div>
-      <div class="error-message"></div>
+      <div class="error-message" style="display:none;"></div>
       <div class="sent-message" style="display:none;">Mesajul tău a fost redirecționat către WhatsApp ✅</div>
 
       <button type="submit" class="btn btn-submit w-100">Trimite mesajul pe WhatsApp</button>
@@ -1458,18 +1458,23 @@
       + "*Subiect:* " + encodeURIComponent(subject) + "%0a"
       + "*Mesaj:* " + encodeURIComponent(message);
 
-    // Ascundem eroarea și arătăm mesajul de succes
-    form.querySelector('.error-message').style.display = 'none';
+    // Afișează mesaj de confirmare
     var sentMsg = form.querySelector('.sent-message');
     sentMsg.style.display = 'block';
 
-    // Deschidem WhatsApp
+    // Deschide WhatsApp
     window.open(url, '_blank').focus();
 
-    // Resetăm formularul după trimitere
+    // Resetează formularul
     form.reset();
+
+    // Opțional: ascunde mesajul verde după 5 secunde
+    setTimeout(() => {
+      sentMsg.style.display = 'none';
+    }, 5000);
   }
 </script>
+
 
 
 
