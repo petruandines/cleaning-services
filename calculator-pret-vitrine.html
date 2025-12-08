@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Măcriș Petru Ionatan PFA - Curățare Profesională Vitrine & Oglinzi București</title>
+    <meta name="description" content="Servicii profesionale de curățare vitrine, geamuri și oglinzi în București. Calculator instant de preț pentru suprafețe de sticlă.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --glass-primary: rgba(230, 245, 255, 0.1);
+            --glass-secondary: rgba(200, 235, 255, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-shadow: rgba(0, 100, 200, 0.1);
+            --accent-blue: #4db8ff;
+            --accent-cyan: #80dfff;
+            --accent-light: #e6f7ff;
+            --text-primary: #0a2540;
+            --text-secondary: #1a5080;
+            --text-muted: #5a7a95;
+            --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #dbeafe 50%, #e0f2fe 75%, #f0f9ff 100%);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Glass Morphism Effects */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px var(--glass-shadow),
+                        inset 0 1px 1px rgba(255, 255, 255, 0.9);
+            border-radius: 24px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 48px var(--glass-shadow),
+                        inset 0 1px 1px rgba(255, 255, 255, 0.9);
+        }
+
+        /* Floating Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(2deg); }
+        }
+
+        @keyframes shimmer {
+            0% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+            100% { opacity: 0.3; }
+        }
+
+        /* Background Glass Elements */
+        .glass-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .glass-shape {
+            position: absolute;
+            background: linear-gradient(135deg, rgba(77, 184, 255, 0.1), rgba(128, 223, 255, 0.15));
+            backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            animation: float 8s ease-in-out infinite;
+        }
+
+        .glass-shape-1 {
+            width: 400px;
+            height: 400px;
+            top: -100px;
+            right: -100px;
+            animation-delay: 0s;
+        }
+
+        .glass-shape-2 {
+            width: 300px;
+            height: 300px;
+            bottom: 100px;
+            left: -50px;
+            animation-delay: 2s;
+        }
+
+        .glass-shape-3 {
+            width: 250px;
+            height: 250px;
+            top: 50%;
+            right: 10%;
+            animation-delay: 4s;
+        }
+
+        /* Header */
+        header {
+            padding: 2rem 5%;
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .logo {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 8px 24px rgba(77, 184, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .brand {
+            flex: 1;
+        }
+
+        .brand-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .brand-tagline {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 3rem 5% 4rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 3.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-title .highlight {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 2rem;
+            line-height: 1.7;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(77, 184, 255, 0.1);
+            border: 1px solid rgba(77, 184, 255, 0.3);
+            border-radius: 50px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 3rem;
+        }
+
+        .badge::before {
+            content: '✨';
+            font-size: 1.2rem;
+        }
+
+        /* Services Grid */
+        .services {
+            padding: 2rem 5% 4rem;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto 4rem;
+        }
+
+        .service-card {
+            padding: 2.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: linear-gradient(135deg, rgba(77, 184, 255, 0.2), rgba(128, 223, 255, 0.2));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            border: 2px solid rgba(77, 184, 255, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .service-card:hover .service-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .service-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .service-description {
+            font-size: 1rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* Calculator Section */
+        .calculator {
+            padding: 4rem 5%;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .calculator-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .calculator-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .calculator-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        .calculator-card {
+            padding: 3rem;
+        }
+
+        .input-group {
+            margin-bottom: 2rem;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            font-size: 1rem;
+            border: 2px solid rgba(77, 184, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 16px rgba(77, 184, 255, 0.2);
+        }
+
+        .input-hint {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        /* Item List */
+        .items-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(180deg, var(--accent-blue), var(--accent-cyan));
+            border-radius: 2px;
+        }
+
+        .item-card {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(77, 184, 255, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .item-card:hover {
+            background: rgba(255, 255, 255, 0.7);
+            border-color: var(--accent-blue);
+        }
+
+        .item-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .input-mini {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-mini label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .input-mini input {
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+            border: 1px solid rgba(77, 184, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.8);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        .input-mini input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 2px 8px rgba(77, 184, 255, 0.2);
+        }
+
+        .btn-remove {
+            padding: 0.75rem 1rem;
+            background: rgba(255, 100, 100, 0.1);
+            border: 1px solid rgba(255, 100, 100, 0.3);
+            border-radius: 8px;
+            color: #c53030;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-remove:hover {
+            background: rgba(255, 100, 100, 0.2);
+            border-color: #c53030;
+        }
+
+        .btn-add {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(77, 184, 255, 0.1);
+            border: 2px dashed rgba(77, 184, 255, 0.3);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-add:hover {
+            background: rgba(77, 184, 255, 0.2);
+            border-color: var(--accent-blue);
+            border-style: solid;
+        }
+
+        .btn-add::before {
+            content: '+';
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 1.25rem 2rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(77, 184, 255, 0.3);
+            margin: 2rem 0;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(77, 184, 255, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        /* Results */
+        .results {
+            margin-top: 2rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(77, 184, 255, 0.05), rgba(128, 223, 255, 0.05));
+            border: 2px solid rgba(77, 184, 255, 0.2);
+            border-radius: 16px;
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: slideIn 0.4s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .result-title::before {
+            content: '📊';
+            font-size: 1.75rem;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .result-item {
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            border: 1px solid rgba(77, 184, 255, 0.2);
+        }
+
+        .result-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .result-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .result-value.price {
+            color: var(--accent-blue);
+        }
+
+        .breakdown {
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 12px;
+            border: 1px solid rgba(77, 184, 255, 0.15);
+        }
+
+        .breakdown-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .breakdown-item {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(77, 184, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .breakdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .breakdown-label {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .breakdown-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Contact Section */
+        .contact {
+            padding: 4rem 5%;
+            text-align: center;
+        }
+
+        .contact-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+        }
+
+        .contact-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .contact-card {
+            padding: 2rem;
+            text-align: center;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+        }
+
+        .contact-card:hover {
+            transform: translateY(-8px);
+        }
+
+        .contact-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            background: linear-gradient(135deg, rgba(77, 184, 255, 0.2), rgba(128, 223, 255, 0.2));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            border: 2px solid rgba(77, 184, 255, 0.3);
+        }
+
+        .contact-label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .contact-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Footer */
+        footer {
+            padding: 3rem 5% 2rem;
+            text-align: center;
+            border-top: 1px solid rgba(77, 184, 255, 0.2);
+            margin-top: 4rem;
+        }
+
+        .footer-text {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .footer-note {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Error Message */
+        .error-message {
+            padding: 1rem 1.5rem;
+            background: rgba(255, 100, 100, 0.1);
+            border: 1px solid rgba(255, 100, 100, 0.3);
+            border-radius: 12px;
+            color: #c53030;
+            margin: 1rem 0;
+            display: none;
+            animation: shake 0.4s ease;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .calculator-card {
+                padding: 2rem 1.5rem;
+            }
+
+            .item-inputs {
+                grid-template-columns: 1fr;
+            }
+
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .glass-shape-1,
+            .glass-shape-2,
+            .glass-shape-3 {
+                display: none;
+            }
+        }
+
+        /* Smooth Scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body>
+    <!-- Glass Background Elements -->
+    <div class="glass-bg">
+        <div class="glass-shape glass-shape-1"></div>
+        <div class="glass-shape glass-shape-2"></div>
+        <div class="glass-shape glass-shape-3"></div>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <div class="logo-section">
+            <div class="logo">MP</div>
+            <div class="brand">
+                <div class="brand-name">Măcriș Petru Ionatan PFA</div>
+                <div class="brand-tagline">Curățare Profesională Vitrine & Oglinzi - București</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="badge">Serviciu executat de Petru și Inés</div>
+        <h1 class="hero-title">
+            Vitrine și oglinzi <span class="highlight">impecabile</span><br>
+            unde brandurile strălucesc
+        </h1>
+        <p class="hero-subtitle">
+            Curățăm fiecare centimetru cu atenție la detaliu, pentru că știm că suprafețele de sticlă sunt cartea de vizită a afacerii tale.
+        </p>
+    </section>
+
+    <!-- Services Section -->
+    <section class="services">
+        <div class="services-grid">
+            <div class="service-card glass-card">
+                <div class="service-icon">🏢</div>
+                <h3 class="service-title">Vitrine & Fațade de Sticlă</h3>
+                <p class="service-description">
+                    Curățare profesională pentru vitrine stradale, showroom-uri și spații comerciale. 
+                </p>
+            </div>
+
+            <div class="service-card glass-card">
+                <div class="service-icon">✨</div>
+                <h3 class="service-title">Oglinzi Fără Urme</h3>
+                <p class="service-description">
+                    Oglinzi perfect curate, fără dâre sau urme. Ideale pentru recepții, holuri, săli de fitness, magazine de îmbrăcăminte și saloane.
+                </p>
+            </div>
+
+            <div class="service-card glass-card">
+                <div class="service-icon">🧪</div>
+                <h3 class="service-title">Soluții Profesionale</h3>
+                <p class="service-description">
+                    Utilizăm doar produse profesionale specifice pentru sticlă care asigură rezultate impecabile și durabile.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Calculator Section -->
+    <section class="calculator" id="calculator">
+        <div class="calculator-header">
+            <h2 class="calculator-title">Calculator Preț Instant</h2>
+            <p class="calculator-subtitle">Calculați rapid costul curățării suprafețelor de sticlă</p>
+        </div>
+
+        <div class="calculator-card glass-card">
+            <!-- Base Price -->
+            <div class="input-group">
+                <label class="input-label" for="pricePerSqm">Preț per m² (începând de la 4 lei / m²)</label>
+                <input 
+                    type="number" 
+                    id="pricePerSqm" 
+                    class="input-field" 
+                    value="4" 
+                    min="0" 
+                    step="0.5"
+                    placeholder="Introduceți prețul per metru pătrat"
+                >
+                <div class="input-hint">Prețul de bază pentru curățare pe o față. Pentru vitrine, îți vom calcula și prețul pentru ambele fețe.</div>
+            </div>
+
+            <!-- Showcases/Windows -->
+            <div class="items-section">
+                <h3 class="section-title">🏪 Vitrine / Geamuri</h3>
+                <div id="vitrineList"></div>
+                <button class="btn-add" onclick="addVitrina()">Adaugă Vitrină</button>
+            </div>
+
+            <!-- Mirrors -->
+            <div class="items-section">
+                <h3 class="section-title">🪞 Oglinzi</h3>
+                <div id="oglinziList"></div>
+                <button class="btn-add" onclick="addOglinda()">Adaugă Oglindă</button>
+            </div>
+
+            <!-- Calculate Button -->
+            <button class="btn-primary" onclick="calculatePrice()">Calculează Prețul</button>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="error-message"></div>
+
+            <!-- Results -->
+            <div id="results" class="results">
+                <h3 class="result-title">Rezultate</h3>
+                
+                <div class="result-grid">
+                    <div class="result-item">
+                        <div class="result-label">Suprafață Totală (1 față)</div>
+                        <div class="result-value" id="totalArea">0 m²</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Preț pentru 1 Față</div>
+                        <div class="result-value price" id="price1Side">0 lei</div>
+                    </div>
+                </div>
+
+                <div class="result-grid">
+                    <div class="result-item">
+                        <div class="result-label">Suprafață Echivalentă<br>(Vitrine 2 Fețe + Oglinzi 1 Față)</div>
+                        <div class="result-value" id="equivalentArea">0 m²</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Preț Vitrine 2 Fețe + Oglinzi 1 Față</div>
+                        <div class="result-value price" id="price2Sides">0 lei</div>
+                    </div>
+                </div>
+
+                <div class="breakdown">
+                    <div class="breakdown-title">Detalii Calcul</div>
+                    <div id="breakdownDetails"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="contact" id="contact">
+        <h2 class="contact-title">Contactați-ne</h2>
+        <div class="contact-cards">
+            <a href="tel:0772053562" class="contact-card glass-card">
+                <div class="contact-icon">📞</div>
+                <div class="contact-label">Telefon</div>
+                <div class="contact-value">0772 053 562</div>
+            </a>
+
+            <a href="mailto:petruandines@gmail.com" class="contact-card glass-card">
+                <div class="contact-icon">📧</div>
+                <div class="contact-label">Email</div>
+                <div class="contact-value">petruandines@gmail.com</div>
+            </a>
+
+            <a href="https://facebook.com/petruandines" target="_blank" rel="noopener" class="contact-card glass-card">
+                <div class="contact-icon">👥</div>
+                <div class="contact-label">Facebook</div>
+                <div class="contact-value">facebook.com/petruandines</div>
+            </a>
+
+            <a href="https://share.google/u30dID2RfQ76TeMz1" target="_blank" rel="noopener" class="contact-card glass-card">
+                <div class="contact-icon">⭐</div>
+                <div class="contact-label">Recenzii</div>
+                <div class="contact-value">Profilul nostru Google</div>
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p class="footer-text">© 2025 Măcriș Petru Ionatan PFA. Toate drepturile rezervate.</p>
+        <p class="footer-note">Prețurile afișate sunt estimative și pot varia în funcție de complexitatea lucrării și accesibilitatea suprafețelor.</p>
+    </footer>
+
+    <script>
+        // State management
+        let vitrineCount = 0;
+        let oglinziCount = 0;
+        const vitrine = [];
+        const oglinzi = [];
+
+        // Add showcase/window
+        function addVitrina() {
+            vitrineCount++;
+            const id = `vitrina-${vitrineCount}`;
+            vitrine.push({ id, width: 0, height: 0 });
+
+            const vitrineList = document.getElementById('vitrineList');
+            const itemCard = document.createElement('div');
+            itemCard.className = 'item-card';
+            itemCard.id = id;
+            itemCard.innerHTML = `
+                <div class="item-inputs">
+                    <div class="input-mini">
+                        <label>Lățime (m)</label>
+                        <input type="number" step="0.01" min="0" placeholder="ex: 2.5" 
+                               onchange="updateVitrina('${id}', 'width', this.value)">
+                    </div>
+                    <div class="input-mini">
+                        <label>Înălțime (m)</label>
+                        <input type="number" step="0.01" min="0" placeholder="ex: 3.0" 
+                               onchange="updateVitrina('${id}', 'height', this.value)">
+                    </div>
+                    <button class="btn-remove" onclick="removeVitrina('${id}')">Șterge</button>
+                </div>
+            `;
+            vitrineList.appendChild(itemCard);
+        }
+
+        // Add mirror
+        function addOglinda() {
+            oglinziCount++;
+            const id = `oglinda-${oglinziCount}`;
+            oglinzi.push({ id, width: 0, height: 0 });
+
+            const oglinziList = document.getElementById('oglinziList');
+            const itemCard = document.createElement('div');
+            itemCard.className = 'item-card';
+            itemCard.id = id;
+            itemCard.innerHTML = `
+                <div class="item-inputs">
+                    <div class="input-mini">
+                        <label>Lățime (m)</label>
+                        <input type="number" step="0.01" min="0" placeholder="ex: 1.5" 
+                               onchange="updateOglinda('${id}', 'width', this.value)">
+                    </div>
+                    <div class="input-mini">
+                        <label>Înălțime (m)</label>
+                        <input type="number" step="0.01" min="0" placeholder="ex: 2.0" 
+                               onchange="updateOglinda('${id}', 'height', this.value)">
+                    </div>
+                    <button class="btn-remove" onclick="removeOglinda('${id}')">Șterge</button>
+                </div>
+            `;
+            oglinziList.appendChild(itemCard);
+        }
+
+        // Update showcase data
+        function updateVitrina(id, field, value) {
+            const vitrina = vitrine.find(v => v.id === id);
+            if (vitrina) {
+                vitrina[field] = parseFloat(value) || 0;
+            }
+        }
+
+        // Update mirror data
+        function updateOglinda(id, field, value) {
+            const oglinda = oglinzi.find(o => o.id === id);
+            if (oglinda) {
+                oglinda[field] = parseFloat(value) || 0;
+            }
+        }
+
+        // Remove showcase
+        function removeVitrina(id) {
+            const index = vitrine.findIndex(v => v.id === id);
+            if (index > -1) {
+                vitrine.splice(index, 1);
+            }
+            document.getElementById(id).remove();
+        }
+
+        // Remove mirror
+        function removeOglinda(id) {
+            const index = oglinzi.findIndex(o => o.id === id);
+            if (index > -1) {
+                oglinzi.splice(index, 1);
+            }
+            document.getElementById(id).remove();
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+            setTimeout(() => {
+                errorDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        // Calculate price
+        function calculatePrice() {
+            // Get base price
+            const pricePerSqm = parseFloat(document.getElementById('pricePerSqm').value);
+            
+            // Validation
+            if (!pricePerSqm || pricePerSqm <= 0) {
+                showError('Vă rugăm introduceți un preț valid per m²!');
+                return;
+            }
+
+            if (vitrine.length === 0 && oglinzi.length === 0) {
+                showError('Vă rugăm adăugați cel puțin o vitrină sau oglindă!');
+                return;
+            }
+
+            // Calculate areas
+            let totalVitrineArea = 0;
+            let totalOglinziArea = 0;
+            const breakdownItems = [];
+
+            // Calculate showcases
+            vitrine.forEach((v, index) => {
+                if (v.width > 0 && v.height > 0) {
+                    const area = v.width * v.height;
+                    totalVitrineArea += area;
+                    breakdownItems.push({
+                        label: `Vitrină ${index + 1} (${v.width}m × ${v.height}m)`,
+                        value: `${area.toFixed(2)} m²`
+                    });
+                }
+            });
+
+            // Calculate mirrors
+            oglinzi.forEach((o, index) => {
+                if (o.width > 0 && o.height > 0) {
+                    const area = o.width * o.height;
+                    totalOglinziArea += area;
+                    breakdownItems.push({
+                        label: `Oglindă ${index + 1} (${o.width}m × ${o.height}m)`,
+                        value: `${area.toFixed(2)} m²`
+                    });
+                }
+            });
+
+            if (totalVitrineArea === 0 && totalOglinziArea === 0) {
+                showError('Vă rugăm introduceți dimensiuni valide pentru cel puțin un element!');
+                return;
+            }
+
+            // Calculate prices
+            const totalArea1Side = totalVitrineArea + totalOglinziArea;
+            const price1Side = totalArea1Side * pricePerSqm;
+
+            const equivalentArea = (totalVitrineArea * 2) + totalOglinziArea;
+            const price2Sides = equivalentArea * pricePerSqm;
+
+            // Display results
+            document.getElementById('totalArea').textContent = `${totalArea1Side.toFixed(2)} m²`;
+            document.getElementById('price1Side').textContent = `${price1Side.toFixed(2)} lei`;
+            document.getElementById('equivalentArea').textContent = `${equivalentArea.toFixed(2)} m²`;
+            document.getElementById('price2Sides').textContent = `${price2Sides.toFixed(2)} lei`;
+
+            // Build breakdown
+            let breakdownHTML = '';
+            breakdownItems.forEach(item => {
+                breakdownHTML += `
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">${item.label}</span>
+                        <span class="breakdown-value">${item.value}</span>
+                    </div>
+                `;
+            });
+
+            breakdownHTML += `
+                <div class="breakdown-item" style="margin-top: 1rem; padding-top: 1rem; border-top: 2px solid rgba(77, 184, 255, 0.2);">
+                    <span class="breakdown-label"><strong>Total Vitrine</strong></span>
+                    <span class="breakdown-value">${totalVitrineArea.toFixed(2)} m²</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="breakdown-label"><strong>Total Oglinzi</strong></span>
+                    <span class="breakdown-value">${totalOglinziArea.toFixed(2)} m²</span>
+                </div>
+                <div class="breakdown-item" style="padding-top: 1rem; border-top: 2px solid rgba(77, 184, 255, 0.2);">
+                    <span class="breakdown-label"><strong>Preț per m²</strong></span>
+                    <span class="breakdown-value">${pricePerSqm.toFixed(2)} lei</span>
+                </div>
+            `;
+
+            document.getElementById('breakdownDetails').innerHTML = breakdownHTML;
+
+            // Show results
+            document.getElementById('results').classList.add('show');
+            
+            // Scroll to results
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Enter key to calculate
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculatePrice();
+            }
+        });
+
+        // Add initial items
+        window.addEventListener('load', function() {
+            // Optionally add one of each by default
+            // addVitrina();
+            // addOglinda();
+        });
+    </script>
+</body>
+</html>
