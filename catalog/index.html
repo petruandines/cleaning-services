@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f4f3f0">
+<title>Catalog</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main class="app">
+<section id="cover" class="cover">
+  <div class="cover-card">
+    <div class="cover-image-wrap"><img id="coverImage" src="pages/01.jpg" alt="Coperta catalogului"></div>
+    <div class="cover-copy">
+      <p class="eyebrow">Petru & Inés</p>
+      <h1 id="coverTitle">Catalog Servicii</h1>
+      <p id="coverSubtitle"></p>
+      <button id="openCatalog" class="primary-btn">Deschide catalogul</button>
+    </div>
+  </div>
+</section>
+
+<section id="viewer" class="viewer" hidden>
+  <header class="topbar">
+    <div class="brand-wrap">
+      <button id="closeCatalog" class="back-btn" aria-label="Închide catalogul" title="Înapoi la copertă">‹</button>
+      <div class="brand" id="brandTitle">Catalog</div>
+    </div>
+    <div class="top-actions">
+      <button id="zoomOut" class="icon-btn" aria-label="Micșorează">−</button>
+      <button id="zoomReset" class="icon-btn zoom-value" aria-label="Resetează zoom">100%</button>
+      <button id="zoomIn" class="icon-btn" aria-label="Mărește">+</button>
+      <button id="fullscreen" class="icon-btn" aria-label="Fullscreen">⛶</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <button id="prev" class="nav-btn prev" aria-label="Pagina anterioară">‹</button>
+    <div id="pageViewport" class="page-viewport">
+      <div id="pageFrame" class="page-frame">
+        <img id="pageImage" alt="" draggable="false">
+      </div>
+    </div>
+    <button id="next" class="nav-btn next" aria-label="Pagina următoare">›</button>
+  </div>
+
+  <div class="bottom-panel">
+    <div class="controls-row">
+      <button id="first" class="text-btn">Prima</button>
+      <span id="pageCounter" class="counter">1 / 28</span>
+      <button id="last" class="text-btn">Ultima</button>
+    </div>
+    <div id="thumbnails" class="thumbnails" aria-label="Miniaturi pagini"></div>
+  </div>
+</section>
+</main>
+<script src="js/catalog-config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
