@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-label="Curățare tapițerie auto">
-<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8faf9"/><stop offset="1" stop-color="#e9f6ec"/></linearGradient></defs>
-<rect width="1400" height="900" fill="url(#g)"/><circle cx="1180" cy="120" r="220" fill="#dbf2e0"/><circle cx="170" cy="820" r="245" fill="#eef2ef"/>
-<path d="M508 285 L680 165 L680 335 C680 380 646 416 603 416 L508 416 Z" fill="#172024"/><path d="M700 428 C700 371 746 325 803 325 L892 325 L892 535 L770 535 C731 535 700 504 700 465 Z" fill="#172024"/><path d="M700 248 L734 336 L822 370 L734 404 L700 492 L666 404 L578 370 L666 336 Z" fill="#22ab39"/>
-<text x="700" y="650" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700" fill="#172024">Curățare tapițerie auto</text>
-<text x="700" y="712" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#6b7771">Petru &amp; Inés • imagine temporară</text>
-</svg>
