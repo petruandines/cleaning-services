@@ -179,7 +179,10 @@
   }
 
   function getWorkCanvas() {
-    const maxAnalysis = 2200;
+    // Limităm rezoluția internă de analiză pentru a preveni blocarea tabului.
+    // SVG-ul rămâne vectorial; această limită afectează doar rasterul analizat.
+    const profile = els.profileSelect.value;
+    const maxAnalysis = profile === 'mono' ? 1600 : profile === 'logo' ? 1400 : 1200;
     const scale = Math.min(1, maxAnalysis / Math.max(state.sourceWidth, state.sourceHeight));
     const w = Math.max(1, Math.round(state.sourceWidth * scale));
     const h = Math.max(1, Math.round(state.sourceHeight * scale));
@@ -255,28 +258,6 @@
     const [r,g,b]=best.split(',').map(Number); return {r,g,b};
   }
 
-  async function loadOpenCV() {
-    if (state.dependency.cv && state.dependency.cv.Mat) return state.dependency.cv;
-    if (!document.querySelector('script[data-opencv]')) {
-      await new Promise((resolve, reject) => {
-        const s=document.createElement('script');
-        s.src='https://docs.opencv.org/4.x/opencv.js';
-        s.async=true; s.dataset.opencv='1';
-        s.onload=resolve; s.onerror=()=>reject(new Error('OpenCV.js nu s-a putut încărca.'));
-        document.head.appendChild(s);
-      });
-    }
-    const deadline=Date.now()+25000;
-    while(Date.now()<deadline){
-      if(window.cv){
-        if(typeof window.cv.then==='function') window.cv=await window.cv;
-        if(window.cv && window.cv.Mat){ state.dependency.cv=window.cv; return window.cv; }
-      }
-      await new Promise(r=>setTimeout(r,80));
-    }
-    throw new Error('OpenCV.js nu a devenit disponibil la timp.');
-  }
-
   async function runOCR(sourceCanvas, scale) {
     if (!els.ocrToggle.checked) return [];
     if (!window.Tesseract) throw new Error('Motorul OCR nu este disponibil. Verifică accesul la CDN.');
@@ -334,54 +315,34 @@
 
   async function detectGeometry(canvas, ctx) {
     if (!els.geometryToggle.checked) return [];
-    setProgress(42, 'Reconstruiesc geometria', 'Încarc detectorul de forme…');
-    let cv;
-    try { cv=await loadOpenCV(); }
-    catch(e){ console.warn(e); toast('Geometry repair indisponibil; continui cu tracing-ul.', 'error'); return []; }
-
-    setProgress(48, 'Reconstruiesc geometria', 'Caut dreptunghiuri și cercuri clare…');
-    let src, gray, blur, edges, contours, hierarchy;
-    const out=[];
-    try {
-      src=cv.imread(canvas); gray=new cv.Mat(); blur=new cv.Mat(); edges=new cv.Mat(); contours=new cv.MatVector(); hierarchy=new cv.Mat();
-      cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
-      cv.GaussianBlur(gray,blur,new cv.Size(3,3),0,0,cv.BORDER_DEFAULT);
-      cv.Canny(blur,edges,55,145);
-      const kernel=cv.Mat.ones(3,3,cv.CV_8U);
-      cv.morphologyEx(edges,edges,cv.MORPH_CLOSE,kernel); kernel.delete();
-      cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);
-      const imgArea=canvas.width*canvas.height;
-      const minArea=Math.max(100,imgArea*0.00035);
-      for(let i=0;i<contours.size();i++){
-        const cnt=contours.get(i); const area=Math.abs(cv.contourArea(cnt));
-        if(area<minArea || area>imgArea*.92){cnt.delete();continue;}
-        const peri=cv.arcLength(cnt,true); const approx=new cv.Mat();
-        cv.approxPolyDP(cnt,approx,0.018*peri,true);
-        const rect=cv.boundingRect(approx); const bboxArea=rect.width*rect.height;
-        const extent=bboxArea?area/bboxArea:0;
-        let shape=null;
-        if(approx.rows===4 && cv.isContourConvex(approx) && extent>.86 && rect.width>8 && rect.height>8){
-          const fill=sampleDominantInside(ctx,rect,canvas.width,canvas.height);
-          if(fill.coverage>.72){
-            shape={type:'rect',x:rect.x,y:rect.y,width:rect.width,height:rect.height,fill:fill.color,confidence:fill.coverage};
-          }
-        } else {
-          const circularity=peri?4*Math.PI*area/(peri*peri):0;
-          if(circularity>.84 && extent>.66 && rect.width>10 && rect.height>10 && Math.abs(rect.width-rect.height)/Math.max(rect.width,rect.height)<.15){
-            const fill=sampleDominantInside(ctx,rect,canvas.width,canvas.height);
-            if(fill.coverage>.68){
-              shape={type:'circle',cx:rect.x+rect.width/2,cy:rect.y+rect.height/2,r:(rect.width+rect.height)/4,fill:fill.color,confidence:fill.coverage};
-            }
-          }
-        }
-        if(shape && !isNearBackground(shape.fill)) out.push(shape);
-        approx.delete(); cnt.delete();
-        if(out.length>90) break;
-      }
-    } finally {
-      [src,gray,blur,edges,hierarchy].forEach(m=>{try{m&&m.delete();}catch{}}); try{contours&&contours.delete();}catch{}
+    if (!window.VectorGeometryLite) {
+      console.warn('VectorGeometryLite indisponibil.');
+      return [];
     }
-    return dedupeGeometry(out);
+    setProgress(42, 'Reconstruiesc geometria', 'Analizez formele cu detectorul rapid…');
+    const shapes = await window.VectorGeometryLite.detect(
+      canvas,
+      state.backgroundColor,
+      (p, detail) => setProgress(42 + p * 12, 'Reconstruiesc geometria', detail)
+    );
+    return shapes.filter(shape => !isNearBackground(shape.fill));
+  }
+
+  function maskGeometryForTrace(ctx, shapes, w, h) {
+    for (const shape of shapes) {
+      const box = shapeBBox(shape);
+      const bg = localBackgroundColor(ctx, {
+        x0: box.x, y0: box.y, x1: box.x + box.w, y1: box.y + box.h
+      }, w, h);
+      ctx.fillStyle = `rgb(${Math.round(bg.r)},${Math.round(bg.g)},${Math.round(bg.b)})`;
+      if (shape.type === 'rect') {
+        ctx.fillRect(shape.x - 1, shape.y - 1, shape.width + 2, shape.height + 2);
+      } else {
+        ctx.beginPath();
+        ctx.arc(shape.cx, shape.cy, shape.r + 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 
   function sampleDominantInside(ctx, rect, w, h) {
@@ -514,7 +475,7 @@
 
   async function vectorize() {
     if(!state.image || state.processing) return;
-    if(!window.ImageTracer){ toast('ImageTracer nu s-a încărcat. Verifică internetul/CDN-ul.', 'error'); return; }
+    if(!window.VectorTraceWorker){ toast('Motorul de vectorizare nu s-a încărcat.', 'error'); return; }
     setBusy(true);
     setProgress(1,'Pregătesc imaginea','Citesc rasterul și estimez fundalul…');
     try {
@@ -542,11 +503,12 @@
 
       const geometry=await detectGeometry(canvas,ctx);
       state.geometryShapes=geometry;
+      maskGeometryForTrace(ctx,geometry,canvas.width,canvas.height);
 
-      setProgress(58,'Vectorizez grafica','Trasez contururile și simplific punctele…');
-      await new Promise(r=>setTimeout(r,30));
+      setProgress(58,'Vectorizez grafica','Trasez contururile într-un worker separat…');
+      await new Promise(r=>requestAnimationFrame(r));
       const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
-      const svgString=ImageTracer.imagedataToSVG(imageData,tracerOptions());
+      const svgString=await window.VectorTraceWorker.trace(imageData,tracerOptions());
       const parsed=new DOMParser().parseFromString(svgString,'image/svg+xml');
       let svg=parsed.documentElement;
       if(svg.nodeName.toLowerCase()!=='svg') throw new Error('Tracerul nu a returnat un SVG valid.');
