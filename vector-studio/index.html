@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#101416" />
+  <title>Vector Studio — PNG/JPG în SVG editabil</title>
+  <meta name="description" content="Vectorizare în browser pentru logo-uri și grafică: tracing curat, OCR editabil, reconstrucție geometrică și export SVG." />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div>
+          <div class="brand-title">Vector Studio</div>
+          <div class="brand-subtitle">Raster → SVG editabil, direct în browser</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="privacy-pill" title="Fișierul rămâne în browser; OCR-ul descarcă motorul și modelele la prima utilizare.">Local-first</span>
+        <button id="newProjectBtn" class="btn btn-ghost" type="button">Proiect nou</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar sidebar-left">
+        <section class="panel-section">
+          <div class="section-heading">
+            <span>1. Imagine</span>
+            <span id="sourceDimensions" class="muted-mini">—</span>
+          </div>
+
+          <label id="dropzone" class="dropzone" for="fileInput">
+            <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+            <div class="dropzone-icon">＋</div>
+            <strong>Încarcă PNG / JPG / WebP</strong>
+            <span>sau trage imaginea aici</span>
+          </label>
+          <div id="fileName" class="file-name hidden"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">2. Reconstrucție</div>
+
+          <label class="field">
+            <span>Profil</span>
+            <select id="profileSelect">
+              <option value="logo" selected>Logo / grafică flat — margini curate</option>
+              <option value="mono">Alb-negru / semnătură</option>
+              <option value="poster">Poster / flyer color</option>
+              <option value="detail">Detaliat — păstrează mai mult</option>
+            </select>
+          </label>
+
+          <div class="toggle-row">
+            <div>
+              <strong>Reconstruiește textul mic</strong>
+              <small>OCR + elemente SVG &lt;text&gt; editabile</small>
+            </div>
+            <label class="switch">
+              <input id="ocrToggle" type="checkbox" checked />
+              <span></span>
+            </label>
+          </div>
+
+          <div id="ocrOptions" class="sub-options">
+            <label class="field compact">
+              <span>Limbă OCR</span>
+              <select id="ocrLanguage">
+                <option value="ron+eng" selected>Română + Engleză</option>
+                <option value="ron">Română</option>
+                <option value="eng">Engleză</option>
+              </select>
+            </label>
+            <label class="field compact">
+              <span>Reface text până la <b id="ocrMaxLabel">12%</b> din înălțimea imaginii</span>
+              <input id="ocrMaxHeight" type="range" min="4" max="30" value="12" step="1" />
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <strong>Geometry repair</strong>
+              <small>Detectează dreptunghiuri și cercuri clare</small>
+            </div>
+            <label class="switch">
+              <input id="geometryToggle" type="checkbox" checked />
+              <span></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <strong>Fundal transparent</strong>
+              <small>Elimină automat forma de fundal dominantă</small>
+            </div>
+            <label class="switch">
+              <input id="transparentBgToggle" type="checkbox" />
+              <span></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">3. Finețe</div>
+
+          <label class="field">
+            <span>Simplificare contur <b id="simplifyLabel">65</b></span>
+            <input id="simplifyRange" type="range" min="0" max="100" value="65" step="1" />
+            <small>Mai sus = mai puține puncte, muchii mai ordonate.</small>
+          </label>
+
+          <label class="field">
+            <span>Netezire margini <b id="smoothLabel">35</b></span>
+            <input id="smoothRange" type="range" min="0" max="100" value="35" step="1" />
+            <small>Reduce zimțarea din raster înainte de tracing.</small>
+          </label>
+
+          <label class="field">
+            <span>Eliminare fragmente <b id="speckleLabel">18</b></span>
+            <input id="speckleRange" type="range" min="0" max="100" value="18" step="1" />
+            <small>Ignoră insule foarte mici care murdăresc SVG-ul.</small>
+          </label>
+
+          <label class="field compact">
+            <span>Număr maxim de culori</span>
+            <select id="colorCount">
+              <option value="2">2</option>
+              <option value="4">4</option>
+              <option value="6">6</option>
+              <option value="8" selected>8</option>
+              <option value="12">12</option>
+              <option value="16">16</option>
+              <option value="24">24</option>
+              <option value="32">32</option>
+            </select>
+          </label>
+        </section>
+
+        <button id="vectorizeBtn" class="btn btn-primary btn-large" type="button" disabled>
+          <span>Analizează și vectorizează</span>
+          <span class="btn-arrow">→</span>
+        </button>
+        <div id="dependencyHint" class="micro-note">La prima analiză, bibliotecile de vectorizare/OCR pot necesita câteva secunde pentru încărcare.</div>
+      </aside>
+
+      <section class="stage-column">
+        <div class="stage-toolbar">
+          <div class="segmented" role="group" aria-label="Vizualizare">
+            <button id="viewOriginalBtn" type="button">Original</button>
+            <button id="viewCompareBtn" type="button" class="active">Compară</button>
+            <button id="viewVectorBtn" type="button">Vector</button>
+          </div>
+
+          <div class="toolbar-center">
+            <button id="zoomOutBtn" class="icon-btn" type="button" title="Micșorează">−</button>
+            <span id="zoomLabel">100%</span>
+            <button id="zoomInBtn" class="icon-btn" type="button" title="Mărește">＋</button>
+            <button id="fitBtn" class="btn btn-ghost btn-small" type="button">Potrivește</button>
+          </div>
+
+          <div class="checker-toggle">
+            <label>
+              <input id="checkerToggle" type="checkbox" />
+              <span>Transparență</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="stageViewport" class="stage-viewport">
+          <div id="emptyState" class="empty-state">
+            <div class="empty-graphic">
+              <div class="raster-grid"></div>
+              <div class="vector-line"></div>
+            </div>
+            <h1>Reconstruiește grafică, nu doar pixeli.</h1>
+            <p>Încarcă un logo, flyer sau element grafic. Modul „Logo / grafică flat” prioritizează margini drepte, curbe curate și mai puține puncte.</p>
+          </div>
+
+          <div id="canvasScene" class="canvas-scene hidden">
+            <div id="sceneTransform" class="scene-transform">
+              <div id="artboard" class="artboard">
+                <img id="originalImage" alt="Imagine originală" draggable="false" />
+                <div id="vectorLayer" class="vector-layer"></div>
+                <div id="compareDivider" class="compare-divider hidden"><span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="compareControl" class="compare-control hidden">
+          <span>Original</span>
+          <input id="compareRange" type="range" min="0" max="100" value="50" />
+          <span>Vector</span>
+        </div>
+
+        <div id="progressPanel" class="progress-panel hidden" aria-live="polite">
+          <div class="progress-header">
+            <strong id="progressTitle">Analizez imaginea…</strong>
+            <span id="progressPercent">0%</span>
+          </div>
+          <div class="progress-track"><div id="progressBar"></div></div>
+          <div id="progressDetail" class="progress-detail">Pregătire</div>
+        </div>
+      </section>
+
+      <aside class="sidebar sidebar-right">
+        <section class="panel-section grow">
+          <div class="section-heading">
+            <span>Layers</span>
+            <button id="showAllLayersBtn" class="text-btn" type="button">Arată tot</button>
+          </div>
+          <div id="layersList" class="layers-list">
+            <div class="layers-empty">Straturile vor apărea după vectorizare.</div>
+          </div>
+        </section>
+
+        <section id="propertiesSection" class="panel-section hidden">
+          <div class="section-heading">Proprietăți selecție</div>
+          <div id="propertiesContent"></div>
+        </section>
+
+        <section class="panel-section stats-section">
+          <div class="section-heading">Calitatea SVG</div>
+          <div class="stats-grid">
+            <div><span>Paths</span><strong id="statPaths">—</strong></div>
+            <div><span>Puncte</span><strong id="statAnchors">—</strong></div>
+            <div><span>Texte</span><strong id="statTexts">—</strong></div>
+            <div><span>Forme</span><strong id="statShapes">—</strong></div>
+          </div>
+          <div class="quality-meter">
+            <div class="quality-row"><span>Curățenie geometrică</span><strong id="qualityLabel">—</strong></div>
+            <div class="quality-track"><div id="qualityFill"></div></div>
+          </div>
+        </section>
+
+        <section class="panel-section export-section">
+          <button id="exportSvgBtn" class="btn btn-primary" type="button" disabled>Descarcă SVG</button>
+          <button id="copySvgBtn" class="btn btn-secondary" type="button" disabled>Copiază cod SVG</button>
+          <small>Exportul păstrează textul OCR editabil. Formele și tracing-ul rămân vectoriale.</small>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
