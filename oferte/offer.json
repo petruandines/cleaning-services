@@ -1,0 +1,32 @@
+{
+  "active": true,
+  "campaignId": "toamna-2026-comenzi-multiple",
+  "eyebrow": "OFERTA TOAMNEI",
+  "kicker": "Curățenie pentru locuințe",
+  "title": "Curățenia de sezon începe cu un mesaj.",
+  "subtitle": "Programează o curățenie pentru apartament, garsonieră, casă sau vilă. Venim cu produsele, materialele și echipamentele necesare.",
+  "offerTitle": "Avantaj pentru comenzi multiple",
+  "offerDescription": "Programează în aceeași zonă împreună cu un vecin, prieten sau membru al familiei și cere oferta pentru comanda comună.",
+  "ctaLabel": "Cere oferta pe WhatsApp",
+  "whatsappMessage": "Bună! Am văzut Oferta Toamnei pe site și doresc mai multe detalii. Localitatea/sectorul meu este: ",
+  "validUntil": "2026-10-31T20:00:00+02:00",
+  "validUntilLabel": "31 octombrie 2026",
+  "updatedAtLabel": "21 septembrie 2026",
+  "image": "/cleaning-services/assets/img/real/curatenie-locuinte-home.webp",
+  "imageAlt": "Locuință luminoasă și îngrijită – oferta Petru & Inés pentru curățenie de sezon",
+  "benefits": [
+    {
+      "title": "Produse profesionale",
+      "text": "Venim cu soluțiile și consumabilele necesare lucrării stabilite."
+    },
+    {
+      "title": "Echipamente incluse",
+      "text": "Pregătim echipamentele potrivite serviciilor confirmate în avans."
+    },
+    {
+      "title": "Deplasare inclusă",
+      "text": "Ne deplasăm la locația clientului în București și Ilfov."
+    }
+  ],
+  "terms": "Reducerea și disponibilitatea se stabilesc în funcție de serviciile solicitate, numărul de lucrări, locații și programarea comună. Oferta finală este confirmată în scris înaintea lucrării."
+}
