@@ -1,19 +1,24 @@
 {
   "active": true,
-  "campaignId": "toamna-2026-comenzi-multiple",
+  "campaignId": "toamna-2026-apartamente-700",
   "eyebrow": "OFERTA TOAMNEI",
-  "kicker": "Curățenie pentru locuințe",
-  "title": "Curățenia de sezon începe cu un mesaj.",
-  "subtitle": "Programează o curățenie pentru apartament, garsonieră, casă sau vilă. Venim cu produsele, materialele și echipamentele necesare.",
-  "offerTitle": "Avantaj pentru comenzi multiple",
-  "offerDescription": "Programează în aceeași zonă împreună cu un vecin, prieten sau membru al familiei și cere oferta pentru comanda comună.",
+  "kicker": "Ofertă pentru apartamente",
+  "title": "Noi ne ocupăm de curățenie. Tu te bucuri de casă.",
+  "subtitle": "Curățenie generală pentru apartamente cu 2 sau 3 camere. Venim cu produsele, materialele și echipamentele necesare.",
+  "price": "700",
+  "priceUnit": " lei",
+  "priceContext": "Apartament cu 2 sau 3 camere",
+  "offerDescription": "Curățenie generală, cu produsele și echipamentele necesare incluse.",
+  "hourlyTitle": "Poți alege și taxarea la oră",
+  "hourlyPrice": "100 lei / oră",
+  "hourlyDescription": " · potrivită pentru intervenții punctuale sau o listă clară de sarcini.",
   "ctaLabel": "Cere oferta pe WhatsApp",
-  "whatsappMessage": "Bună! Am văzut Oferta Toamnei pe site și doresc mai multe detalii. Localitatea/sectorul meu este: ",
-  "validUntil": "2026-10-31T20:00:00+02:00",
-  "validUntilLabel": "31 octombrie 2026",
+  "whatsappMessage": "Bună! Am văzut oferta de 700 lei pentru curățenia unui apartament cu 2 sau 3 camere și doresc mai multe detalii. Localitatea/sectorul meu este: ",
+  "validUntil": "2026-09-28T20:00:00+03:00",
+  "validUntilLabel": "28 septembrie 2026",
   "updatedAtLabel": "21 septembrie 2026",
-  "image": "/cleaning-services/assets/img/real/curatenie-locuinte-home.webp",
-  "imageAlt": "Locuință luminoasă și îngrijită – oferta Petru & Inés pentru curățenie de sezon",
+  "image": "/cleaning-services/oferte/assets/curatenie-apartament-toamna-2026.webp",
+  "imageAlt": "Apartament luminos și proaspăt curățat – oferta Petru & Inés pentru apartamente cu 2 sau 3 camere",
   "benefits": [
     {
       "title": "Produse profesionale",
@@ -28,5 +33,5 @@
       "text": "Ne deplasăm la locația clientului în București și Ilfov."
     }
   ],
-  "terms": "Reducerea și disponibilitatea se stabilesc în funcție de serviciile solicitate, numărul de lucrări, locații și programarea comună. Oferta finală este confirmată în scris înaintea lucrării."
+  "terms": "Oferta de 700 lei este valabilă pentru curățenia generală a apartamentelor cu 2 sau 3 camere. Varianta cu taxare la oră este de 100 lei/oră. Disponibilitatea și serviciile incluse se confirmă înaintea programării, pe baza detaliilor sau fotografiilor primite. Lucrările speciale ori suplimentare se stabilesc separat."
 }

@@ -74,7 +74,9 @@ img { display: block; max-width: 100%; }
   width: 42px;
   height: 42px;
   object-fit: contain;
-  filter: brightness(0) invert(1);
+  padding: 4px;
+  border-radius: 9px;
+  background: #fff;
 }
 
 .brand span { display: grid; gap: 2px; }
@@ -176,6 +178,8 @@ h1 {
   letter-spacing: -.055em;
 }
 
+.billboard h1 { font-size: clamp(40px, 4.4vw, 62px); }
+
 .campaign-intro {
   max-width: 670px;
   margin-bottom: 28px;
@@ -184,32 +188,67 @@ h1 {
   line-height: 1.65;
 }
 
-.offer-highlight {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 30px;
-  padding: 17px 18px;
+.price-offer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: stretch;
+  margin-bottom: 14px;
   border: 1px solid rgba(33, 170, 58, .28);
   border-radius: 16px;
   background: #eef9e9;
+  overflow: hidden;
 }
 
-.offer-icon {
-  flex: 0 0 46px;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
+.price-main {
+  min-width: 178px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 18px 22px;
   color: #fff;
   background: var(--forest);
-  font-size: 20px;
-  font-weight: 900;
 }
 
-.offer-highlight strong { display: block; margin-bottom: 4px; font-size: 16px; }
-.offer-highlight p { margin: 0; color: #506158; font-size: 14px; line-height: 1.5; }
+.price-main > span {
+  margin-bottom: 3px;
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.price-main strong { font-size: 38px; line-height: 1; letter-spacing: -.04em; }
+.price-main small { font-size: 16px; letter-spacing: 0; }
+
+.price-context { display: flex; flex-direction: column; justify-content: center; padding: 18px 20px; }
+.price-context strong { display: block; margin-bottom: 5px; font-size: 16px; }
+.price-context p { margin: 0; color: #506158; font-size: 13px; line-height: 1.45; }
+
+.hourly-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+  padding: 12px 15px;
+  border: 1px dashed rgba(18, 62, 43, .28);
+  border-radius: 13px;
+  background: #fff;
+}
+
+.hourly-badge {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border-radius: 7px;
+  color: var(--forest);
+  background: #e6f5e4;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.hourly-option strong { display: block; margin-bottom: 2px; font-size: 13px; }
+.hourly-option p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.hourly-option b { color: var(--forest); }
 
 .campaign-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 
@@ -287,7 +326,7 @@ h1 {
   color: #fff;
 }
 
-.visual-signature img { width: 48px; height: 48px; object-fit: contain; filter: brightness(0) invert(1); }
+.visual-signature img { width: 52px; height: 52px; padding: 5px; border-radius: 10px; object-fit: contain; background: #fff; }
 .visual-signature span { display: grid; }
 .visual-signature strong { font-size: 15px; }
 .visual-signature small { color: rgba(255, 255, 255, .72); }
@@ -393,8 +432,11 @@ h1 {
   .location-label { max-width: 100px; text-align: right; }
   h1 { font-size: clamp(38px, 13vw, 54px); }
   .campaign-intro { font-size: 16px; }
-  .offer-highlight { align-items: flex-start; padding: 15px; }
-  .offer-icon { flex-basis: 40px; width: 40px; height: 40px; }
+  .price-offer { grid-template-columns: 1fr; }
+  .price-main { min-width: 0; padding: 16px 18px; }
+  .price-main strong { font-size: 34px; }
+  .price-context { padding: 16px 18px; }
+  .hourly-option { align-items: flex-start; }
   .campaign-actions .primary-cta { width: 100%; }
   .campaign-actions .phone-link { display: none; }
   .campaign-meta { display: grid; }

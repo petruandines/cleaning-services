@@ -58,8 +58,13 @@
     setText('[data-kicker]', offer.kicker);
     setText('[data-title]', offer.title);
     setText('[data-subtitle]', offer.subtitle);
-    setText('[data-offer-title]', offer.offerTitle);
+    setText('[data-price]', offer.price);
+    setText('[data-price-unit]', offer.priceUnit);
+    setText('[data-price-context]', offer.priceContext);
     setText('[data-offer-description]', offer.offerDescription);
+    setText('[data-hourly-title]', offer.hourlyTitle);
+    setText('[data-hourly-price]', offer.hourlyPrice);
+    setText('[data-hourly-description]', offer.hourlyDescription);
     setText('[data-cta-label]', offer.ctaLabel);
     setText('[data-valid-until]', offer.validUntilLabel);
     setText('[data-updated-at]', offer.updatedAtLabel);
