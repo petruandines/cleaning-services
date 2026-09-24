@@ -3,6 +3,7 @@
   "main": "src/index.mjs",
   "compatibility_date": "2026-09-24",
   "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "./public" },
   "d1_databases": [{
     "binding": "DB",
     "database_name": "petru-ines-portal-eu",
