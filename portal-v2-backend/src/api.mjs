@@ -53,8 +53,9 @@ export async function handleApi(request, { db, auth }) {
   const staff = session.user.role === 'admin';
 
   if (name === 'me' && request.method === 'GET') {
-    return json({ id: userId, name: session.user.name, role: staff ? 'staff' : 'client' });
+    return json({ id: userId, name: session.user.name, role: staff ? 'staff' : 'client', twoFactorRequired: staff && session.user.twoFactorEnabled !== true });
   }
+  if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
   if (name === 'clients' && request.method === 'GET') {
     if (!staff) return error(403, 'forbidden');
     const result = await db.prepare('SELECT id, kind, display_name, email, phone, company_name, cui, status FROM clients ORDER BY created_at DESC LIMIT ?').bind(LIMIT).all();
