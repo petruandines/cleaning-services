@@ -28,6 +28,15 @@ function setup() {
         async run() { return statement.run(...args); },
       }; }};
     },
+    async batch(statements) {
+      sqlite.exec('BEGIN');
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
+    },
   };
   const auth = { api: { async getSession({ headers }) {
     const token = headers.get('Authorization')?.replace(/^Bearer /, '');
@@ -73,7 +82,8 @@ test('message write derives company from session, ignores forged client ID', asy
   });
   assert.equal(response.status, 201);
   assert.equal(sqlite.prepare('SELECT client_id FROM messages').get().client_id, 'a');
-  assert.equal((await call('messages', 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"body":"salut"}' })).status, 403);
+  assert.equal(sqlite.prepare('SELECT client_id, actor_user_id FROM audit_events').get().actor_user_id, 'user_a');
+  assert.equal((await call('messages', 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"body":"salut"}' })).status, 400);
 });
 
 test('staff data stays closed until TOTP is enabled', async () => {
@@ -81,4 +91,63 @@ test('staff data stays closed until TOTP is enabled', async () => {
   assert.equal((await call('clients', 'admin_pending')).status, 403);
   const me = await (await call('me', 'admin_pending')).json();
   assert.equal(me.twoFactorRequired, true);
+});
+
+test('staff creates a complete client history with atomic audit; client isolation stays intact', async () => {
+  const { call, sqlite } = setup();
+  const post = async (table, data, token = 'admin') => call(table, token, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+  const created = await post('clients', { kind: 'PJ', display_name: 'Firma Exemplu', email: 'office@example.test' });
+  assert.equal(created.status, 201);
+  const client = (await created.json()).id;
+  const location = await post('locations', { client_id: client, label: 'Sediu', address: 'Str. Exemplu 1', city: 'București', county: 'București' });
+  assert.equal(location.status, 201);
+  const locationId = (await location.json()).id;
+  const appointment = await post('appointments', {
+    client_id: client, location_id: locationId, starts_at: '2026-10-01T08:00:00.000Z', ends_at: '2026-10-01T10:00:00.000Z',
+    estimated_cost_bani: 70000,
+  });
+  assert.equal(appointment.status, 201);
+  const job = await post('jobs', {
+    client_id: client, appointment_id: (await appointment.json()).id, service_name: 'Curățenie', price_bani: 70000,
+  });
+  assert.equal(job.status, 201);
+  const payment = await post('payments', {
+    client_id: client, job_id: (await job.json()).id, amount_bani: 70000, status: 'confirmed',
+  });
+  assert.equal(payment.status, 201);
+  const message = await post('messages', { client_id: client, body: 'Bună ziua!' });
+  assert.equal(message.status, 201);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM audit_events WHERE client_id = ?').get(client).n, 6);
+  assert.equal(sqlite.prepare('SELECT recorded_at FROM payments WHERE id = ?').get((await payment.json()).id).recorded_at !== null, true);
+  assert.equal((await (await call('payments', 'a')).json()).rows.length, 0);
+  assert.equal((await (await call('clients', 'a', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"kind":"PF"}' })).status), 403);
+});
+
+test('cross-client references and invalid money cannot be written', async () => {
+  const { call, sqlite } = setup();
+  const post = (table, data, token = 'admin') => call(table, token, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+  const start = '2026-10-01T08:00:00.000Z', end = '2026-10-01T10:00:00.000Z';
+  assert.equal((await post('appointments', { client_id: 'a', location_id: 'loc_b', starts_at: start, ends_at: end })).status, 400);
+  assert.equal((await post('jobs', { client_id: 'a', appointment_id: 'ap_b', service_name: 'Curățenie' })).status, 400);
+  const job = await post('jobs', { client_id: 'b', service_name: 'Curățenie' });
+  assert.equal(job.status, 201);
+  const jobId = (await job.json()).id;
+  assert.equal((await post('payments', { client_id: 'a', job_id: jobId, amount_bani: 50000 })).status, 400);
+  assert.equal((await post('payments', { client_id: 'b', job_id: jobId, amount_bani: -1 })).status, 400);
+  assert.equal((await post('clients', { kind: 'PF', display_name: 'Test', role: 'admin' })).status, 400);
+  assert.equal((await post('locations', { client_id: 'a', label: 'x', address: 'y', city: 'z', county: 'q' }, 'admin_pending')).status, 403);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payments').get().n, 0);
+});
+
+test('failed audit rolls back the business record', async () => {
+  const { call, sqlite } = setup();
+  sqlite.exec("CREATE TRIGGER fail_audit BEFORE INSERT ON audit_events BEGIN SELECT RAISE(ABORT, 'audit failed'); END");
+  await assert.rejects(() => call('clients', 'admin', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'PF', display_name: 'Nu rămâne în bază' }),
+  }));
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM clients').get().n, 2);
 });
