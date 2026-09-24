@@ -5,12 +5,16 @@ import { DatabaseSync } from 'node:sqlite';
 import { handleApi, ORIGIN } from '../src/api.mjs';
 
 const schema = readFileSync(new URL('../../docs/portal-v2/0001_app_schema.sql', import.meta.url), 'utf8');
+const authSchema = readFileSync(new URL('../../docs/portal-v2/0002_auth.sql', import.meta.url), 'utf8');
+const accountSchema = readFileSync(new URL('../../docs/portal-v2/0003_portal_accounts.sql', import.meta.url), 'utf8');
 const now = '2026-09-24T10:00:00Z';
 
 function setup() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys = ON');
   sqlite.exec(schema);
+  sqlite.exec(authSchema);
+  sqlite.exec(accountSchema);
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
       .run(id, 'PF', id, now, now);
