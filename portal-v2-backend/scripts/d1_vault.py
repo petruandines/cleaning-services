@@ -142,7 +142,7 @@ def export_database(name, scope, target, key):
     print("Encrypted export saved. Verify it with 'verify' and keep the key separately.")
 
 
-def restore_local_test(source, key):
+def restore_local_test(source, key, expect_client_id=None):
     with tempfile.TemporaryDirectory(prefix="pi-d1-restore-") as directory:
         temp = Path(directory)
         plaintext = temp / "export.sql"
@@ -170,6 +170,12 @@ def restore_local_test(source, key):
                 "SELECT name FROM sqlite_schema WHERE type = 'table'")}
             if not {"clients", "portal_accounts", "user", "audit_events"}.issubset(tables):
                 raise ValueError("Restored database is missing portal tables")
+            if expect_client_id is not None:
+                count = restored.execute(
+                    "SELECT count(*) FROM clients WHERE id = ?", (expect_client_id,)
+                ).fetchone()[0]
+                if count != 1:
+                    raise ValueError("Expected client was not restored")
     print("Encrypted backup restored into an isolated local D1; integrity and foreign keys verified.")
 
 
@@ -186,6 +192,8 @@ def main():
         command = actions.add_parser(action)
         command.add_argument("--input", required=True)
         command.add_argument("--key", required=True)
+        if action == "restore-local-test":
+            command.add_argument("--expect-client-id")
     command = actions.add_parser("export")
     command.add_argument("--database", required=True)
     command.add_argument("--scope", choices=("local", "remote"), required=True)
@@ -203,7 +211,7 @@ def main():
             decrypt(args.input, read_key(args.key))
             print("Encrypted backup authentication succeeded.")
         elif args.action == "restore-local-test":
-            restore_local_test(args.input, read_key(args.key))
+            restore_local_test(args.input, read_key(args.key), args.expect_client_id)
         else:
             export_database(args.database, args.scope, args.out, read_key(args.key))
     except (ValueError, InvalidTag, FileExistsError, OSError, subprocess.CalledProcessError) as error:
