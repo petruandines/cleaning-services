@@ -1,0 +1,16 @@
+{
+  "name": "petru-ines-portal-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "better-auth": "1.7.5"
+  },
+  "devDependencies": {
+    "wrangler": "4.40.0"
+  }
+}
