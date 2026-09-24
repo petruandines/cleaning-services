@@ -49,6 +49,10 @@
   let section = 'appointments';
   let loginWindow = null;
   let loginState = null;
+  let accountWindow = null;
+  let accountState = null;
+  let accountClientId = '';
+  let accountClientLabel = '';
   let generation = 0;
   let offset = 0;
   let nextOffset = null;
@@ -63,16 +67,20 @@
   }
   function clearSession() {
     generation++;
+    if (accountWindow && !accountWindow.closed) accountWindow.close();
     token = null;
     user = null;
     loginState = null;
     loginWindow = null;
+    accountWindow = null;
+    accountState = null;
     $('workspace').hidden = true;
     $('welcome').hidden = false;
     $('content').replaceChildren();
     $('message-form').hidden = true;
     $('staff-form').hidden = true;
     $('staff-tools').hidden = true;
+    $('account-panel').hidden = true;
     $('pager').hidden = true;
     currentClientId = '';
     currentClientLabel = '';
@@ -243,6 +251,22 @@
     picker.value = currentClientId;
     if (section === 'clients') { offset = 0; loadSection(); }
   }
+  async function refreshAccounts() {
+    const client = currentClientId;
+    $('account-panel').hidden = user?.role !== 'staff' || !client;
+    if ($('account-panel').hidden) { $('account-list').replaceChildren(); return; }
+    const requestGeneration = generation;
+    const result = await api('/api/users?client_id=' + encodeURIComponent(client));
+    if (requestGeneration !== generation || currentClientId !== client) return;
+    const list = $('account-list');
+    list.replaceChildren();
+    if (!result.rows.length) { list.textContent = 'Nu există încă utilizatori pentru acest client.'; return; }
+    for (const row of result.rows) {
+      const line = document.createElement('p');
+      line.textContent = row.name + ' · ' + row.email;
+      list.append(line);
+    }
+  }
   function pageUrl() {
     const params = new URLSearchParams({ offset: String(offset) });
     if (user?.role === 'staff' && section === 'clients' && $('client-search').value.trim())
@@ -314,6 +338,19 @@
   });
 
   window.addEventListener('message', async event => {
+    if (ready() && event.origin === API && accountWindow && event.source === accountWindow &&
+      accountState && event.data?.state === accountState) {
+      if (event.data.type === 'portal-account-ready' && token && user?.role === 'staff') {
+        accountWindow.postMessage({ type: 'portal-account-start', state: accountState,
+          token, clientId: accountClientId, clientLabel: accountClientLabel }, API);
+      } else if (event.data.type === 'portal-account-created') {
+        accountWindow = null;
+        accountState = null;
+        refreshAccounts().catch(error => notice(error.message));
+        notice('Contul de client a fost creat.');
+      }
+      return;
+    }
     if (!ready() || event.origin !== API || !loginWindow || event.source !== loginWindow ||
       !loginState || event.data?.type !== 'petru-ines-auth' || event.data.state !== loginState ||
       typeof event.data.token !== 'string' || !event.data.token) return;
@@ -348,6 +385,17 @@
     currentClientLabel = event.target.selectedOptions[0]?.textContent || '';
     offset = 0;
     loadSection();
+    refreshAccounts().catch(error => notice(error.message));
+  });
+  $('open-account').addEventListener('click', () => {
+    if (!ready() || !token || user?.role !== 'staff' || !currentClientId) return;
+    const random = new Uint8Array(16);
+    crypto.getRandomValues(random);
+    accountState = Array.from(random, byte => byte.toString(16).padStart(2, '0')).join('');
+    accountClientId = currentClientId;
+    accountClientLabel = currentClientLabel;
+    accountWindow = window.open(API + '/account.html?state=' + accountState, 'petru-ines-account', 'popup=yes,width=520,height=720');
+    if (!accountWindow) { accountState = null; notice('Permite fereastra pentru crearea contului.'); }
   });
   function leiToBani(value) {
     const normalized = value.trim().replace(',', '.');
@@ -376,6 +424,7 @@
         currentClientLabel = data.display_name;
         $('client-search').value = data.display_name;
         await refreshClientChoices();
+        await refreshAccounts();
       }
       formKey = '';
       await loadSection();
