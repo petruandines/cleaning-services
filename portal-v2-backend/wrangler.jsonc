@@ -1,0 +1,15 @@
+{
+  "name": "petru-ines-portal-api",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-09-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "petru-ines-portal-eu",
+    "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+    "migrations_dir": "../docs/portal-v2"
+  }],
+  "vars": {
+    "PUBLIC_API_URL": "https://REPLACE_WITH_WORKER_URL.workers.dev"
+  }
+}
