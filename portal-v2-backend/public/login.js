@@ -3,7 +3,7 @@
   const portalOrigin = 'https://petruandines.github.io';
   const state = new URL(location.href).searchParams.get('state');
   const $ = id => document.getElementById(id);
-  const views = ['sign-in', 'totp', 'enroll'];
+  const views = ['sign-in', 'totp', 'enroll', 'change-password'];
   let pendingToken = null;
 
   function show(view) {
@@ -35,6 +35,7 @@
     const user = await me.json();
     pendingToken = token;
     if (user.twoFactorRequired) { show('enroll'); return; }
+    if (user.mustChangePassword) { show('change-password'); return; }
     if (!window.opener || !/^[a-f0-9]{32}$/.test(state || '')) throw new Error('Portal session unavailable');
     window.opener.postMessage({ type: 'petru-ines-auth', state, token, user }, portalOrigin);
     pendingToken = null;
@@ -74,6 +75,29 @@
       form.elements.code.value = '';
       await complete(response);
     } catch { form.elements.code.value = ''; fail(); }
+    finally { button.disabled = false; }
+  });
+
+  $('change-password-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button');
+    if (form.elements.new.value !== form.elements.confirm.value ||
+      form.elements.new.value === form.elements.current.value) { fail(); return; }
+    button.disabled = true;
+    try {
+      const response = await fetch('/api/password', {
+        method: 'POST', credentials: 'omit', cache: 'no-store',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + pendingToken },
+        body: JSON.stringify({ currentPassword: form.elements.current.value, newPassword: form.elements.new.value }),
+      });
+      if (!response.ok) throw new Error('Password change failed');
+      const result = await response.json();
+      if (!result.token) throw new Error('Missing rotated token');
+      pendingToken = result.token;
+      form.reset();
+      await complete(new Response());
+    } catch { form.elements.current.value = ''; fail(); }
     finally { button.disabled = false; }
   });
 
