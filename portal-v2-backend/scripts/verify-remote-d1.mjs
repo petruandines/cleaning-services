@@ -13,6 +13,12 @@ export function assertDatabaseIdentity(actual, expected) {
   }
 }
 
+export function parseWranglerJson(output) {
+  // Some managed runners prepend this informational proxy line to stdout.
+  const json = output.replace(/^Proxy environment variables detected\. We'll use your proxy for fetch requests\.\r?\n/, '');
+  return JSON.parse(json);
+}
+
 export function expectedDatabase(config) {
   const databases = config?.d1_databases;
   if (!Array.isArray(databases) || databases.length !== 1 || databases[0]?.binding !== 'DB' ||
@@ -29,7 +35,7 @@ export function verifyRemoteD1() {
   const raw = execFileSync(process.execPath,
     [wrangler, 'd1', 'info', expected.database_name, '--json'],
     { cwd: ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
-  assertDatabaseIdentity(JSON.parse(raw), expected);
+  assertDatabaseIdentity(parseWranglerJson(raw), expected);
   return { expected, wrangler, root: ROOT };
 }
 
