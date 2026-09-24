@@ -57,22 +57,36 @@ export async function handleApi(request, { db, auth }) {
     return json({ id: userId, name: session.user.name, role: staff ? 'staff' : 'client', twoFactorRequired: staff && session.user.twoFactorEnabled !== true });
   }
   if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
-  if (name === 'clients' && request.method === 'GET') {
-    if (!staff) return error(403, 'forbidden');
-    const result = await db.prepare('SELECT id, kind, display_name, email, phone, company_name, cui, status FROM clients ORDER BY created_at DESC LIMIT ?').bind(LIMIT).all();
-    return json({ rows: result.results });
-  }
   if (name !== 'clients' && !Object.hasOwn(lists, name)) return error(404, 'not_found');
 
   if (request.method === 'GET') {
-    if (name === 'clients') return error(403, 'forbidden');
+    if (name === 'clients' && !staff) return error(403, 'forbidden');
+    const offsetValue = url.searchParams.get('offset') || '0';
+    if (!/^\d{1,6}$/.test(offsetValue)) return error(400, 'invalid_offset');
+    const offset = Number(offsetValue);
+    const search = url.searchParams.get('search');
+    const clientId = url.searchParams.get('client_id');
+    if (search !== null && (name !== 'clients' || search.trim().length > 120)) return error(400, 'invalid_search');
+    if (clientId !== null && (!staff || name === 'clients' || !/^[a-zA-Z0-9_-]{1,100}$/.test(clientId))) return error(400, 'invalid_filter');
     // Only constant SQL fragments are interpolated. IDs never become SQL source.
-    const sql = staff
-      ? `SELECT ${lists[name]} FROM ${name} ORDER BY ${order[name]} LIMIT ?`
-      : `SELECT ${lists[name]} FROM ${name} WHERE client_id IN (SELECT client_id FROM client_users WHERE user_id = ?) ORDER BY ${order[name]} LIMIT ?`;
-    const query = db.prepare(sql);
-    const result = await (staff ? query.bind(LIMIT) : query.bind(userId, LIMIT)).all();
-    return json({ rows: result.results });
+    let sql, params;
+    if (name === 'clients') {
+      sql = 'SELECT id, kind, display_name, email, phone, company_name, cui, status FROM clients';
+      params = [];
+      if (search?.trim()) { sql += ' WHERE instr(lower(display_name), lower(?)) > 0'; params.push(search.trim()); }
+      sql += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
+    } else {
+      sql = `SELECT ${lists[name]} FROM ${name}`;
+      params = [];
+      if (staff && clientId) { sql += ' WHERE client_id = ?'; params.push(clientId); }
+      if (!staff) {
+        sql += ' WHERE client_id IN (SELECT client_id FROM client_users WHERE user_id = ?)';
+        params.push(userId);
+      }
+      sql += ` ORDER BY ${order[name]}, id DESC LIMIT ? OFFSET ?`;
+    }
+    const result = await db.prepare(sql).bind(...params, LIMIT + 1, offset).all();
+    return json({ rows: result.results.slice(0, LIMIT), nextOffset: result.results.length > LIMIT ? offset + LIMIT : null });
   }
 
   if (request.method === 'POST') {
