@@ -1,0 +1,29 @@
+{
+  "name": "cleaning-services",
+  "version": "1.0.0",
+  "description": "Site HTML/CSS/JavaScript pregătit pentru GitHub Pages în repository-ul `cleaning-services`.",
+  "scripts": {
+    "build:portal": "esbuild portal/src/entry.mjs --bundle --minify --target=es2020 --outfile=portal/app.js",
+    "test:portal": "node --test portal/tests/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/petruandines/cleaning-services.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/petruandines/cleaning-services/issues"
+  },
+  "homepage": "https://github.com/petruandines/cleaning-services#readme",
+  "dependencies": {
+    "appwrite": "27.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.1"
+  },
+  "private": true
+}

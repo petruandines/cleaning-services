@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://fra.cloud.appwrite.io; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta name="theme-color" content="#16842a"><title>Portal clienți · Petru & Inés</title>
+<link rel="icon" href="../assets/img/favicon-32.png"><link rel="stylesheet" href="portal.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Sari la conținut</a>
+<header><a class="brand" href="../"><img src="../assets/img/brandmark.webp" alt="" width="44" height="44"><span>PETRU & INÉS<small>PORTAL CLIENȚI</small></span></a><a class="back" href="../">Înapoi la site ↗</a></header>
+<main id="main">
+<section id="login-view" class="login-layout">
+<div class="intro"><span class="eyebrow">Mai aproape de noi</span><h1>Totul despre<br>curățenia ta.<br><em>Într-un singur loc.</em></h1><p>Programări, lucrări și facturi. Informațiile colaborării tale cu Petru & Inés, simplu și la îndemână.</p><div class="features"><span>01 <b>Programările tale</b></span><span>02 <b>Istoricul lucrărilor</b></span><span>03 <b>Facturi și documente</b></span></div><small>București & Ilfov · Luni–Vineri, 05:00–20:00</small></div>
+<div class="login-card"><span class="eyebrow">Bine ai revenit</span><h2>Intră în cont</h2><p>Folosește adresa de e-mail și parola primite de la noi.</p><form id="login-form"><label>E-mail<input name="email" type="email" autocomplete="username" required maxlength="254" inputmode="email"></label><label>Parolă<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary" type="submit">Intră în cont <span aria-hidden="true">→</span></button></form><p class="help">Nu ai cont sau ai uitat parola?<br><a href="https://wa.me/40772053562" target="_blank" rel="noopener noreferrer">Scrie-ne pe WhatsApp ↗</a></p></div>
+</section>
+<section id="workspace" hidden><div class="workspace-top"><div><span id="role-label" class="eyebrow"></span><h1 id="greeting"></h1><p id="account-label"></p></div><button id="logout" class="secondary">Ieși din cont</button></div><nav id="tabs" aria-label="Secțiuni portal"></nav><div class="section-heading"><div><h2 id="section-title"></h2><p id="section-description"></p></div><div class="actions"><button id="refresh" class="secondary">Actualizează</button><button id="new-client" class="primary" hidden>+ Client nou</button></div></div><div id="content" aria-live="polite"></div><div class="pager"><button id="previous" class="secondary" hidden>← Înapoi</button><span id="page-label"></span><button id="next" class="secondary" hidden>Mai multe →</button></div></section>
+<div id="notice" role="status" aria-live="polite" hidden></div>
+<noscript>Activează JavaScript pentru a folosi portalul.</noscript>
+</main>
+<footer><span>Petru & Inés · Lucrăm cu grijă, comunicăm direct.</span><a href="tel:+40772053562">0772 053 562</a><span>Plata exclusiv prin transfer bancar.</span></footer>
+<dialog id="client-dialog" aria-labelledby="client-title"><div class="dialog-header"><div><span class="eyebrow">Administrare</span><h2 id="client-title">Client nou</h2></div><button id="close-dialog" class="secondary" aria-label="Închide formularul">✕</button></div><p>Creează un cont și un profil de client. Transmite personal datele de acces clientului.</p><form id="client-form"><div class="form-grid"><label>Cod client<input name="client_code" required maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,39}" placeholder="Ex.: PI-001"></label><label>Tip client<select name="client_type"><option>PF</option><option>PJ</option></select></label><label class="wide">Nume afișat<input name="display_name" required maxlength="128"></label><label>E-mail<input name="email" type="email" required maxlength="254" autocomplete="off"></label><label>Telefon<input name="phone" type="tel" maxlength="32"></label><label class="wide">Parolă inițială<input name="password" type="password" required minlength="12" maxlength="256" autocomplete="new-password"><small>Cel puțin 12 caractere. Parola nu apare în profilul clientului.</small></label><label>Persoană de contact<input name="contact_name" maxlength="200"></label><label>Denumire firmă<input name="company_name" maxlength="200"></label><label>CUI<input name="cui" maxlength="32"></label><label class="wide">Adresă de facturare<textarea name="billing_address" maxlength="1000" rows="2"></textarea></label></div><p id="client-notice" role="status" aria-live="polite"></p><button class="primary" type="submit">Creează contul clientului</button></form></dialog>
+</body></html>

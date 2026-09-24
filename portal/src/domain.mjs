@@ -1,0 +1,13 @@
+export const config = Object.freeze({ endpoint:'https://fra.cloud.appwrite.io/v1', project:'6ab27521001bf3416a5f', database:'petru_ines_portal', team:'staff', functionId:'create-client', bucket:'invoices' });
+export const money = value => value === null || value === undefined ? 'De stabilit' : new Intl.NumberFormat('ro-RO',{style:'currency',currency:'RON'}).format(value / 100);
+export const date = value => { if (!value) return '—'; const d = new Date(value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('ro-RO',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Bucharest'}).format(d); };
+export const labels = {requested:'Solicitată',confirmed:'Confirmată',in_progress:'În desfășurare',completed:'Finalizată',cancelled:'Anulată',issued:'Emisă',paid:'Achitată',active:'Activ',inactive:'Inactiv'};
+export function isStaff(result,userId) { return result.memberships?.some(m=>m.userId===userId && m.confirm===true) === true; }
+export function clientPayload(form) {
+ const data=Object.fromEntries(form); data.client_code=data.client_code.trim().toUpperCase(); data.email=data.email.trim().toLowerCase();
+ for(const key of Object.keys(data)) if(key!=='password') data[key]=data[key].trim();
+ if(data.client_type==='PJ' && (!data.company_name || !data.cui)) throw new Error('Pentru persoanele juridice, completează denumirea firmei și CUI.');
+ return data;
+}
+export const functionErrors={invalid_client_data:'Verifică datele completate. Parola trebuie să aibă cel puțin 12 caractere.',client_code_conflict:'Codul clientului este deja folosit. Alege un alt cod.',account_conflict_review_required:'Există deja un cont cu aceste date. Verifică în Appwrite înainte de a încerca din nou.',profile_creation_unconfirmed_review_required:'Contul poate fi creat, dar profilul nu este confirmat. Verifică în Appwrite înainte de a reîncerca.',account_creation_unconfirmed:'Crearea contului nu este confirmată. Verifică în Appwrite înainte de a reîncerca.',staff_required:'Contul nu are drept de administrare.',staff_verification_failed:'Nu am putut confirma drepturile de administrator.',configuration_required:'Serviciul necesită verificarea configurației.'};
+export const sections={appointments:['Programări','Datele și starea programărilor tale.'],interventions:['Intervenții','Lucrările efectuate și costurile lor.'],invoices:['Facturi','Documentele tale și situația plăților.'],locations:['Locații','Adresele înregistrate pentru colaborarea noastră.'],messages:['Mesaje','Comunicările primite de la Petru & Inés.'],clients:['Clienți','Conturile și datele de contact ale clienților.'],internal_notes:['Note interne','Informații vizibile doar echipei.']};
