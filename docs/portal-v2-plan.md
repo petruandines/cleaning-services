@@ -35,7 +35,7 @@ https://better-auth.com/docs/plugins/bearer
 - Cheile, secretele și datele reale nu se comit în repository. În tabele păstrăm numai datele necesare serviciului. Prețurile se stochează în bani, `700,00 lei` se afișează în interfață.
 - Nu există garanție de disponibilitate perpetuă sau de păstrare a planului gratuit. Pe Free, la depășirea cotelor D1 interogările pot eșua până la resetare. Se păstrează exportul portabil și un plan de recuperare.
 
-## Modelul de date v1, de implementat după decizia de autentificare
+## Modelul de date v1
 
 Tabele de aplicație:
 
@@ -62,7 +62,7 @@ Nu considerăm Time Travel drept backup extern. Prima livrare trebuie să includ
 ## Etape verificabile
 
 1. Forma URL este confirmată. Stabilim ce date din Appwrite, dacă există, trebuie migrate. Nu introducem date de clienți reali în test.
-2. Creăm în repository privat backendul, schema D1 și migrațiile; rulăm teste locale cu două identități client și una staff.
+2. Creăm în ramura de lucru backendul, schema D1 și migrațiile; rulăm teste locale cu două identități client și una staff.
 3. Implementăm API-ul și autentificarea; testăm accesul direct la ID-ul altui client, schimbarea parolei, revocarea sesiunii, rate limit și 2FA admin.
 4. Refacem interfața existentă pentru noul API, scoatem ecranele de facturi/documente, adăugăm trimiterea mesajelor și gestionarea programărilor; verificăm pe mobil.
 5. Configurăm D1 UE, secrete, Worker și backup; executăm export + restaurare într-o bază separată. Abia după acestea conectăm interfața la clienți reali.
@@ -72,9 +72,10 @@ Nu considerăm Time Travel drept backup extern. Prima livrare trebuie să includ
 
 La o sesiune nouă: citește mai întâi **acest fișier**, `portal/README.md` și ultimele commit-uri/PR-uri din proiect. Verifică starea curentă din cod; nu reface comparația de platforme, schema sau cercetarea de prețuri fără un motiv concret. Lucrează într-un singur pas verificabil pe sesiune, actualizează aici: **finalizat / testat / următorul pas / blocaje / commit sau PR**. Încheie înainte de limita de credite cu un commit al lucrului valid și cu blocajele scrise clar. Nu trece la implementarea loginului sau la date reale pe baza unei presupuneri.
 
-### Stare la 24 septembrie 2026
+### Stare la 24 septembrie 2026 — actualizare după previzualizarea loginului
 
-- Finalizat: decizia URL; schema aplicației cu 8 tabele și schema Better Auth 1.7.5 generate în `docs/portal-v2/`; Worker API în `portal-v2-backend/`, inclusiv configurare de autentificare și teste. Toate sunt numai în ramura `codex/portal-v2-plan`; site-ul publicat folosește încă Appwrite.
-- Testat: ambele migrații aplicate în D1 local cu Wrangler; 3 teste API trec (anonim și origin străin respins, client A/B izolați, mesajul nu acceptă `client_id` falsificat); compilarea Workerului trece cu `wrangler deploy --dry-run`. Testul local interactiv `wrangler dev` nu a putut porni aici din cauza erorii mediului `uv_interface_addresses`. Autentificarea reală și Cloudflare remote nu sunt încă testate.
-- Următorul pas: test autentic Better Auth + D1 cu două conturi fictive și unul staff într-un mediu în care `wrangler dev` pornește; implementarea completă a creării conturilor și a 2FA, backup criptat/restaurare, apoi conectarea interfeței de pe GitHub Pages și testele de browser. Codul backend este în repository-ul public fără secrete; permisiunile trebuie să rămână exclusiv server-side.
-- Blocaje pentru deployment: contul Cloudflare nu este conectat la această sesiune; D1 UE și URL-ul Worker încă nu există. Nu publica Workerul sau noul login până la testele reale, backup și restore. `BETTER_AUTH_SECRET` trebuie setat ca secret, iar valorile `REPLACE_WITH_*` din `wrangler.jsonc` înlocuite numai la configurare.
+- Finalizat în PR #1, ramura `codex/portal-v2-plan`: schema aplicației și Better Auth 1.7.5; Worker API cu listări izolate pe client, mesaj de la client, blocare staff fără 2FA; pagină de login pe Worker cu parolă, TOTP și activarea TOTP pentru echipă; interfață separată în `portal-v2-frontend/` pentru programări, lucrări, plăți, mesaje, locații și clienți. Frontendul comunică printr-un popup cu verificarea exactă a originului, ferestrei și unui nonce; verifică sesiunea la `/api/me`, ține tokenul numai în memoria paginii.
+- Testat în acest mediu: 5 teste API trec, inclusiv izolarea client A/B, controlul 2FA pentru staff și originul popupului; `node --check` trece pentru scripturile noi; `wrangler deploy --dry-run` compilează cu resursele statice. Migrațiile au fost aplicate anterior în D1 local. **Nu a fost testat fluxul complet Better Auth în browser / Safari**: `wrangler dev` nu pornește în acest mediu (`uv_interface_addresses`), iar tabloul Cloudflare a rămas blocat la verificarea browserului.
+- Nu s-a modificat `portal/` pe ramura publicată: portalul live continuă să folosească Appwrite. `portal-v2-frontend/config.js`, CSP-ul interfeței și `wrangler.jsonc` conțin încă `REPLACE_WITH_*`; nu există D1 UE sau Worker creat.
+- Următorul pas tehnic: operațiile staff (crearea clientului, locației, programării, lucrării, plății și răspunsului) cu autorizare și audit, apoi bootstrap conturi, schimbarea parolei inițiale și teste reale de autentificare/2FA. După configurarea D1 UE și Worker: export criptat + probă de restaurare într-o bază separată, test Safari/mobil, comutarea controlată a căii exacte `/cleaning-services/portal/`.
+- Criteriu de lansare: nu comuta `portal/` și nu importa date reale înainte de testele de izolare, autentificare, recuperare și verificarea de către proprietar a interfeței. La reluare începe cu acest checkpoint și fișierele din PR #1; nu repeta cercetarea de platforme sau schema fără o constatare nouă.
