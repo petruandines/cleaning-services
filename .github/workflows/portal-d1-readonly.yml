@@ -2,11 +2,6 @@ name: Portal D1 identity (read only)
 
 on:
   workflow_dispatch:
-    inputs:
-      cloudflare_account_id:
-        description: Cloudflare account ID (32 hexadecimal characters, not a secret)
-        required: true
-        type: string
 
 permissions: {}
 
@@ -16,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
       D1_READ_TOKEN: ${{ secrets.PORTAL_D1_READ_TOKEN }}
     steps:
       - name: Compare Cloudflare D1 metadata with the portal configuration
