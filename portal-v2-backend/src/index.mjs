@@ -24,6 +24,8 @@ export default {
     // arrive from GitHub Pages; reject every other browser origin.
     if (origin && origin !== ORIGIN && origin !== url.origin) return new Response('Forbidden', { status: 403 });
     if (url.pathname.startsWith('/api/auth/')) {
+      // Account creation/roles go through the audited portal endpoint only.
+      if (url.pathname.startsWith('/api/auth/admin/')) return new Response('Not found', { status: 404 });
       // Only the Worker's own login popup handles credentials. The Pages
       // frontend needs a cross-origin request solely to revoke its session.
       if (origin === ORIGIN && url.pathname !== '/api/auth/sign-out') return new Response('Forbidden', { status: 403 });
