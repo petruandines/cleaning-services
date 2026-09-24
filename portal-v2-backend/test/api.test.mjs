@@ -151,3 +151,29 @@ test('failed audit rolls back the business record', async () => {
   }));
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM clients').get().n, 2);
 });
+
+test('staff can page through clients and search by a literal name', async () => {
+  const { call, sqlite } = setup();
+  for (let i = 0; i < 32; i++) {
+    sqlite.prepare('INSERT INTO clients (id, kind, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run('extra_' + i, 'PF', i === 0 ? 'Ana_Exemplu' : 'Client ' + i, now, now);
+  }
+  const first = await (await call('clients', 'admin')).json();
+  assert.equal(first.rows.length, 30);
+  assert.equal(first.nextOffset, 30);
+  const second = await (await call('clients?offset=30', 'admin')).json();
+  assert.equal(second.rows.length, 4);
+  assert.equal(second.nextOffset, null);
+  assert.equal(new Set([...first.rows, ...second.rows].map(row => row.id)).size, 34);
+  const search = await (await call('clients?search=ana_exemplu', 'admin')).json();
+  assert.deepEqual(search.rows.map(row => row.display_name), ['Ana_Exemplu']);
+  assert.equal((await call('clients?offset=-1', 'admin')).status, 400);
+});
+
+test('staff client filter works but cannot alter client account isolation', async () => {
+  const { call } = setup();
+  const staff = await (await call('appointments?client_id=b', 'admin')).json();
+  assert.deepEqual(staff.rows.map(row => row.id), ['ap_b']);
+  assert.equal((await call('appointments?client_id=b', 'a')).status, 400);
+  assert.deepEqual((await (await call('appointments', 'a')).json()).rows.map(row => row.id), ['ap_a']);
+});
