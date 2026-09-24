@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
+    "migrate:remote": "node scripts/migrate-remote.mjs",
     "generate:auth": "auth generate --config auth.config.mjs --output ../docs/portal-v2/0002_auth.sql --yes",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
