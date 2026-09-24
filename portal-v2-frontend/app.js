@@ -14,12 +14,48 @@
     locations: { label: 'Nume', address: 'Adresă', city: 'Oraș', county: 'Județ' },
     clients: { display_name: 'Nume', kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI', status: 'Stare' },
   };
+  const forms = {
+    clients: [
+      ['kind', 'Tip client', 'select', true, [['PF', 'Persoană fizică'], ['PJ', 'Firmă']]],
+      ['display_name', 'Nume afișat', 'text', true, 160], ['email', 'E-mail', 'email', false, 254],
+      ['phone', 'Telefon', 'tel', false, 40], ['company_name', 'Nume firmă', 'text', false, 160],
+      ['cui', 'CUI', 'text', false, 30],
+    ],
+    locations: [
+      ['label', 'Nume locație', 'text', true, 160], ['address', 'Adresă', 'text', true, 300],
+      ['city', 'Oraș', 'text', true, 120], ['county', 'Județ', 'text', true, 120],
+    ],
+    appointments: [
+      ['location_id', 'Locație', 'related', true, 'locations'],
+      ['starts_at', 'Început', 'datetime-local', true], ['ends_at', 'Sfârșit', 'datetime-local', true],
+      ['status', 'Stare', 'select', true, [['confirmed', 'Confirmată'], ['requested', 'Solicitată'], ['in_progress', 'În curs'], ['completed', 'Finalizată'], ['cancelled', 'Anulată']]],
+      ['estimated_cost_bani', 'Estimare (lei)', 'money', false], ['client_note', 'Notă pentru client', 'textarea', false, 2000],
+    ],
+    jobs: [
+      ['appointment_id', 'Programare (opțional)', 'related', false, 'appointments'],
+      ['service_name', 'Serviciu', 'text', true, 160], ['description', 'Descriere', 'textarea', false, 2000],
+      ['status', 'Stare', 'select', true, [['planned', 'Planificată'], ['in_progress', 'În curs'], ['completed', 'Finalizată'], ['cancelled', 'Anulată']]],
+      ['price_bani', 'Preț (lei)', 'money', false],
+    ],
+    payments: [
+      ['job_id', 'Lucrare', 'related', true, 'jobs'], ['amount_bani', 'Sumă (lei)', 'money', true],
+      ['status', 'Stare', 'select', true, [['pending', 'În așteptare'], ['confirmed', 'Confirmată'], ['reversed', 'Anulată']]],
+      ['recorded_at', 'Data înregistrării (opțional)', 'datetime-local', false], ['note', 'Notă', 'textarea', false, 1000],
+    ],
+    messages: [['body', 'Răspuns către client', 'textarea', true, 4000]],
+  };
   let token = null;
   let user = null;
   let section = 'appointments';
   let loginWindow = null;
   let loginState = null;
   let generation = 0;
+  let offset = 0;
+  let nextOffset = null;
+  let currentClientId = '';
+  let currentClientLabel = '';
+  let formKey = '';
+  let searchTimer = null;
 
   function notice(message) {
     $('notice').textContent = message;
@@ -35,6 +71,12 @@
     $('welcome').hidden = false;
     $('content').replaceChildren();
     $('message-form').hidden = true;
+    $('staff-form').hidden = true;
+    $('staff-tools').hidden = true;
+    $('pager').hidden = true;
+    currentClientId = '';
+    currentClientLabel = '';
+    formKey = '';
   }
   function ready() {
     try {
@@ -93,6 +135,122 @@
     }
     container.append(cards);
   }
+  async function allRelated(name, clientId) {
+    const rows = [];
+    let page = 0;
+    do {
+      const result = await api('/api/' + name + '?client_id=' + encodeURIComponent(clientId) + '&offset=' + page);
+      rows.push(...result.rows);
+      page = result.nextOffset;
+      if (rows.length > 1000) throw new Error('Prea multe înregistrări pentru lista de selecție.');
+    } while (page !== null);
+    return rows;
+  }
+  function makeInput([name, label, kind, required, extra]) {
+    const wrapper = document.createElement('label');
+    wrapper.textContent = label;
+    let control;
+    if (kind === 'select' || kind === 'related') {
+      control = document.createElement('select');
+      if (!required || kind === 'related') {
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = required ? 'Alege...' : 'Fără asociere';
+        control.append(blank);
+      }
+      if (kind === 'select') for (const [value, text] of extra) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        control.append(option);
+      }
+    } else if (kind === 'textarea') {
+      control = document.createElement('textarea');
+      control.rows = 3;
+    } else {
+      control = document.createElement('input');
+      control.type = kind === 'money' ? 'text' : kind;
+      if (kind === 'money') { control.inputMode = 'decimal'; control.placeholder = 'Ex.: 700,00'; }
+    }
+    control.name = name;
+    control.required = required;
+    if (typeof extra === 'number') control.maxLength = extra;
+    wrapper.append(control);
+    return { wrapper, control };
+  }
+  async function renderStaffForm() {
+    const form = $('staff-form');
+    form.hidden = user?.role !== 'staff';
+    if (form.hidden) return;
+    const key = section + ':' + currentClientId + ':' + generation;
+    if (formKey === key) return;
+    formKey = key;
+    const sectionAtStart = section;
+    const clientAtStart = currentClientId;
+    const sessionAtStart = generation;
+    const fieldsBox = $('staff-fields');
+    fieldsBox.replaceChildren();
+    $('staff-form-title').textContent = section === 'messages' ? 'Răspunde clientului' : 'Adaugă · ' + sections[section];
+    const needClient = section !== 'clients' && !currentClientId;
+    $('staff-form-hint').hidden = !needClient;
+    form.querySelector('button[type=submit]').hidden = needClient;
+    if (needClient) return;
+    const related = [];
+    for (const definition of forms[section]) {
+      const { wrapper, control } = makeInput(definition);
+      fieldsBox.append(wrapper);
+      if (definition[2] === 'related') related.push({ control, name: definition[4] });
+    }
+    try {
+      for (const { control, name } of related) {
+        const rows = await allRelated(name, clientAtStart);
+        if (section !== sectionAtStart || currentClientId !== clientAtStart || generation !== sessionAtStart) return;
+        for (const row of rows) {
+          const option = document.createElement('option');
+          option.value = row.id;
+          option.textContent = name === 'locations' ? row.label + ' · ' + row.address :
+            name === 'jobs' ? row.service_name + ' · ' + row.id.slice(0, 8) :
+              format('starts_at', row.starts_at) + ' · ' + row.id.slice(0, 8);
+          control.append(option);
+        }
+      }
+    } catch (error) { if (sessionAtStart === generation) notice(error.message); }
+  }
+  async function refreshClientChoices() {
+    if (user?.role !== 'staff') return;
+    const wanted = $('client-search').value.trim();
+    const requestGeneration = generation;
+    const result = await api('/api/clients?search=' + encodeURIComponent(wanted));
+    if (requestGeneration !== generation || wanted !== $('client-search').value.trim()) return;
+    const picker = $('client-picker');
+    picker.replaceChildren();
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = 'Toți clienții';
+    picker.append(blank);
+    if (currentClientId && !result.rows.some(row => row.id === currentClientId)) {
+      const selected = document.createElement('option');
+      selected.value = currentClientId;
+      selected.textContent = currentClientLabel;
+      picker.append(selected);
+    }
+    for (const row of result.rows) {
+      const option = document.createElement('option');
+      option.value = row.id;
+      option.textContent = row.display_name + ' · ' + row.kind;
+      picker.append(option);
+    }
+    picker.value = currentClientId;
+    if (section === 'clients') { offset = 0; loadSection(); }
+  }
+  function pageUrl() {
+    const params = new URLSearchParams({ offset: String(offset) });
+    if (user?.role === 'staff' && section === 'clients' && $('client-search').value.trim())
+      params.set('search', $('client-search').value.trim());
+    if (user?.role === 'staff' && section !== 'clients' && currentClientId)
+      params.set('client_id', currentClientId);
+    return '/api/' + section + '?' + params;
+  }
   async function loadSection() {
     const current = section;
     const requestGeneration = generation;
@@ -100,8 +258,16 @@
     $('message-form').hidden = section !== 'messages' || user?.role !== 'client';
     $('content').textContent = 'Se încarcă…';
     try {
-      const data = await api('/api/' + current);
-      if (requestGeneration === generation && section === current) render(data.rows);
+      const data = await api(pageUrl());
+      if (requestGeneration === generation && section === current) {
+        render(data.rows);
+        nextOffset = data.nextOffset;
+        $('pager').hidden = offset === 0 && nextOffset === null;
+        $('previous').disabled = offset === 0;
+        $('next').disabled = nextOffset === null;
+        $('page-label').textContent = 'Pagina ' + (Math.floor(offset / 30) + 1);
+        await renderStaffForm();
+      }
     } catch (error) {
       if (requestGeneration !== generation) return;
       $('content').textContent = '';
@@ -110,6 +276,7 @@
   }
   function selectSection(next) {
     section = next;
+    offset = 0;
     for (const button of $('tabs').querySelectorAll('button')) {
       if (button.dataset.section === next) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
@@ -121,6 +288,8 @@
     $('workspace').hidden = false;
     $('greeting').textContent = 'Bună, ' + (user.name || 'bine ai venit') + '!';
     $('role').textContent = user.role === 'staff' ? 'Echipa Petru & Inés' : 'Portalul tău';
+    $('staff-tools').hidden = user.role !== 'staff';
+    if (user.role === 'staff') refreshClientChoices().catch(error => notice(error.message));
     $('tabs').replaceChildren();
     for (const [key, label] of Object.entries(sections)) {
       if (key === 'clients' && user.role !== 'staff') continue;
@@ -168,6 +337,51 @@
   });
 
   $('refresh').addEventListener('click', loadSection);
+  $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 30); loadSection(); });
+  $('next').addEventListener('click', () => { if (nextOffset !== null) { offset = nextOffset; loadSection(); } });
+  $('client-search').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => refreshClientChoices().catch(error => notice(error.message)), 300);
+  });
+  $('client-picker').addEventListener('change', event => {
+    currentClientId = event.target.value;
+    currentClientLabel = event.target.selectedOptions[0]?.textContent || '';
+    offset = 0;
+    loadSection();
+  });
+  function leiToBani(value) {
+    const normalized = value.trim().replace(',', '.');
+    if (!/^\d{1,8}(\.\d{1,2})?$/.test(normalized)) throw new Error('Introdu suma în lei, cu cel mult două zecimale.');
+    const [lei, bani = ''] = normalized.split('.');
+    return Number(lei) * 100 + Number(bani.padEnd(2, '0'));
+  }
+  $('staff-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (user?.role !== 'staff' || (section !== 'clients' && !currentClientId)) return;
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type=submit]');
+    const sectionAtStart = section;
+    const data = section === 'clients' ? {} : { client_id: currentClientId };
+    button.disabled = true;
+    try {
+      for (const [key, value] of new FormData(form)) {
+        if (!value) continue;
+        data[key] = key.endsWith('_bani') ? leiToBani(value) :
+          ['starts_at', 'ends_at', 'recorded_at'].includes(key) ? new Date(value).toISOString() : value;
+      }
+      const result = await api('/api/' + sectionAtStart, { method: 'POST', body: JSON.stringify(data) });
+      notice('Înregistrarea a fost adăugată.');
+      if (sectionAtStart === 'clients') {
+        currentClientId = result.id;
+        currentClientLabel = data.display_name;
+        $('client-search').value = data.display_name;
+        await refreshClientChoices();
+      }
+      formKey = '';
+      await loadSection();
+    } catch (error) { notice(error.message); }
+    finally { button.disabled = false; }
+  });
   $('logout').addEventListener('click', async () => {
     const previous = token;
     clearSession();
