@@ -15,6 +15,11 @@
 <section id="totp" hidden><h1>Cod de verificare</h1><p>Introdu codul din aplicația ta de autentificare.</p>
 <form id="totp-form"><label>Cod TOTP<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
 <button type="submit">Verifică</button></form></section>
+<section id="change-password" hidden><h1>Schimbă parola inițială</h1><p>Înainte de a intra în portal, alege o parolă nouă, de minimum 12 caractere. Sesiunile create cu parola temporară vor fi închise.</p>
+<form id="change-password-form"><label>Parola primită<input name="current" type="password" autocomplete="current-password" required></label>
+<label>Parola nouă<input name="new" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+<label>Confirmă parola nouă<input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+<button type="submit">Schimbă parola și intră</button></form></section>
 <section id="enroll" hidden><h1>Activează verificarea în doi pași</h1>
 <p>Conturile echipei au nevoie de un al doilea factor înainte de a vedea datele clienților.</p>
 <form id="enroll-form"><label>Confirmă parola<input name="password" type="password" autocomplete="current-password" required></label>
