@@ -23,14 +23,19 @@ export function expectedDatabase(config) {
   return databases[0];
 }
 
+export function verifyRemoteD1() {
+  const expected = expectedDatabase(JSON.parse(readFileSync(join(ROOT, 'wrangler.jsonc'), 'utf8')));
+  const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
+  const raw = execFileSync(process.execPath,
+    [wrangler, 'd1', 'info', expected.database_name, '--json'],
+    { cwd: ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
+  assertDatabaseIdentity(JSON.parse(raw), expected);
+  return { expected, wrangler, root: ROOT };
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const expected = expectedDatabase(JSON.parse(readFileSync(join(ROOT, 'wrangler.jsonc'), 'utf8')));
-    const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
-    const raw = execFileSync(process.execPath,
-      [wrangler, 'd1', 'info', expected.database_name, '--json'],
-      { cwd: ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
-    assertDatabaseIdentity(JSON.parse(raw), expected);
+    verifyRemoteD1();
     process.stdout.write('Remote D1 UUID, name and EU jurisdiction confirmed. No data was changed.\n');
   } catch {
     process.stderr.write('Could not verify remote D1. Stop before remote migrations or deploy.\n');
