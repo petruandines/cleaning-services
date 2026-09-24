@@ -11,6 +11,6 @@
     "migrations_dir": "../docs/portal-v2"
   }],
   "vars": {
-    "PUBLIC_API_URL": "https://REPLACE_WITH_WORKER_URL.workers.dev"
+    "PUBLIC_API_URL": "https://petru-ines-portal-api.petruandines.workers.dev"
   }
 }
