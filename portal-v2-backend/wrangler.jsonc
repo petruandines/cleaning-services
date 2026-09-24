@@ -7,7 +7,7 @@
   "d1_databases": [{
     "binding": "DB",
     "database_name": "petru-ines-portal-eu",
-    "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+    "database_id": "6816004b-dc95-48c9-be52-9bd4131d157e",
     "migrations_dir": "../docs/portal-v2"
   }],
   "vars": {
