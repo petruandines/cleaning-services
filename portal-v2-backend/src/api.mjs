@@ -1,3 +1,4 @@
+import { commitRecord, createStaffRecord } from './writes.mjs';
 const ORIGIN = 'https://petruandines.github.io';
 const LIMIT = 30;
 
@@ -61,9 +62,10 @@ export async function handleApi(request, { db, auth }) {
     const result = await db.prepare('SELECT id, kind, display_name, email, phone, company_name, cui, status FROM clients ORDER BY created_at DESC LIMIT ?').bind(LIMIT).all();
     return json({ rows: result.results });
   }
-  if (!Object.hasOwn(lists, name)) return error(404, 'not_found');
+  if (name !== 'clients' && !Object.hasOwn(lists, name)) return error(404, 'not_found');
 
   if (request.method === 'GET') {
+    if (name === 'clients') return error(403, 'forbidden');
     // Only constant SQL fragments are interpolated. IDs never become SQL source.
     const sql = staff
       ? `SELECT ${lists[name]} FROM ${name} ORDER BY ${order[name]} LIMIT ?`
@@ -73,21 +75,30 @@ export async function handleApi(request, { db, auth }) {
     return json({ rows: result.results });
   }
 
-  if (name === 'messages' && request.method === 'POST') {
-    if (staff) return error(403, 'staff_message_endpoint_pending');
+  if (request.method === 'POST') {
+    if (!staff && name !== 'messages') return error(403, 'forbidden');
     if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return error(415, 'json_required');
     const raw = await request.text();
-    if (raw.length > 5000) return error(413, 'message_too_long');
-    let body;
-    try { body = JSON.parse(raw)?.body; } catch { return error(400, 'invalid_json'); }
-    if (typeof body !== 'string' || !body.trim() || body.length > 4000) return error(400, 'invalid_message');
+    if (raw.length > 6000) return error(413, 'payload_too_large');
+    let data;
+    try { data = JSON.parse(raw); } catch { return error(400, 'invalid_json'); }
+    if (staff) {
+      const result = await createStaffRecord(db, name, data, userId);
+      return result.error ? error(result.status, result.error) : json({ id: result.id }, result.status);
+    }
+    const body = data?.body;
+    if (typeof body !== 'string' || !body.trim() || body.trim().length > 4000) return error(400, 'invalid_message');
     // A client with access to several companies must choose one later. We
     // reject this ambiguous write instead of trusting a client_id in JSON.
     const access = await db.prepare('SELECT client_id FROM client_users WHERE user_id = ? LIMIT 2').bind(userId).all();
     if (access.results.length !== 1) return error(403, 'client_scope_required');
     const id = crypto.randomUUID();
-    await db.prepare('INSERT INTO messages (id, client_id, sender_user_id, body, created_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(id, access.results[0].client_id, userId, body.trim(), new Date().toISOString()).run();
+    const at = new Date().toISOString();
+    await commitRecord(db, {
+      sql: 'INSERT INTO messages (id, client_id, sender_user_id, body, created_at) VALUES (?, ?, ?, ?, ?)',
+      values: [id, access.results[0].client_id, userId, body.trim(), at],
+      actor: userId, clientId: access.results[0].client_id, entity: 'messages', id, at,
+    });
     return json({ id }, 201);
   }
   return error(405, 'method_not_allowed');
