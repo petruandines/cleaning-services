@@ -31,9 +31,10 @@ function setup() {
   };
   const auth = { api: { async getSession({ headers }) {
     const token = headers.get('Authorization')?.replace(/^Bearer /, '');
-    if (!['a', 'b', 'admin'].includes(token)) return null;
-    return { user: { id: token === 'admin' ? 'owner' : 'user_' + token,
-      name: token, role: token === 'admin' ? 'admin' : 'user' } };
+    if (!['a', 'b', 'admin', 'admin_pending'].includes(token)) return null;
+    const staff = token.startsWith('admin');
+    return { user: { id: staff ? 'owner' : 'user_' + token,
+      name: token, role: staff ? 'admin' : 'user', twoFactorEnabled: token === 'admin' } };
   } } };
   async function call(path, token, init = {}) {
     const request = new Request('https://api.example.test/api/' + path, {
@@ -73,4 +74,11 @@ test('message write derives company from session, ignores forged client ID', asy
   assert.equal(response.status, 201);
   assert.equal(sqlite.prepare('SELECT client_id FROM messages').get().client_id, 'a');
   assert.equal((await call('messages', 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"body":"salut"}' })).status, 403);
+});
+
+test('staff data stays closed until TOTP is enabled', async () => {
+  const { call } = setup();
+  assert.equal((await call('clients', 'admin_pending')).status, 403);
+  const me = await (await call('me', 'admin_pending')).json();
+  assert.equal(me.twoFactorRequired, true);
 });
