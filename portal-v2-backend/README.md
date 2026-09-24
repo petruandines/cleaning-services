@@ -14,7 +14,7 @@ Acest Worker va primi cereri de pe acel origin. Codul nu conține credentiale;
 
 ## Verificare locală
 
-`npm ci && npm test`. Migrarea SQL a aplicației este testată separat cu `python3 ../docs/portal-v2/test_schema.py` într-un checkout al proiectului.
+`npm ci && npm test`. Suitele includ un flux autentic Better Auth pe SQLite în memorie: parolă, activare TOTP, noua autentificare cu al doilea factor și logout. Verificarea în browser și pe D1 remote rămâne necesară. Migrarea SQL a aplicației este testată separat cu `python3 ../docs/portal-v2/test_schema.py` într-un checkout al proiectului.
 
 ## Pașii următori
 
