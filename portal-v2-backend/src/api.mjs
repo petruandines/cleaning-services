@@ -1,4 +1,5 @@
 import { commitRecord, createStaffRecord } from './writes.mjs';
+import { changeInitialPassword, createClientUser, mustChangePassword } from './accounts.mjs';
 const ORIGIN = 'https://petruandines.github.io';
 const LIMIT = 30;
 
@@ -17,7 +18,7 @@ function error(status, code) { return json({ error: code }, status); }
 
 function allowedOrigin(request) {
   const origin = request.headers.get('Origin');
-  return !origin || origin === ORIGIN;
+  return !origin || origin === ORIGIN || origin === new URL(request.url).origin;
 }
 
 const lists = Object.freeze({
@@ -52,14 +53,27 @@ export async function handleApi(request, { db, auth }) {
   if (!session?.user?.id) return error(401, 'unauthorized');
   const userId = session.user.id;
   const staff = session.user.role === 'admin';
+  const initialPassword = staff ? false : await mustChangePassword(db, userId);
 
   if (name === 'me' && request.method === 'GET') {
-    return json({ id: userId, name: session.user.name, role: staff ? 'staff' : 'client', twoFactorRequired: staff && session.user.twoFactorEnabled !== true });
+    return json({ id: userId, name: session.user.name, role: staff ? 'staff' : 'client',
+      twoFactorRequired: staff && session.user.twoFactorEnabled !== true, mustChangePassword: initialPassword });
   }
   if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
-  if (name !== 'clients' && !Object.hasOwn(lists, name)) return error(404, 'not_found');
+  if (initialPassword && name !== 'password') return error(403, 'initial_password_required');
+  if (!['clients', 'users', 'password'].includes(name) && !Object.hasOwn(lists, name)) return error(404, 'not_found');
+
+  if (name === 'users' && request.method === 'GET') {
+    if (!staff) return error(403, 'forbidden');
+    const clientId = url.searchParams.get('client_id');
+    if (!clientId || !/^[a-zA-Z0-9_-]{1,100}$/.test(clientId)) return error(400, 'invalid_client_id');
+    const result = await db.prepare('SELECT u.id, u.name, u.email FROM client_users cu JOIN "user" u ON u.id = cu.user_id WHERE cu.client_id = ? ORDER BY cu.created_at DESC LIMIT ?')
+      .bind(clientId, LIMIT).all();
+    return json({ rows: result.results });
+  }
 
   if (request.method === 'GET') {
+    if (name === 'password' || name === 'users') return error(405, 'method_not_allowed');
     if (name === 'clients' && !staff) return error(403, 'forbidden');
     const offsetValue = url.searchParams.get('offset') || '0';
     if (!/^\d{1,6}$/.test(offsetValue)) return error(400, 'invalid_offset');
@@ -90,12 +104,22 @@ export async function handleApi(request, { db, auth }) {
   }
 
   if (request.method === 'POST') {
-    if (!staff && name !== 'messages') return error(403, 'forbidden');
+    if (name === 'users' && !staff) return error(403, 'forbidden');
+    if (!staff && !['messages', 'password'].includes(name)) return error(403, 'forbidden');
+    if (name === 'password' && (staff || request.headers.get('Origin') !== url.origin)) return error(403, 'forbidden');
     if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return error(415, 'json_required');
     const raw = await request.text();
     if (raw.length > 6000) return error(413, 'payload_too_large');
     let data;
     try { data = JSON.parse(raw); } catch { return error(400, 'invalid_json'); }
+    if (name === 'password') {
+      const result = await changeInitialPassword({ db, auth, headers: request.headers, userId, data });
+      return result.error ? error(result.status, result.error) : json({ token: result.token }, 200);
+    }
+    if (name === 'users') {
+      const result = await createClientUser({ db, auth, headers: request.headers, actor: userId, data });
+      return result.error ? error(result.status, result.error) : json({ id: result.id }, result.status);
+    }
     if (staff) {
       const result = await createStaffRecord(db, name, data, userId);
       return result.error ? error(result.status, result.error) : json({ id: result.id }, result.status);
