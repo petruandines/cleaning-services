@@ -164,11 +164,13 @@ def restore_local_test(source, key):
         with sqlite3.connect(f"file:{files[0]}?mode=ro", uri=True) as restored:
             if restored.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 raise ValueError("Restored database failed SQLite integrity check")
+            if restored.execute("PRAGMA foreign_key_check").fetchone() is not None:
+                raise ValueError("Restored database has broken foreign-key references")
             tables = {name for (name,) in restored.execute(
                 "SELECT name FROM sqlite_schema WHERE type = 'table'")}
             if not {"clients", "portal_accounts", "user", "audit_events"}.issubset(tables):
                 raise ValueError("Restored database is missing portal tables")
-    print("Encrypted backup restored into an isolated local D1; integrity_check=ok.")
+    print("Encrypted backup restored into an isolated local D1; integrity and foreign keys verified.")
 
 
 def main():
