@@ -25,7 +25,7 @@ Pe `github.io` nu controlăm DNS/rutarea, astfel că un Worker nu poate servi di
 https://better-auth.com/docs/1.6/concepts/cookies
 https://better-auth.com/docs/plugins/bearer
 
-**Decizie amânată până la alegerea proprietarilor:** (A) exact URL-ul GitHub Pages, asumând și verificând limitele de securitate/compatibilitate ale unui frontend static cu autentificare cross-origin; (B) portalul complet găzduit în Worker, legat vizual din site, cu URL diferit și cookie-uri proprii. Pentru o aplicație cu date personale reale, recomandarea tehnică actuală este B. O cale identică și rutare sigură, pe același origin controlat de noi, ar cere un domeniu propriu. Nu implementăm noul login înainte de această decizie.
+**Decizie confirmată de proprietar:** păstrăm exact URL-ul GitHub Pages `https://petruandines.github.io/cleaning-services/portal/`. API-ul și autentificarea rulează pe Worker, pe alt origin. Nu putem aduce Worker pe aceeași cale `github.io` fără controlul domeniului. Pentru noul login, tokenul de sesiune primit de la API rămâne numai în memoria tabului; nu intră în localStorage, sessionStorage, URL sau GitHub. Reîncărcarea paginii va cere autentificare din nou. Restricționăm CORS la originul exact, aplicăm CSP, limită de încercări și verificări server-side. Acest compromis trebuie testat pe mobil și în Safari înainte de lansare; avertismentul GitHub privind parolele pe Pages rămâne consemnat. Nu există pretenția de risc zero.
 
 ## Fundație propusă
 
@@ -61,7 +61,7 @@ Nu considerăm Time Travel drept backup extern. Prima livrare trebuie să includ
 
 ## Etape verificabile
 
-1. Confirmăm forma URL/autentificare și stabilim ce date din Appwrite, dacă există, trebuie migrate. Nu introducem date de clienți reali în test.
+1. Forma URL este confirmată. Stabilim ce date din Appwrite, dacă există, trebuie migrate. Nu introducem date de clienți reali în test.
 2. Creăm în repository privat backendul, schema D1 și migrațiile; rulăm teste locale cu două identități client și una staff.
 3. Implementăm API-ul și autentificarea; testăm accesul direct la ID-ul altui client, schimbarea parolei, revocarea sesiunii, rate limit și 2FA admin.
 4. Refacem interfața existentă pentru noul API, scoatem ecranele de facturi/documente, adăugăm trimiterea mesajelor și gestionarea programărilor; verificăm pe mobil.
@@ -74,7 +74,7 @@ La o sesiune nouă: citește mai întâi **acest fișier**, `portal/README.md` �
 
 ### Stare la 24 septembrie 2026
 
-- Finalizat: inventar repository și corectarea limitelor D1; această specificație în ramura `codex/portal-v2-plan`.
-- Testat: numai citirea codului existent și documentația oficială; noul backend nu este creat.
-- Următorul pas: decizia A/B privind URL-ul portalului și crearea unui repository privat pentru backend. Apoi migrația SQL și testele de izolare.
-- Blocaje: lipsa deciziei URL/autentificare și lipsa unui cont Cloudflare conectat la această sesiune. Nu există încă implementare Cloudflare verificată.
+- Finalizat: inventar repository, decizia URL și schema aplicației cu 8 tabele în `docs/portal-v2/0001_app_schema.sql`; verificare locală SQLite pentru relații între clienți și sume negative; această specificație în ramura `codex/portal-v2-plan`.
+- Testat: structura SQL în SQLite local, inclusiv refuzul legăturilor client A ↔ client B și al unei sume negative. Nu este testată încă în D1; noul backend nu este creat.
+- Următorul pas: pregătirea backendului Worker + Better Auth, migrarea SQL în D1 de test, testele API cu două conturi și conectarea interfeței. Preferabil repository privat pentru backend; în proiectul public sunt numai schema și testele, fără secrete.
+- Blocaje pentru deployment: lipsa unui cont Cloudflare conectat la această sesiune și lipsa ID-ului unei baze D1 UE. Nu există încă implementare Cloudflare verificată.
