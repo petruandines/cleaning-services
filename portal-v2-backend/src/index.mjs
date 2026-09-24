@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
-import { admin, bearer, twoFactor } from 'better-auth/plugins';
 import { handleApi, ORIGIN } from './api.mjs';
+import { authOptions } from './auth-options.mjs';
 
 function cors(response) {
   const headers = new Headers(response.headers);
@@ -13,16 +13,7 @@ function cors(response) {
 
 export function createAuth(env) {
   if (!env.DB || !env.BETTER_AUTH_SECRET || !env.PUBLIC_API_URL) throw new Error('Missing backend configuration');
-  return betterAuth({
-    database: env.DB,
-    secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.PUBLIC_API_URL,
-    trustedOrigins: [ORIGIN],
-    emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 12 },
-    session: { expiresIn: 60 * 60 * 8 },
-    rateLimit: { enabled: true, storage: 'database', window: 60, max: 20 },
-    plugins: [admin(), bearer(), twoFactor({ issuer: 'Petru & Inés' })],
-  });
+  return betterAuth(authOptions({ database: env.DB, secret: env.BETTER_AUTH_SECRET, baseURL: env.PUBLIC_API_URL }));
 }
 
 export default {
