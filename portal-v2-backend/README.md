@@ -6,10 +6,10 @@ Acest Worker va primi cereri de pe acel origin. Codul nu conține credentiale;
 
 ## Stare
 
-- Schema aplicației: `../docs/portal-v2/0001_app_schema.sql`.
+- Schema aplicației: `../docs/portal-v2/0001_app_schema.sql`. Schema Better Auth 1.7.5: `../docs/portal-v2/0002_auth.sql`, generată cu `BETTER_AUTH_SECRET=<valoare temporară> npm run generate:auth`. Ambele au fost aplicate cu Wrangler în D1 local.
 - API inițial: citire filtrată după sesiune, mesaj text de la client.
 - Autentificarea folosește Better Auth și pluginul Bearer. Frontendul va ține tokenul **numai în memorie**: reîncărcarea paginii cere login nou.
-- `disableSignUp` oprește înscrierea publică. Administratorul inițial, crearea utilizatorilor, migrarea tabelelor Better Auth, 2FA, backupul și testul end-to-end **nu sunt încă finalizate**.
+- `disableSignUp` oprește înscrierea publică. Administratorul inițial, crearea utilizatorilor, configurarea efectivă 2FA, backupul și testul end-to-end **nu sunt încă finalizate**.
 - `wrangler.jsonc` conține intenționat substituenți. Nu executa deploy până când D1 cu jurisdicție UE, migrațiile, secretul și rate limiting sunt verificate.
 
 ## Verificare locală
@@ -18,7 +18,6 @@ Acest Worker va primi cereri de pe acel origin. Codul nu conține credentiale;
 
 ## Pașii următori
 
-1. Generează schema de autentificare din versiunea fixată Better Auth; păstreaz-o în migrații, apoi verifică rularea în D1 local.
-2. Testează API-ul cu două conturi reale de test și unul staff în Wrangler local; verifică refuzul accesului între clienți și logarea cu 2FA.
-3. Conectează interfața existentă la Worker fără a păstra tokenuri în storage și testează mobil/Safari.
-4. Testează exportul criptat și restaurarea D1 înainte de date reale sau deploy public.
+1. Testează autentificarea cu două conturi reale de test și unul staff în Wrangler local; verifică refuzul accesului între clienți și logarea cu 2FA.
+2. Conectează interfața existentă la Worker fără a păstra tokenuri în storage și testează mobil/Safari.
+3. Testează exportul criptat și restaurarea D1 înainte de date reale sau deploy public.
