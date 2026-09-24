@@ -9,7 +9,8 @@ Acest Worker va primi cereri de pe acel origin. Codul nu conține credentiale;
 - Schema aplicației: `../docs/portal-v2/0001_app_schema.sql`. Schema Better Auth 1.7.5: `../docs/portal-v2/0002_auth.sql`, generată cu `BETTER_AUTH_SECRET=<valoare temporară> npm run generate:auth`. Ambele au fost aplicate cu Wrangler în D1 local.
 - API: citire filtrată după sesiune, mesaje de la client și echipă, creare de client, locație, programare, lucrare și plată de către echipă. Scrierile sunt validate, verifică legăturile cu același client și înregistrează auditul în aceeași tranzacție D1. Datele staff sunt blocate până la activarea TOTP.
 - Autentificarea din `public/login.html` rulează pe originul Workerului, iar interfața de previzualizare din `../portal-v2-frontend/` primește tokenul prin `postMessage` cu verificarea originului, ferestrei și unui cod aleator. Tokenul rămâne **numai în memorie**: reîncărcarea paginii cere login nou.
-- `disableSignUp` oprește înscrierea publică. Administratorul inițial, crearea utilizatorilor, schimbarea parolei inițiale, formularele staff din interfață, backupul și testul end-to-end **nu sunt încă finalizate**.
+- Interfața de previzualizare include acum formulare staff, căutarea clientului și paginare. Nu a fost verificată încă într-un browser real și nu este conectată la un Worker public.
+- `disableSignUp` oprește înscrierea publică. Administratorul inițial, crearea utilizatorilor, schimbarea parolei inițiale, backupul și testul end-to-end **nu sunt încă finalizate**.
 - `wrangler.jsonc` conține intenționat substituenți. Nu executa deploy până când D1 cu jurisdicție UE, migrațiile, secretul și rate limiting sunt verificate.
 
 ## Verificare locală
@@ -19,5 +20,5 @@ Acest Worker va primi cereri de pe acel origin. Codul nu conține credentiale;
 ## Pașii următori
 
 1. Testează autentificarea cu două conturi fictive și unul staff într-un mediu cu Wrangler funcțional; verifică izolarea și logarea cu 2FA.
-2. Conectează formularele staff la operațiile API, apoi implementează crearea conturilor și schimbarea parolei inițiale. Interfața nouă este momentan o previzualizare în `portal-v2-frontend/`; pagina publică `portal/` nu a fost modificată.
+2. Implementează bootstrapul administratorului, crearea conturilor și asocierea lor cu clienții, schimbarea parolei inițiale și verifică formularele staff într-un browser. Interfața nouă este momentan o previzualizare în `portal-v2-frontend/`; pagina publică `portal/` nu a fost modificată.
 3. Configurează adresa Workerului după alocare, testează fluxul browser pe mobil/Safari și execută exportul criptat plus restaurarea D1 înainte de date reale sau deploy public.
