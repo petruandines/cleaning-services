@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
+    "generate:auth": "auth generate --config auth.config.mjs --output ../docs/portal-v2/0002_auth.sql --yes",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
@@ -11,6 +12,7 @@
     "better-auth": "1.7.5"
   },
   "devDependencies": {
+    "auth": "^1.7.5",
     "wrangler": "4.40.0"
   }
 }
