@@ -20,7 +20,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin');
-    if (origin && origin !== ORIGIN) return new Response('Forbidden', { status: 403 });
+    // The login popup posts from this Worker's own origin. Portal requests
+    // arrive from GitHub Pages; reject every other browser origin.
+    if (origin && origin !== ORIGIN && origin !== url.origin) return new Response('Forbidden', { status: 403 });
     if (url.pathname.startsWith('/api/auth/')) {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: {
         'access-control-allow-origin': ORIGIN,
