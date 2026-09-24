@@ -1,0 +1,45 @@
+name: Portal D1 identity (read only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloudflare_account_id:
+        description: Cloudflare account ID (32 hexadecimal characters, not a secret)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  verify:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ACCOUNT_ID: ${{ inputs.cloudflare_account_id }}
+      D1_READ_TOKEN: ${{ secrets.PORTAL_D1_READ_TOKEN }}
+    steps:
+      - name: Compare Cloudflare D1 metadata with the portal configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo '::error::Invalid Cloudflare account ID.'
+            exit 1
+          fi
+          if [[ -z "$D1_READ_TOKEN" ]]; then
+            echo '::error::PORTAL_D1_READ_TOKEN is not configured.'
+            exit 1
+          fi
+          response=$(curl --fail --silent --show-error --max-time 20 \
+            --header "Authorization: Bearer $D1_READ_TOKEN" \
+            --header 'Accept: application/json' \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/d1/database/6816004b-dc95-48c9-be52-9bd4131d157e")
+          if ! jq -e \
+            --arg uuid '6816004b-dc95-48c9-be52-9bd4131d157e' \
+            '.success == true and .result.uuid == $uuid and .result.name == "petru-ines-portal-eu" and .result.jurisdiction == "eu"' \
+            <<< "$response" > /dev/null; then
+            echo '::error::Remote D1 UUID, name or EU jurisdiction differs. No data was changed.'
+            exit 1
+          fi
+          echo 'Remote D1 UUID, name and EU jurisdiction confirmed. No data was changed.'
