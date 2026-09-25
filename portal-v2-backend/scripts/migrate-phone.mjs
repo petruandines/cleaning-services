@@ -1,7 +1,7 @@
 /** Manually inspect or apply the three initial D1 migrations from GitHub Actions. */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expectedDatabase, parseWranglerJson, verifyRemoteD1 } from './verify-remote-d1.mjs';
@@ -29,11 +29,15 @@ export function assertChoice(operation, confirmation) {
 }
 
 export function assertMigrationFiles() {
+  const directory = join(ROOT, '..', 'docs', 'portal-v2');
   for (const [name, expectedHash] of Object.entries(MIGRATIONS)) {
     const hash = createHash('sha256')
-      .update(readFileSync(join(ROOT, '..', 'docs', 'portal-v2', name))).digest('hex');
+      .update(readFileSync(join(directory, name))).digest('hex');
     if (hash !== expectedHash) throw new Error(`Migration contents changed: ${name}`);
   }
+  if (JSON.stringify(readdirSync(directory).filter(name => /^\d+_.+\.sql$/.test(name)).sort()) !==
+      JSON.stringify(Object.keys(MIGRATIONS).sort()))
+    throw new Error('Unexpected migration files; use the separate upgrade workflow');
 }
 
 export function tableNames(raw) {
