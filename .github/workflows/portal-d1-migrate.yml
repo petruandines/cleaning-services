@@ -32,7 +32,7 @@ jobs:
       - name: Read the reviewed backend at a fixed commit
         uses: actions/checkout@v4
         with:
-          ref: 3405a131d5a606db90a8eea09d5ada7b09a40134
+          ref: dc73c27bcaba041af3b34d018fa1d35583bd3d24
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@v4
