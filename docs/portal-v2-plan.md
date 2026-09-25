@@ -175,3 +175,8 @@ La o sesiune nouă: citește mai întâi **acest fișier**, `portal/README.md` �
 
 - Proprietarul a confirmat că a generat și păstrat privat cheia Workerului, apoi a salvat-o direct în GitHub Actions secret `PORTAL_WORKER_AUTH_SECRET`. Valoarea nu a fost comunicată în chat și nu este verificată prin citire; confirmarea proprietarului este suficientă pentru pasul următor.
 - Următorul pas: token Cloudflare temporar, limitat la contul `47b9f8498a9865c0fbbaca8f0f5cf59d`, cu D1 Read și Workers Scripts Edit, introdus direct în GitHub secret `PORTAL_WORKER_DEPLOY_TOKEN`. Apoi se rulează **numai `inspect`**, cu confirmare goală. Workerul nu este încă publicat.
+
+### Stare la 25 septembrie 2026 — tokenul temporar pentru Worker configurat
+
+- Proprietarul a confirmat că a creat un token Cloudflare temporar pentru contul corect, cu D1 Read și Workers Scripts Edit, și l-a introdus direct în GitHub Actions secret `PORTAL_WORKER_DEPLOY_TOKEN`. Valoarea nu a fost comunicată în chat; nu se poate verifica din GitHub prin citire. `PORTAL_WORKER_AUTH_SECRET` fusese configurat separat și păstrat privat.
+- Următorul pas exclusiv: pornește manual workflow-ul `Portal Worker first deployment (manual)` pe branch `main`, selectează `operation=inspect`, lasă `confirmation` gol. Verifică runul înainte de `deploy`; nu folosi Re-run. Workerul încă nu a fost publicat și portalul live încă folosește Appwrite.
