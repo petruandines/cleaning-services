@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { assertChoice, assertFiles, assertSchema, queryRows } from '../scripts/upgrade-phone.mjs';
+import { assertChoice, assertFiles, assertSchema, queryRows, readBookmark } from '../scripts/upgrade-phone.mjs';
 
 const tables = [
   'account', 'appointments', 'audit_events', 'client_users', 'clients',
@@ -21,9 +21,9 @@ test('upgrade requires precise operation, exact UUID confirmation and five pinne
   assert.throws(() => assertChoice('inspect', 'APPLY'), /empty/);
   assert.throws(() => assertChoice('apply', ''), /exact database confirmation/);
   assert.throws(() => assertChoice('apply', 'APPLY PORTAL UPGRADE 6816004b-dc95-48c9-be52-9bd4131d157f'), /exact database confirmation/);
-  assert.throws(() => assertChoice('apply', 'APPLY PORTAL UPGRADE 6816004b-dc95-48c9-be52-9bd4131d157e'), /backup confirmation/);
+  assert.throws(() => assertChoice('apply', 'APPLY PORTAL UPGRADE 6816004b-dc95-48c9-be52-9bd4131d157e'), /Time Travel recovery/);
   assertChoice('apply', 'APPLY PORTAL UPGRADE 6816004b-dc95-48c9-be52-9bd4131d157e',
-    'BACKUP VERIFIED 6816004b-dc95-48c9-be52-9bd4131d157e');
+    'TIME TRAVEL VERIFIED 6816004b-dc95-48c9-be52-9bd4131d157e');
   assertFiles();
 });
 
@@ -52,6 +52,13 @@ test('remote query response must contain one successful D1 result', () => {
     '[{"success":true,"results":[]},{"success":true,"results":[]}]']) {
     assert.throws(() => queryRows(value), /Unexpected remote D1/);
   }
+});
+
+test('Time Travel recovery bookmark is strictly validated', () => {
+  const bookmark = '00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683';
+  assert.equal(readBookmark(JSON.stringify({bookmark})), bookmark);
+  for (const value of ['{}', '{"bookmark":"invalid"}', '{"bookmark":null}'])
+    assert.throws(() => readBookmark(value), /bookmark is unavailable/);
 });
 
 test('initial schema upgrades to the reviewed columns without losing records', () => {
