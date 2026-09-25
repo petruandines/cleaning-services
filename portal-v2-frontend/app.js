@@ -8,13 +8,22 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     appointments: 'Programări', jobs: 'Lucrări', payments: 'Plăți',
     messages: 'Mesaje', locations: 'Locații', clients: 'Clienți',
   };
+  const singular = {
+    appointments: 'Programare', jobs: 'Lucrare', payments: 'Plată',
+    messages: 'Mesaj', locations: 'Locație', clients: 'Client',
+  };
+  const states = {
+    requested: 'Solicitată', confirmed: 'Confirmată', in_progress: 'În curs',
+    completed: 'Finalizată', cancelled: 'Anulată', planned: 'Planificată',
+    pending: 'În așteptare', reversed: 'Anulată', active: 'Activ', inactive: 'Inactiv',
+    PF: 'Persoană fizică', PJ: 'Firmă',
+  };
   const fields = {
-    appointments: { starts_at: 'Începe', ends_at: 'Se termină', status: 'Stare', client_note: 'Detalii', estimated_cost_bani: 'Estimare' },
-    jobs: { service_name: 'Serviciu', description: 'Descriere', status: 'Stare', price_bani: 'Preț', completed_at: 'Finalizată' },
-    payments: { amount_bani: 'Sumă', status: 'Stare', recorded_at: 'Înregistrată' },
-    messages: { body: 'Mesaj', created_at: 'Trimis la' },
-    locations: { label: 'Nume', address: 'Adresă', city: 'Oraș', county: 'Județ' },
-    clients: { display_name: 'Nume', kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI', status: 'Stare' },
+    appointments: { starts_at: 'Începe', ends_at: 'Se termină', client_note: 'Detalii', estimated_cost_bani: 'Estimare' },
+    jobs: { description: 'Descriere', price_bani: 'Preț', completed_at: 'Finalizată' },
+    payments: { amount_bani: 'Sumă', recorded_at: 'Înregistrată', note: 'Detalii' },
+    locations: { address: 'Adresă', city: 'Oraș', county: 'Județ' },
+    clients: { kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI' },
   };
   const forms = {
     clients: [
@@ -106,6 +115,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   }
   function format(key, value) {
     if (value === null || value === undefined || value === '') return '—';
+    if (['status', 'kind'].includes(key)) return states[value] || String(value);
     if (key.endsWith('_bani')) return new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(value / 100);
     if (['starts_at', 'ends_at', 'completed_at', 'recorded_at', 'created_at'].includes(key)) {
       const date = new Date(value);
@@ -124,14 +134,48 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       return;
     }
     const cards = document.createElement('div');
-    cards.className = 'cards';
-    for (const row of rows) {
+    cards.className = section === 'messages' ? 'conversation' : 'cards';
+    if (section === 'messages' && user?.role === 'staff' && !currentClientId) {
+      const tip = document.createElement('p');
+      tip.className = 'conversation-tip';
+      tip.textContent = 'Alege un client din lista de mai sus pentru a vedea conversația lui.';
+      container.append(tip);
+    }
+    for (const row of section === 'messages' ? [...rows].reverse() : rows) {
+      if (section === 'messages') {
+        const bubble = document.createElement('article');
+        bubble.className = 'bubble ' + (row.sender_user_id === user?.id ? 'bubble-mine' : 'bubble-theirs');
+        const sender = document.createElement('strong');
+        sender.textContent = row.sender_user_id === user?.id ? 'Tu' : row.sender_name || 'Petru & Inés';
+        const body = document.createElement('p');
+        body.textContent = row.body;
+        const meta = document.createElement('small');
+        meta.textContent = (user?.role === 'staff' && !currentClientId ? row.client_name + ' · ' : '') + format('created_at', row.created_at);
+        bubble.append(sender, body, meta);
+        cards.append(bubble);
+        continue;
+      }
       const card = document.createElement('article');
       card.className = 'card';
+      const top = document.createElement('div');
+      top.className = 'card-top';
       const title = document.createElement('h3');
-      title.textContent = row.service_name || row.display_name || row.label ||
-        (section === 'messages' ? 'Mesaj' : sections[section].slice(0, -1));
-      card.append(title);
+      title.textContent = section === 'appointments' ? (row.client_name || singular.appointments) :
+        row.service_name || row.display_name || row.label || singular[section];
+      top.append(title);
+      if (row.status) {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = format('status', row.status);
+        top.append(badge);
+      }
+      card.append(top);
+      if (section === 'appointments') {
+        const location = document.createElement('p');
+        location.className = 'card-location';
+        location.textContent = '⌖ ' + (row.location_name || 'Locație') + (row.location_address ? ' · ' + row.location_address : '');
+        card.append(location);
+      }
       const details = document.createElement('dl');
       for (const [key, label] of Object.entries(fields[section])) {
         if (row[key] === null || row[key] === undefined || row[key] === '') continue;
@@ -141,7 +185,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
         description.textContent = format(key, row[key]);
         details.append(term, description);
       }
-      card.append(details);
+      if (details.childElementCount) card.append(details);
       cards.append(card);
     }
     container.append(cards);
