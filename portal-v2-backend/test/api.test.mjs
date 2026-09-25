@@ -73,6 +73,10 @@ test('client sees only own appointment and no internal note; staff sees both', a
   assert.deepEqual(a.rows.map(row => row.id), ['ap_a']);
   assert.deepEqual(b.rows.map(row => row.id), ['ap_b']);
   assert.deepEqual(staff.rows.map(row => row.id).sort(), ['ap_a', 'ap_b']);
+  assert.equal(a.rows[0].client_name, 'a');
+  assert.equal(a.rows[0].location_name, 'Locație');
+  assert.equal(a.rows[0].location_address, 'Strada Test');
+  assert.equal(b.rows[0].client_name, 'b');
   assert.equal('internal_note' in a.rows[0], false);
   assert.equal((await call('clients', 'a')).status, 403);
   assert.equal((await call('clients', 'admin')).status, 200);
@@ -86,6 +90,10 @@ test('message write derives company from session, ignores forged client ID', asy
   });
   assert.equal(response.status, 201);
   assert.equal(sqlite.prepare('SELECT client_id FROM messages').get().client_id, 'a');
+  const ownMessages = await (await call('messages', 'a')).json();
+  const otherMessages = await (await call('messages', 'b')).json();
+  assert.equal(ownMessages.rows[0].client_name, 'a');
+  assert.equal(otherMessages.rows.length, 0);
   assert.equal(sqlite.prepare('SELECT client_id, actor_user_id FROM audit_events').get().actor_user_id, 'user_a');
   assert.equal((await call('messages', 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"body":"salut"}' })).status, 400);
 });
