@@ -1,0 +1,29 @@
+name: Portal Worker public verification (read only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read the reviewed verifier at a fixed commit
+        uses: actions/checkout@v4
+        with:
+          ref: 5361df18875e74af136d630c5cb5b28e2e5afea2
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test read-only verifier
+        run: node --test test/verify-worker-phone.test.mjs
+        working-directory: portal-v2-backend
+      - name: Check public login and anonymous API
+        run: node scripts/verify-worker-phone.mjs
+        working-directory: portal-v2-backend
