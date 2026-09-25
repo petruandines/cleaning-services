@@ -74,6 +74,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   let currentClientLabel = '';
   let formKey = '';
   let searchTimer = null;
+  let editingId = '';
 
   function notice(message) {
     $('notice').textContent = message;
@@ -100,6 +101,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     currentClientId = '';
     currentClientLabel = '';
     formKey = '';
+    editingId = '';
   }
   function ready() {
     try {
@@ -113,7 +115,12 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       headers: { authorization: 'Bearer ' + token, ...(options.body ? { 'content-type': 'application/json' } : {}) },
     });
     if (response.status === 401) { clearSession(); throw new Error('Sesiunea a expirat. Intră din nou în cont.'); }
-    if (!response.ok) throw new Error('Cererea nu a putut fi finalizată. Încearcă din nou.');
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      if (response.status === 409 && detail.error === 'has_related_records')
+        throw new Error('Această înregistrare are elemente asociate. Șterge mai întâi înregistrările dependente.');
+      throw new Error('Cererea nu a putut fi finalizată. Încearcă din nou.');
+    }
     return response.json();
   }
   function format(key, value) {
@@ -155,6 +162,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
         const meta = document.createElement('small');
         meta.textContent = (user?.role === 'staff' && !currentClientId ? row.client_name + ' · ' : '') + format('created_at', row.created_at);
         bubble.append(sender, body, meta);
+        addActions(bubble, row);
         cards.append(bubble);
         continue;
       }
@@ -189,9 +197,70 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
         details.append(term, description);
       }
       if (details.childElementCount) card.append(details);
+      addActions(card, row);
       cards.append(card);
     }
     container.append(cards);
+  }
+  function addActions(container, row) {
+    if (user?.role !== 'staff') return;
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    for (const [label, action] of [['Editează', () => beginEdit(row)], ['Șterge', () => deleteRecord(row)]]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary';
+      button.textContent = label;
+      button.addEventListener('click', action);
+      actions.append(button);
+    }
+    container.append(actions);
+  }
+  function dateForInput(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const two = number => String(number).padStart(2, '0');
+    return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}T${two(date.getHours())}:${two(date.getMinutes())}`;
+  }
+  async function beginEdit(row) {
+    const editingSection = section;
+    const editingGeneration = generation;
+    if (section !== 'clients' && currentClientId !== row.client_id) {
+      currentClientId = row.client_id;
+      currentClientLabel = row.client_name || 'Client selectat';
+      await refreshClientChoices();
+      if (editingGeneration !== generation || section !== editingSection) return;
+    }
+    editingId = row.id;
+    formKey = '';
+    await renderStaffForm();
+    if (editingGeneration !== generation || section !== editingSection || editingId !== row.id) return;
+    const form = $('staff-form');
+    for (const [key, value] of Object.entries(row)) {
+      const control = form.elements.namedItem(key);
+      if (!control || !('value' in control)) continue;
+      control.value = key.endsWith('_bani') ? value === null ? '' : (value / 100).toFixed(2).replace('.', ',') :
+        ['starts_at', 'ends_at', 'recorded_at'].includes(key) ? value ? dateForInput(value) : '' : value ?? '';
+    }
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  async function deleteRecord(row) {
+    const target = section;
+    const label = row.display_name || row.service_name || row.label || singular[target];
+    if (!window.confirm('Ștergi „' + label + '”? Înregistrarea va dispărea din portal.')) return;
+    try {
+      await api('/api/' + target + '/' + encodeURIComponent(row.id), { method: 'DELETE' });
+      if (editingId === row.id) cancelEdit();
+      if (target === 'clients' && currentClientId === row.id) {
+        currentClientId = '';
+        currentClientLabel = '';
+        $('client-search').value = '';
+        await refreshClientChoices();
+        await refreshAccounts();
+      }
+      notice('Înregistrarea a fost ștearsă din portal.');
+      if (section === target) await loadSection();
+    } catch (error) { notice(error.message); }
   }
   async function allRelated(name, clientId) {
     const rows = [];
@@ -240,7 +309,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     const form = $('staff-form');
     form.hidden = user?.role !== 'staff';
     if (form.hidden) return;
-    const key = section + ':' + currentClientId + ':' + generation;
+    const key = section + ':' + currentClientId + ':' + generation + ':' + editingId;
     if (formKey === key) return;
     formKey = key;
     const sectionAtStart = section;
@@ -248,13 +317,19 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     const sessionAtStart = generation;
     const fieldsBox = $('staff-fields');
     fieldsBox.replaceChildren();
-    $('staff-form-title').textContent = section === 'messages' ? 'Răspunde clientului' : 'Adaugă · ' + sections[section];
+    $('staff-form-title').textContent = editingId ? 'Editează · ' + singular[section] :
+      section === 'messages' ? 'Răspunde clientului' : 'Adaugă · ' + sections[section];
     const needClient = section !== 'clients' && !currentClientId;
     $('staff-form-hint').hidden = !needClient;
-    form.querySelector('button[type=submit]').hidden = needClient;
+    const submit = form.querySelector('button[type=submit]');
+    submit.hidden = needClient;
+    submit.textContent = editingId ? 'Salvează modificările' : 'Adaugă';
+    $('cancel-edit').hidden = !editingId;
     if (needClient) return;
     const related = [];
-    for (const definition of forms[section]) {
+    const definitions = section === 'clients' && editingId ?
+      [...forms.clients, ['status', 'Stare', 'select', true, [['active', 'Activ'], ['inactive', 'Inactiv']]]] : forms[section];
+    for (const definition of definitions) {
       const { wrapper, control } = makeInput(definition);
       fieldsBox.append(wrapper);
       if (definition[2] === 'related') related.push({ control, name: definition[4] });
@@ -349,6 +424,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     }
   }
   function selectSection(next) {
+    if (next !== section) { editingId = ''; formKey = ''; }
     section = next;
     offset = 0;
     for (const button of $('tabs').querySelectorAll('button')) {
@@ -433,6 +509,8 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     searchTimer = setTimeout(() => refreshClientChoices().catch(error => notice(error.message)), 300);
   });
   $('client-picker').addEventListener('change', event => {
+    editingId = '';
+    formKey = '';
     currentClientId = event.target.value;
     currentClientLabel = event.target.selectedOptions[0]?.textContent || '';
     offset = 0;
@@ -461,28 +539,45 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     const form = event.currentTarget;
     const button = form.querySelector('button[type=submit]');
     const sectionAtStart = section;
+    const editAtStart = editingId;
     const data = section === 'clients' ? {} : { client_id: currentClientId };
     button.disabled = true;
     try {
       for (const [key, value] of new FormData(form)) {
-        if (!value) continue;
+        if (!value) {
+          if (editAtStart && key !== 'kind' && key !== 'status') data[key] = null;
+          continue;
+        }
         data[key] = key.endsWith('_bani') ? leiToBani(value) :
           ['starts_at', 'ends_at', 'recorded_at'].includes(key) ? new Date(value).toISOString() : value;
       }
-      const result = await api('/api/' + sectionAtStart, { method: 'POST', body: JSON.stringify(data) });
-      notice('Înregistrarea a fost adăugată.');
-      if (sectionAtStart === 'clients') {
+      if (editAtStart) delete data.client_id;
+      const result = await api('/api/' + sectionAtStart + (editAtStart ? '/' + encodeURIComponent(editAtStart) : ''),
+        { method: editAtStart ? 'PATCH' : 'POST', body: JSON.stringify(data) });
+      notice(editAtStart ? 'Modificările au fost salvate.' : 'Înregistrarea a fost adăugată.');
+      if (sectionAtStart === 'clients' && !editAtStart) {
         currentClientId = result.id;
         currentClientLabel = data.display_name;
         $('client-search').value = data.display_name;
         await refreshClientChoices();
         await refreshAccounts();
+      } else if (sectionAtStart === 'clients' && editAtStart) {
+        if (currentClientId === editAtStart) currentClientLabel = data.display_name + ' · ' + data.kind;
+        $('client-search').value = data.display_name || '';
+        await refreshClientChoices();
       }
+      editingId = '';
       formKey = '';
       await loadSection();
     } catch (error) { notice(error.message); }
     finally { button.disabled = false; }
   });
+  function cancelEdit() {
+    editingId = '';
+    formKey = '';
+    renderStaffForm();
+  }
+  $('cancel-edit').addEventListener('click', cancelEdit);
   $('logout').addEventListener('click', async () => {
     const previous = token;
     clearSession();
