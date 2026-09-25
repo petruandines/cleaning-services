@@ -1,5 +1,6 @@
 import { commitRecord, createStaffRecord } from './writes.mjs';
 import { changeInitialPassword, createClientUser, mustChangePassword } from './accounts.mjs';
+import { changeStaffRecord } from './mutations.mjs';
 const ORIGIN = 'https://petruandines.github.io';
 const LIMIT = 30;
 
@@ -25,7 +26,7 @@ const lists = Object.freeze({
   locations: 'id, client_id, label, address, city, county, contact_name, contact_phone, contact_email, active, created_at',
   appointments: 'a.id, a.client_id, a.location_id, a.starts_at, a.ends_at, a.status, a.client_note, a.estimated_cost_bani, c.display_name AS client_name, l.label AS location_name, l.address AS location_address',
   jobs: 'id, client_id, appointment_id, service_name, description, status, price_bani, completed_at',
-  payments: 'id, client_id, job_id, amount_bani, status, recorded_at',
+  payments: 'id, client_id, job_id, amount_bani, status, recorded_at, note',
   messages: 'm.id, m.client_id, m.sender_user_id, m.body, m.created_at, m.read_at, c.display_name AS client_name, u.name AS sender_name',
 });
 
@@ -41,19 +42,24 @@ export async function handleApi(request, { db, auth }) {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: {
       'access-control-allow-origin': ORIGIN,
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
       'access-control-allow-headers': 'Authorization, Content-Type',
       'access-control-max-age': '600', 'vary': 'Origin',
     }});
   }
   const url = new URL(request.url);
-  const name = url.pathname.slice('/api/'.length);
-  if (!/^[a-z]+$/.test(name)) return error(404, 'not_found');
+  const [, name, recordId] = /^\/api\/([a-z]+)(?:\/([\w-]{1,100}))?$/.exec(url.pathname) || [];
+  if (!name) return error(404, 'not_found');
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user?.id) return error(401, 'unauthorized');
   const userId = session.user.id;
   const staff = session.user.role === 'admin';
   const initialPassword = staff ? false : await mustChangePassword(db, userId);
+  if (!staff) {
+    const access = await db.prepare("SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active' LIMIT 1")
+      .bind(userId).all();
+    if (!access.results.length) return error(401, 'no_active_client');
+  }
 
   if (name === 'me' && request.method === 'GET') {
     return json({ id: userId, name: session.user.name, role: staff ? 'staff' : 'client',
@@ -62,6 +68,21 @@ export async function handleApi(request, { db, auth }) {
   if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
   if (initialPassword && name !== 'password') return error(403, 'initial_password_required');
   if (!['clients', 'users', 'password'].includes(name) && !Object.hasOwn(lists, name)) return error(404, 'not_found');
+  if (recordId && (request.method === 'PATCH' || request.method === 'DELETE')) {
+    if (!staff || (name !== 'clients' && !Object.hasOwn(lists, name))) return error(403, 'forbidden');
+    if (request.method === 'DELETE') {
+      const result = await changeStaffRecord(db, name, recordId, null, userId);
+      return result.error ? error(result.status, result.error) : json({ deleted: true });
+    }
+    if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return error(415, 'json_required');
+    const raw = await request.text();
+    if (raw.length > 6000) return error(413, 'payload_too_large');
+    let data;
+    try { data = JSON.parse(raw); } catch { return error(400, 'invalid_json'); }
+    const result = await changeStaffRecord(db, name, recordId, data, userId);
+    return result.error ? error(result.status, result.error) : json({ id: result.id });
+  }
+  if (recordId) return error(405, 'method_not_allowed');
 
   if (name === 'users' && request.method === 'GET') {
     if (!staff) return error(403, 'forbidden');
@@ -85,9 +106,9 @@ export async function handleApi(request, { db, auth }) {
     // Only constant SQL fragments are interpolated. IDs never become SQL source.
     let sql, params;
     if (name === 'clients') {
-      sql = 'SELECT id, kind, display_name, email, phone, company_name, cui, status FROM clients';
+      sql = 'SELECT id, kind, display_name, email, phone, company_name, cui, status FROM clients WHERE deleted_at IS NULL';
       params = [];
-      if (search?.trim()) { sql += ' WHERE instr(lower(display_name), lower(?)) > 0'; params.push(search.trim()); }
+      if (search?.trim()) { sql += ' AND instr(lower(display_name), lower(?)) > 0'; params.push(search.trim()); }
       sql += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
     } else {
       const joined = name === 'appointments' ?
@@ -95,11 +116,11 @@ export async function handleApi(request, { db, auth }) {
         name === 'messages' ?
           'messages m JOIN clients c ON c.id = m.client_id LEFT JOIN "user" u ON u.id = m.sender_user_id' : name;
       const prefix = name === 'appointments' ? 'a.' : name === 'messages' ? 'm.' : '';
-      sql = `SELECT ${lists[name]} FROM ${joined}`;
+      sql = `SELECT ${lists[name]} FROM ${joined} WHERE ${prefix}deleted_at IS NULL`;
       params = [];
-      if (staff && clientId) { sql += ` WHERE ${prefix}client_id = ?`; params.push(clientId); }
+      if (staff && clientId) { sql += ` AND ${prefix}client_id = ?`; params.push(clientId); }
       if (!staff) {
-        sql += ` WHERE ${prefix}client_id IN (SELECT client_id FROM client_users WHERE user_id = ?)`;
+        sql += ` AND ${prefix}client_id IN (SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active')`;
         params.push(userId);
       }
       sql += ` ORDER BY ${prefix}${order[name]}, ${prefix}id DESC LIMIT ? OFFSET ?`;
@@ -133,7 +154,7 @@ export async function handleApi(request, { db, auth }) {
     if (typeof body !== 'string' || !body.trim() || body.trim().length > 4000) return error(400, 'invalid_message');
     // A client with access to several companies must choose one later. We
     // reject this ambiguous write instead of trusting a client_id in JSON.
-    const access = await db.prepare('SELECT client_id FROM client_users WHERE user_id = ? LIMIT 2').bind(userId).all();
+    const access = await db.prepare("SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active' LIMIT 2").bind(userId).all();
     if (access.results.length !== 1) return error(403, 'client_scope_required');
     const id = crypto.randomUUID();
     const at = new Date().toISOString();
