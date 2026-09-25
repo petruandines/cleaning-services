@@ -10,7 +10,8 @@ import worker from '../src/index.mjs';
 test('admin links a client account; temporary password gate and session rotation', async () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys = ON');
-  for (const path of ['0001_app_schema.sql', '0002_auth.sql', '0003_portal_accounts.sql'])
+  for (const path of ['0001_app_schema.sql', '0002_auth.sql', '0003_portal_accounts.sql',
+    '0004_location_contact.sql', '0005_soft_delete.sql'])
     sqlite.exec(readFileSync(new URL('../../docs/portal-v2/' + path, import.meta.url), 'utf8'));
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
