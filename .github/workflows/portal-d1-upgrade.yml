@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Inspect first; apply only after backup and successful inspect
+        description: Inspect first; apply only after recovery check and successful inspect
         required: true
         type: choice
         options:
@@ -16,7 +16,7 @@ on:
         required: false
         type: string
       backup_confirmation:
-        description: For apply, type BACKUP VERIFIED followed by the D1 UUID
+        description: For apply, type TIME TRAVEL VERIFIED followed by the D1 UUID
         required: false
         type: string
 
@@ -36,7 +36,7 @@ jobs:
       - name: Read the reviewed upgrade at a fixed commit
         uses: actions/checkout@v4
         with:
-          ref: 7387062c47ad5a11e79692de1d507c1175b4b006
+          ref: 2232b85c8ec37c596b8aaa42203c1b3d49865c1d
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@v4
