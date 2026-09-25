@@ -48,7 +48,7 @@ export async function createStaffRecord(db, name, data, actor) {
     values = [id, kind, display, email, phone, company, cui, now, now];
   } else {
     const allowed = {
-      locations: ['client_id', 'label', 'address', 'city', 'county'],
+      locations: ['client_id', 'label', 'address', 'city', 'county', 'contact_name', 'contact_phone', 'contact_email'],
       appointments: ['client_id', 'location_id', 'starts_at', 'ends_at', 'status', 'client_note', 'estimated_cost_bani'],
       jobs: ['client_id', 'appointment_id', 'service_name', 'description', 'status', 'price_bani'],
       payments: ['client_id', 'job_id', 'amount_bani', 'status', 'recorded_at', 'note'],
@@ -62,9 +62,13 @@ export async function createStaffRecord(db, name, data, actor) {
     if (name === 'locations') {
       const label = text(data.label, 160), address = text(data.address, 300);
       const city = text(data.city, 120), county = text(data.county, 120);
-      if ([label, address, city, county].includes(undefined)) return bad('invalid_location');
-      sql = 'INSERT INTO locations (id, client_id, label, address, city, county, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-      values = [id, clientId, label, address, city, county, now, now];
+      const contactName = text(data.contact_name, 160, false);
+      const contactPhone = text(data.contact_phone, 40, false);
+      const contactEmail = text(data.contact_email, 254, false);
+      if ([label, address, city, county, contactName, contactPhone, contactEmail].includes(undefined) ||
+        (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail))) return bad('invalid_location');
+      sql = 'INSERT INTO locations (id, client_id, label, address, city, county, contact_name, contact_phone, contact_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+      values = [id, clientId, label, address, city, county, contactName, contactPhone, contactEmail, now, now];
     } else if (name === 'appointments') {
       const location = text(data.location_id, 100);
       const start = time(data.starts_at), end = time(data.ends_at);
