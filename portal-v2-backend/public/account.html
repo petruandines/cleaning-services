@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ro"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Cont nou · Petru & Inés</title>
+<link rel="stylesheet" href="/login.css"><script src="/account.js" defer></script>
+</head><body><main>
+<header><strong>Petru & Inés</strong><span>Administrare portal</span></header>
+<section id="loading"><h1>Pregătim contul</h1><p>Revino în portal dacă această fereastră nu se conectează.</p></section>
+<section id="ready" hidden><h1>Cont nou de client</h1><p id="client-name"></p>
+<form id="account-form">
+<label>Nume utilizator<input name="name" autocomplete="off" maxlength="160" required></label>
+<label>E-mail de autentificare<input name="email" type="email" autocomplete="off" maxlength="254" required></label>
+<label>Parolă temporară<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+<button id="generate" type="button">Generează parolă</button> <button id="copy" type="button">Copiază parola</button>
+<label><input name="saved" type="checkbox" required> Am salvat parola ca să o pot transmite clientului în privat.</label>
+<button type="submit">Creează contul</button>
+</form><p>Clientul va schimba parola la prima intrare. Parola nu va mai fi afișată după crearea contului.</p></section>
+<section id="done" hidden><h1>Cont creat</h1><p>Clientul este asociat și va schimba parola la prima conectare.</p><button id="close" type="button">Închide fereastra</button></section>
+<p id="error" role="alert" hidden></p>
+</main></body></html>
