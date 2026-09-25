@@ -7,6 +7,7 @@ import { handleApi, ORIGIN } from '../src/api.mjs';
 const schema = readFileSync(new URL('../../docs/portal-v2/0001_app_schema.sql', import.meta.url), 'utf8');
 const authSchema = readFileSync(new URL('../../docs/portal-v2/0002_auth.sql', import.meta.url), 'utf8');
 const accountSchema = readFileSync(new URL('../../docs/portal-v2/0003_portal_accounts.sql', import.meta.url), 'utf8');
+const contactSchema = readFileSync(new URL('../../docs/portal-v2/0004_location_contact.sql', import.meta.url), 'utf8');
 const now = '2026-09-24T10:00:00Z';
 
 function setup() {
@@ -15,6 +16,7 @@ function setup() {
   sqlite.exec(schema);
   sqlite.exec(authSchema);
   sqlite.exec(accountSchema);
+  sqlite.exec(contactSchema);
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
       .run(id, 'PF', id, now, now);
@@ -153,6 +155,26 @@ test('cross-client references and invalid money cannot be written', async () => 
   assert.equal((await post('clients', { kind: 'PF', display_name: 'Test', role: 'admin' })).status, 400);
   assert.equal((await post('locations', { client_id: 'a', label: 'x', address: 'y', city: 'z', county: 'q' }, 'admin_pending')).status, 403);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payments').get().n, 0);
+});
+
+test('location contact is optional, validated and visible only within client scope', async () => {
+  const { call } = setup();
+  const create = data => call('locations', 'admin', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+  const base = { client_id: 'a', label: 'Sediu', address: 'Strada A', city: 'București', county: 'București' };
+  const empty = await create(base);
+  assert.equal(empty.status, 201);
+  const withContact = await create({ ...base, contact_name: 'Ana', contact_phone: '0700000000', contact_email: 'ana@example.test' });
+  assert.equal(withContact.status, 201);
+  assert.equal((await create({ ...base, contact_email: 'greșit' })).status, 400);
+  const own = await (await call('locations', 'a')).json();
+  const other = await (await call('locations', 'b')).json();
+  const emptyId = (await empty.json()).id;
+  const contactId = (await withContact.json()).id;
+  assert.equal(own.rows.find(row => row.id === emptyId).contact_name, null);
+  assert.equal(own.rows.find(row => row.id === contactId).contact_email, 'ana@example.test');
+  assert.equal(other.rows.some(row => row.contact_email === 'ana@example.test'), false);
 });
 
 test('failed audit rolls back the business record', async () => {
