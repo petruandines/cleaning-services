@@ -23,10 +23,10 @@ function allowedOrigin(request) {
 
 const lists = Object.freeze({
   locations: 'id, client_id, label, address, city, county, active, created_at',
-  appointments: 'id, client_id, location_id, starts_at, ends_at, status, client_note, estimated_cost_bani',
+  appointments: 'a.id, a.client_id, a.location_id, a.starts_at, a.ends_at, a.status, a.client_note, a.estimated_cost_bani, c.display_name AS client_name, l.label AS location_name, l.address AS location_address',
   jobs: 'id, client_id, appointment_id, service_name, description, status, price_bani, completed_at',
   payments: 'id, client_id, job_id, amount_bani, status, recorded_at',
-  messages: 'id, client_id, sender_user_id, body, created_at, read_at',
+  messages: 'm.id, m.client_id, m.sender_user_id, m.body, m.created_at, m.read_at, c.display_name AS client_name, u.name AS sender_name',
 });
 
 const order = Object.freeze({
@@ -90,14 +90,19 @@ export async function handleApi(request, { db, auth }) {
       if (search?.trim()) { sql += ' WHERE instr(lower(display_name), lower(?)) > 0'; params.push(search.trim()); }
       sql += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
     } else {
-      sql = `SELECT ${lists[name]} FROM ${name}`;
+      const joined = name === 'appointments' ?
+        'appointments a JOIN clients c ON c.id = a.client_id JOIN locations l ON l.id = a.location_id AND l.client_id = a.client_id' :
+        name === 'messages' ?
+          'messages m JOIN clients c ON c.id = m.client_id LEFT JOIN "user" u ON u.id = m.sender_user_id' : name;
+      const prefix = name === 'appointments' ? 'a.' : name === 'messages' ? 'm.' : '';
+      sql = `SELECT ${lists[name]} FROM ${joined}`;
       params = [];
-      if (staff && clientId) { sql += ' WHERE client_id = ?'; params.push(clientId); }
+      if (staff && clientId) { sql += ` WHERE ${prefix}client_id = ?`; params.push(clientId); }
       if (!staff) {
-        sql += ' WHERE client_id IN (SELECT client_id FROM client_users WHERE user_id = ?)';
+        sql += ` WHERE ${prefix}client_id IN (SELECT client_id FROM client_users WHERE user_id = ?)`;
         params.push(userId);
       }
-      sql += ` ORDER BY ${order[name]}, id DESC LIMIT ? OFFSET ?`;
+      sql += ` ORDER BY ${prefix}${order[name]}, ${prefix}id DESC LIMIT ? OFFSET ?`;
     }
     const result = await db.prepare(sql).bind(...params, LIMIT + 1, offset).all();
     return json({ rows: result.results.slice(0, LIMIT), nextOffset: result.results.length > LIMIT ? offset + LIMIT : null });
