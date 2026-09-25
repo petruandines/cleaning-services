@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { assertChoice, assertFiles, assertSchema, queryRows } from '../scripts/upgrade-phone.mjs';
 
 const tables = [
@@ -50,4 +52,32 @@ test('remote query response must contain one successful D1 result', () => {
     '[{"success":true,"results":[]},{"success":true,"results":[]}]']) {
     assert.throws(() => queryRows(value), /Unexpected remote D1/);
   }
+});
+
+test('initial schema upgrades to the reviewed columns without losing records', () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec('CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL)');
+  const sql = name => readFileSync(new URL('../../docs/portal-v2/' + name, import.meta.url), 'utf8');
+  for (const name of names.slice(0, 3)) {
+    db.exec(sql(name));
+    db.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(name);
+  }
+  db.prepare('INSERT INTO clients (id, kind, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run('kept', 'PF', 'Păstrat', '2026-09-25T00:00:00Z', '2026-09-25T00:00:00Z');
+  const snapshot = () => ({
+    tables: db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .all().map(row => row.name),
+    migrations: db.prepare('SELECT name FROM d1_migrations ORDER BY id').all().map(row => row.name),
+    columns: Object.fromEntries(entities.map(table => [table, db.prepare(`PRAGMA table_info(${table})`).all().map(row => row.name)])),
+  });
+  assertSchema(snapshot());
+  for (const name of names.slice(3)) {
+    db.exec(sql(name));
+    db.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(name);
+  }
+  assertSchema(snapshot(), true);
+  assert.equal(db.prepare('SELECT display_name, deleted_at FROM clients WHERE id = ?').get('kept').display_name, 'Păstrat');
+  assert.equal(db.prepare('SELECT deleted_at FROM clients WHERE id = ?').get('kept').deleted_at, null);
+  db.close();
 });
