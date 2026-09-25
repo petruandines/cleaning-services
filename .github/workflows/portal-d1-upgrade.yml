@@ -1,0 +1,62 @@
+name: Portal D1 versioned upgrade (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect first; apply only after recovery check and successful inspect
+        required: true
+        type: choice
+        options:
+          - inspect
+          - apply
+        default: inspect
+      confirmation:
+        description: For apply, type APPLY PORTAL UPGRADE followed by the D1 UUID
+        required: false
+        type: string
+      backup_confirmation:
+        description: For apply, type TIME TRAVEL VERIFIED followed by the D1 UUID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-d1-versioned-upgrade
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Read the reviewed upgrade at a fixed commit
+        uses: actions/checkout@v4
+        with:
+          ref: 2232b85c8ec37c596b8aaa42203c1b3d49865c1d
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal-v2-backend/package-lock.json
+      - name: Install locked dependencies without the Cloudflare token
+        run: npm ci --no-audit --no-fund
+        working-directory: portal-v2-backend
+      - name: Test the backend and upgrade guards without the Cloudflare token
+        run: npm test
+        working-directory: portal-v2-backend
+      - name: Inspect or apply exactly the two new migrations
+        working-directory: portal-v2-backend
+        env:
+          CI: 'true'
+          CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_D1_UPGRADE_TOKEN }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          BACKUP_CONFIRMATION: ${{ inputs.backup_confirmation }}
+        run: node scripts/upgrade-phone.mjs "$OPERATION" "$CONFIRMATION" "$BACKUP_CONFIRMATION"
