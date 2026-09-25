@@ -1,7 +1,7 @@
-# Portal API — draft, nu este publicat
+# Portal API — Worker publicat pentru testare; portalul public nu este comutat
 
 Interfața rămâne la `https://petruandines.github.io/cleaning-services/portal/`.
-Acest Worker va primi cereri de pe acel origin. Codul nu conține credentiale; 
+Acest Worker primește cereri de pe acel origin după conectarea interfeței noi. Codul nu conține credentiale; 
 `BETTER_AUTH_SECRET` se setează ca Worker secret, niciodată în repository.
 
 ## Stare
@@ -39,6 +39,8 @@ Proba executată aici: export **D1 local** → criptare → verificare → decri
 Proprietarul a creat baza D1 și a furnizat UUID-ul `6816004b-dc95-48c9-be52-9bd4131d157e` și subdomeniul `petruandines.workers.dev`. Sunt deja în `wrangler.jsonc`, iar adresa API este în configurația interfeței de previzualizare. Captura Cloudflare Settings arată baza `petru-ines-portal-eu`, jurisdicția **The European Union** și regiunea Eastern Europe. [Rularea GitHub Actions din 24 septembrie 2026](https://github.com/petruandines/cleaning-services/actions/runs/36050649911) a confirmat și legătura dintre UUID, nume, jurisdicție și contul Cloudflare, numai prin citire. Nu transmite parola Cloudflare, coduri 2FA, chei API sau cheia de backup în chat ori GitHub.
 
 Pe telefon, urmează [fluxul manual `inspect` / `apply`](../docs/portal-v2/cloudflare-phone-migrations.md), cu token nou D1 limitat și confirmare explicită la aplicare. `scripts/migrate-phone.mjs` refuză o bază cu tabele deja prezente și verifică cele trei fișiere SQL înainte de migrare; dacă `apply` eșuează, inspectează cauza înainte de o nouă încercare. Pe un calculator controlat rămâne disponibilă alternativa `node scripts/verify-remote-d1.mjs` urmată de `npm run migrate:remote`, în terminal interactiv. Migrațiile aplică în ordine `0001_app_schema.sql`, `0002_auth.sql`, `0003_portal_accounts.sql` și sunt urmărite în `d1_migrations`. Migrațiile remote **au fost aplicate și verificate** în [rularea #3](https://github.com/petruandines/cleaning-services/actions/runs/36095944402). Tokenul temporar de migrare a fost revocat, iar secretul GitHub aferent a fost șters. **Nu relansa `apply`.** Adresa pregătită este `https://petru-ines-portal-api.petruandines.workers.dev`; nu presupune că răspunde până la primul deploy. Creează un `BETTER_AUTH_SECRET` aleator, păstrat în afara GitHub; la primul deploy poate fi încărcat cu `wrangler deploy --secrets-file /cale-privată/worker.env` (fișier privat cu `BETTER_AUTH_SECRET=...`). Nu încărca acel fișier în GitHub. Verifică apoi fluxul complet cu conturi fictive și TOTP. Pentru backupul inițial folosește comenzile de mai sus și o bază D1 remote **distinctă** pentru proba de restaurare. Până la aceste verificări nu comuta directorul `portal/` public și nu importa date reale.
+
+Workerul a fost publicat la `https://petru-ines-portal-api.petruandines.workers.dev` prin rularea manuală `deploy` #3 (25 septembrie 2026). Jobul a afișat roșu din cauza unui test de disponibilitate prea grăbit, însă ulterior `/login` a răspuns HTTP 200 și `/api/me` anonim HTTP 401. Nu relansa prima publicare. Pentru verificare ulterioară folosește workflow-ul read-only `portal-worker-verify.yml` de pe `main`, fără secret. Portalul public GitHub Pages rămâne pe Appwrite.
 
 ## Prima publicare a Workerului de pe telefon
 
