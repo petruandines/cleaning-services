@@ -8,6 +8,7 @@ const schema = readFileSync(new URL('../../docs/portal-v2/0001_app_schema.sql', 
 const authSchema = readFileSync(new URL('../../docs/portal-v2/0002_auth.sql', import.meta.url), 'utf8');
 const accountSchema = readFileSync(new URL('../../docs/portal-v2/0003_portal_accounts.sql', import.meta.url), 'utf8');
 const contactSchema = readFileSync(new URL('../../docs/portal-v2/0004_location_contact.sql', import.meta.url), 'utf8');
+const archiveSchema = readFileSync(new URL('../../docs/portal-v2/0005_soft_delete.sql', import.meta.url), 'utf8');
 const now = '2026-09-24T10:00:00Z';
 
 function setup() {
@@ -17,6 +18,7 @@ function setup() {
   sqlite.exec(authSchema);
   sqlite.exec(accountSchema);
   sqlite.exec(contactSchema);
+  sqlite.exec(archiveSchema);
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
       .run(id, 'PF', id, now, now);
@@ -210,4 +212,74 @@ test('staff client filter works but cannot alter client account isolation', asyn
   assert.deepEqual(staff.rows.map(row => row.id), ['ap_b']);
   assert.equal((await call('appointments?client_id=b', 'a')).status, 400);
   assert.deepEqual((await (await call('appointments', 'a')).json()).rows.map(row => row.id), ['ap_a']);
+});
+
+test('staff edits scoped records; a client cannot edit or archive anything', async () => {
+  const { call, sqlite } = setup();
+  const patch = (path, token, data) => call(path, token, { method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  assert.equal((await patch('appointments/ap_a', 'a', { status: 'cancelled' })).status, 403);
+  assert.equal((await call('appointments/ap_a', 'a', { method: 'DELETE' })).status, 403);
+  assert.equal((await patch('appointments/ap_a', 'admin_pending', { status: 'cancelled' })).status, 403);
+  assert.equal((await patch('appointments/ap_a', 'admin', { client_id: 'b' })).status, 400);
+  assert.equal((await patch('appointments/ap_a', 'admin', { location_id: 'loc_b' })).status, 400);
+  assert.equal((await patch('appointments/ap_a', 'admin', { ends_at: '2026-09-24T09:00:00.000Z' })).status, 400);
+  assert.equal((await patch('appointments/ap_a', 'admin', { status: 'cancelled', client_note: 'Reprogramăm' })).status, 200);
+  const a = await (await call('appointments', 'a')).json();
+  assert.equal(a.rows[0].status, 'cancelled');
+  assert.equal(a.rows[0].client_note, 'Reprogramăm');
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action = 'update'").get().n, 1);
+});
+
+test('archive preserves history, prevents linked deletion and revokes client access', async () => {
+  const { call, sqlite } = setup();
+  const archive = path => call(path, 'admin', { method: 'DELETE' });
+  assert.equal((await archive('clients/a')).status, 409);
+  assert.equal((await archive('locations/loc_a')).status, 409);
+  assert.equal((await archive('appointments/ap_a')).status, 200);
+  assert.equal((await (await call('appointments', 'a')).json()).rows.length, 0);
+  assert.equal(sqlite.prepare('SELECT id FROM appointments WHERE id = ?').get('ap_a').id, 'ap_a');
+  assert.equal((await archive('appointments/ap_a')).status, 404);
+  assert.equal((await archive('locations/loc_a')).status, 200);
+  assert.equal((await archive('clients/a')).status, 200);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM client_users WHERE client_id = ?').get('a').n, 0);
+  assert.equal((await (await call('clients', 'admin')).json()).rows.some(row => row.id === 'a'), false);
+  assert.equal((await call('locations', 'a')).status, 401);
+  assert.equal((await call('me', 'a')).status, 401);
+  assert.equal((await call('messages', 'a', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body: 'Acum?' }) })).status, 401);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action = 'delete'").get().n, 3);
+});
+
+test('financial records and messages can be changed and archived with audit', async () => {
+  const { call, sqlite } = setup();
+  const post = (name, data) => call(name, 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data) });
+  const patch = (path, data) => call(path, 'admin', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  const job = (await (await post('jobs', { client_id: 'a', service_name: 'Curățenie' })).json()).id;
+  const payment = (await (await post('payments', { client_id: 'a', job_id: job, amount_bani: 10000 })).json()).id;
+  const message = (await (await post('messages', { client_id: 'a', body: 'Salut' })).json()).id;
+  assert.equal((await call('jobs/' + job, 'admin', { method: 'DELETE' })).status, 409);
+  assert.equal((await patch('payments/' + payment, { amount_bani: 25000, note: 'Transfer bancar' })).status, 200);
+  assert.equal((await patch('payments/' + payment, { job_id: 'job_b' })).status, 400);
+  assert.equal((await patch('messages/' + message, { body: 'Bună ziua!' })).status, 200);
+  assert.equal((await call('payments/' + payment, 'admin', { method: 'DELETE' })).status, 200);
+  assert.equal((await call('jobs/' + job, 'admin', { method: 'DELETE' })).status, 200);
+  assert.equal((await call('messages/' + message, 'admin', { method: 'DELETE' })).status, 200);
+  assert.equal((await (await call('payments', 'a')).json()).rows.length, 0);
+  assert.equal((await (await call('messages', 'a')).json()).rows.length, 0);
+  assert.equal(sqlite.prepare('SELECT amount_bani FROM payments WHERE id = ?').get(payment).amount_bani, 25000);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action IN ('update','delete')").get().n, 5);
+});
+
+test('a failed audit rolls back an archive; inactive clients lose access', async () => {
+  const { call, sqlite } = setup();
+  sqlite.exec("CREATE TRIGGER fail_archival_audit BEFORE INSERT ON audit_events WHEN NEW.action = 'delete' BEGIN SELECT RAISE(ABORT, 'audit failed'); END");
+  await assert.rejects(() => call('appointments/ap_a', 'admin', { method: 'DELETE' }));
+  assert.equal(sqlite.prepare('SELECT deleted_at FROM appointments WHERE id = ?').get('ap_a').deleted_at, null);
+  assert.equal((await (await call('appointments', 'a')).json()).rows.length, 1);
+  const patch = await call('clients/a', 'admin', { method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'inactive' }) });
+  assert.equal(patch.status, 200);
+  assert.equal((await call('me', 'a')).status, 401);
 });
