@@ -39,10 +39,6 @@ Migrațiile inițiale `0001`–`0003` au fost aplicate și verificate în [rular
 
 Workerul curent a fost publicat la `https://petru-ines-portal-api.petruandines.workers.dev` în 25 septembrie 2026. Pentru verificare read-only există `portal-worker-verify.yml` pe `main`.
 
-## Prima publicare a Workerului de pe telefon
-
-Urmează [ghidul pentru telefon](../docs/portal-v2/cloudflare-phone-worker.md) și workflow-ul manual `.github/workflows/portal-worker-deploy.yml`: mai întâi `inspect`, apoi `deploy` numai după verificarea rezultatului. Secretul `BETTER_AUTH_SECRET` se încarcă odată cu codul Workerului; autentificarea anonimă este verificată după publicare. Nu schimba încă `portal/` public și nu introduce clienți reali.
-
 ## Următoarele etape
 
 1. Implementează editarea și ștergerea înregistrărilor, cu permisiuni, audit și protecția relațiilor dintre clienți, programări, lucrări și plăți.
