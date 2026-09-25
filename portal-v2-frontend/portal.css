@@ -17,6 +17,10 @@
 .bubble strong{font-size:13px;color:#31563a}
 .bubble p{margin:5px 0 6px;white-space:pre-wrap;line-height:1.45}
 .bubble small{display:block;color:var(--muted);font-size:11px;text-align:right}
+.card-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.card-actions button{padding:7px 11px;font-size:13px}
+.bubble .card-actions{margin-top:8px;padding-top:8px}
+#cancel-edit{margin-top:8px}
 #message-form{max-width:760px}
 @media(max-width:720px){
   nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;margin-right:-18px;padding-right:18px;-webkit-overflow-scrolling:touch}
