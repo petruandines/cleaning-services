@@ -1,3 +1,5 @@
+import { forgetTabSession, readTabSession, rememberTabSession } from './session.mjs';
+
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
@@ -67,6 +69,7 @@
   }
   function clearSession() {
     generation++;
+    forgetTabSession(window);
     if (accountWindow && !accountWindow.closed) accountWindow.close();
     token = null;
     user = null;
@@ -365,10 +368,12 @@
       if (!response.ok) throw new Error('invalid_session');
       const verified = await response.json();
       if (attempt !== generation) return;
-      if (!verified.id || verified.twoFactorRequired || !['client', 'staff'].includes(verified.role)) throw new Error('invalid_session');
+      if (!verified.id || verified.twoFactorRequired || verified.mustChangePassword ||
+          !['client', 'staff'].includes(verified.role)) throw new Error('invalid_session');
       token = candidate;
       user = verified;
-      notice('');
+      const stored = rememberTabSession(window, candidate);
+      notice(stored ? '' : 'Browserul nu poate păstra sesiunea după reîncărcarea paginii.');
       showWorkspace();
     } catch { if (attempt === generation) { clearSession(); notice('Nu am putut valida sesiunea. Încearcă din nou.'); } }
   });
@@ -455,4 +460,29 @@
     } catch (error) { notice(error.message); }
     finally { button.disabled = false; }
   });
+
+  const saved = readTabSession(window);
+  if (saved && ready()) {
+    const attempt = ++generation;
+    $('login').disabled = true;
+    notice('Verificăm sesiunea din această filă…');
+    fetch(API + '/api/me', {
+      headers: { authorization: 'Bearer ' + saved }, credentials: 'omit', cache: 'no-store',
+    }).then(async response => {
+      if (!response.ok) throw new Error('invalid_session');
+      const verified = await response.json();
+      if (attempt !== generation) return;
+      if (!verified.id || verified.twoFactorRequired || verified.mustChangePassword ||
+          !['client', 'staff'].includes(verified.role)) throw new Error('invalid_session');
+      token = saved;
+      user = verified;
+      notice('');
+      showWorkspace();
+    }).catch(() => {
+      if (attempt === generation) {
+        clearSession();
+        notice('Sesiunea a expirat. Intră din nou în cont.');
+      }
+    }).finally(() => { $('login').disabled = false; });
+  }
 })();
