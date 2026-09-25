@@ -16,7 +16,7 @@ export async function createClientUser({ db, auth, headers, actor, data }) {
     typeof name !== 'string' || name.length < 1 || name.length > 160 ||
     typeof password !== 'string' || password.length < 12 || password.length > 128)
     return { status: 400, error: 'invalid_account' };
-  const client = await db.prepare('SELECT id FROM clients WHERE id = ? LIMIT 1').bind(clientId).all();
+  const client = await db.prepare("SELECT id FROM clients WHERE id = ? AND deleted_at IS NULL AND status = 'active' LIMIT 1").bind(clientId).all();
   if (!client.results.length) return { status: 404, error: 'client_not_found' };
 
   let userId;
