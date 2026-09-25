@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { expectedDatabase, parseWranglerJson, verifyRemoteD1 } from './verify-remote-d1.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const INTERNAL_D1_TABLES = new Set(['_cf_METADATA', '_cf_KV']);
 const MIGRATIONS = Object.freeze({
   '0001_app_schema.sql': '9cd04b2a7825de6330c2298d80f51049e1d9c030321dd09263c34c2dd6a1534f',
   '0002_auth.sql': '0e97e57b5daac492cc0ff859b5951236090ead6a6968bfcaa740408b86f07f66',
@@ -42,7 +43,8 @@ export function tableNames(raw) {
       data[0].results.some(row => typeof row?.name !== 'string')) {
     throw new Error('Unexpected D1 query response');
   }
-  return data[0].results.map(row => row.name).sort();
+  return data[0].results.map(row => row.name)
+    .filter(name => !INTERNAL_D1_TABLES.has(name)).sort();
 }
 
 export function assertEmpty(names) {
@@ -65,8 +67,8 @@ function wrangler(wranglerPath, args) {
 function remoteTables(details) {
   return tableNames(wrangler(details.wrangler, [
     'execute', details.expected.database_name, '--remote', '--json',
-    // D1 itself maintains _cf_METADATA; it is present even in a fresh local D1.
-    '--command', "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '_cf_METADATA' ORDER BY name",
+    // Only the two known D1 system tables are ignored in tableNames().
+    '--command', "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
   ]));
 }
 
