@@ -22,7 +22,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     appointments: { starts_at: 'Începe', ends_at: 'Se termină', client_note: 'Detalii', estimated_cost_bani: 'Estimare' },
     jobs: { description: 'Descriere', price_bani: 'Preț', completed_at: 'Finalizată' },
     payments: { amount_bani: 'Sumă', recorded_at: 'Înregistrată', note: 'Detalii' },
-    locations: { address: 'Adresă', city: 'Oraș', county: 'Județ' },
+    locations: { address: 'Adresă', city: 'Oraș', county: 'Județ', contact_name: 'Persoană de contact', contact_phone: 'Telefon contact', contact_email: 'E-mail contact' },
     clients: { kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI' },
   };
   const forms = {
@@ -35,6 +35,9 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     locations: [
       ['label', 'Nume locație', 'text', true, 160], ['address', 'Adresă', 'text', true, 300],
       ['city', 'Oraș', 'text', true, 120], ['county', 'Județ', 'text', true, 120],
+      ['contact_name', 'Persoană de contact (opțional)', 'text', false, 160],
+      ['contact_phone', 'Telefon contact (opțional)', 'tel', false, 40],
+      ['contact_email', 'E-mail contact (opțional)', 'email', false, 254],
     ],
     appointments: [
       ['location_id', 'Locație', 'related', true, 'locations'],
