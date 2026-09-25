@@ -17,7 +17,7 @@ const clean = (data, allowed) => data && typeof data === 'object' && !Array.isAr
   Object.keys(data).every(key => allowed.includes(key));
 const exists = async (db, table, id, clientId) => {
   // `table` is chosen solely from literal call sites below.
-  const sql = `SELECT id FROM ${table} WHERE id = ?${clientId ? ' AND client_id = ?' : ''} LIMIT 1`;
+  const sql = `SELECT id FROM ${table} WHERE id = ? AND deleted_at IS NULL${clientId ? ' AND client_id = ?' : ''} LIMIT 1`;
   return !!(await db.prepare(sql).bind(...(clientId ? [id, clientId] : [id])).all()).results.length;
 };
 
