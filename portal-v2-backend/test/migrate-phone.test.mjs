@@ -5,12 +5,12 @@ import {
 } from '../scripts/migrate-phone.mjs';
 import { parseWranglerJson } from '../scripts/verify-remote-d1.mjs';
 
-test('phone migration requires an exact apply confirmation and locked SQL', () => {
+test('initial phone migration requires exact confirmation and refuses later migrations', () => {
   assertChoice('inspect', '');
   assert.throws(() => assertChoice('apply', ''), /exact database confirmation/);
   assert.throws(() => assertChoice('apply', 'APPLY 6816004b-dc95-48c9-be52-9bd4131d157f'), /exact database confirmation/);
   assertChoice('apply', 'APPLY 6816004b-dc95-48c9-be52-9bd4131d157e');
-  assertMigrationFiles();
+  assert.throws(() => assertMigrationFiles(), /Unexpected migration files/);
 });
 
 test('phone migration refuses an existing schema or an invalid D1 response', () => {
