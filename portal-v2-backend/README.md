@@ -35,13 +35,13 @@ Proba executată aici: export **D1 local** → criptare → verificare → decri
 
 ## Migrații și publicare
 
-Migrațiile inițiale `0001`–`0003` au fost aplicate și verificate în [rularea inițială](https://github.com/petruandines/cleaning-services/actions/runs/36095944402). **Nu relansa** workflow-ul de migrare inițială: verifică explicit că baza existentă are acele migrații, apoi folosește un flux separat, verificat, cu token temporar D1 Edit și confirmare precisă pentru `0004_location_contact.sql` și `0005_soft_delete.sql` în această ordine. Fă o copie de siguranță înainte de upgrade. Nu transmite tokenul prin chat și revocă-l după aplicare. Publică versiunea nouă a Workerului doar după validarea coloanelor, apoi interfața de previzualizare; păstrează portalul public pe Appwrite până la testarea funcțiilor și restaurării.
+Migrațiile inițiale `0001`–`0003` au fost aplicate și verificate în [rularea inițială](https://github.com/petruandines/cleaning-services/actions/runs/36095944402). **Nu relansa** workflow-ul de migrare inițială: verifică explicit că baza existentă are acele migrații, apoi folosește un flux separat, verificat, cu token temporar D1 Edit și confirmare precisă pentru `0004_location_contact.sql` și `0005_soft_delete.sql` în această ordine. Verifică mai întâi un bookmark Time Travel read-only înainte de upgrade; pe planul Free punctul de revenire este valabil cel mult 7 zile. Aceasta nu înlocuiește exportul criptat separat necesar înainte de folosirea cu date reale. Nu transmite tokenul prin chat și revocă-l după aplicare. Publică versiunea nouă a Workerului doar după validarea coloanelor, apoi interfața de previzualizare; păstrează portalul public pe Appwrite până la testarea funcțiilor și restaurării.
 
 Workerul curent a fost publicat la `https://petru-ines-portal-api.petruandines.workers.dev` în 25 septembrie 2026. Pentru verificare read-only există `portal-worker-verify.yml` pe `main`.
 
 ## Următoarele etape
 
 1. Revizuiește fluxurile de editare/arhivare în previzualizare cu date fictive, inclusiv ordinea ștergerii plăților, lucrărilor și programărilor.
-2. Pregătește și testează un workflow separat de upgrade D1 0004 și 0005; verifică backupul și baza reală înainte de aplicare.
+2. Pregătește și testează un workflow-ul de upgrade D1 0004 și 0005 din `docs/portal-v2/cloudflare-phone-upgrade.md`: întâi `inspect` și punctul Time Travel, apoi `apply` numai după verificarea jurnalului și confirmarea explicită; exportul criptat separat rămâne necesar înainte de date reale.
 3. Publică Workerul și previzualizarea actualizate, testează pe telefon contul echipei și un cont fictiv de client, apoi verifică o restaurare remote într-o bază distinctă.
 4. Abia după verificări planifică trecerea controlată a `/cleaning-services/portal/`.
