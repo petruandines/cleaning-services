@@ -23,9 +23,9 @@ export function assertChoice(operation, confirmation, backupConfirmation = '') {
   if (operation === 'apply' && confirmation !== 'APPLY PORTAL UPGRADE 6816004b-dc95-48c9-be52-9bd4131d157e')
     throw new Error('Upgrade requires the exact database confirmation text');
   if (operation === 'inspect' && confirmation) throw new Error('Inspect confirmation must be empty');
-  if (operation === 'apply' && backupConfirmation !== 'BACKUP VERIFIED 6816004b-dc95-48c9-be52-9bd4131d157e')
-    throw new Error('Upgrade requires a separately verified backup confirmation');
-  if (operation === 'inspect' && backupConfirmation) throw new Error('Inspect backup confirmation must be empty');
+  if (operation === 'apply' && backupConfirmation !== 'TIME TRAVEL VERIFIED 6816004b-dc95-48c9-be52-9bd4131d157e')
+    throw new Error('Upgrade requires an explicit Time Travel recovery confirmation');
+  if (operation === 'inspect' && backupConfirmation) throw new Error('Inspect recovery confirmation must be empty');
 }
 
 export function assertFiles() {
@@ -43,6 +43,14 @@ export function queryRows(raw) {
   if (!Array.isArray(result) || result.length !== 1 || result[0]?.success !== true ||
       !Array.isArray(result[0].results)) throw new Error('Unexpected remote D1 query response');
   return result[0].results;
+}
+
+export function readBookmark(raw) {
+  const result = parseWranglerJson(raw);
+  if (!result || typeof result.bookmark !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}$/i.test(result.bookmark))
+    throw new Error('Time Travel bookmark is unavailable; stop before migration');
+  return result.bookmark;
 }
 
 export function assertSchema({ tables, migrations, columns }, upgraded = false) {
@@ -96,7 +104,12 @@ export function run(operation, confirmation, backupConfirmation) {
   assertFiles();
   const details = verifyRemoteD1();
   assertSchema(remoteState(details));
+  const bookmark = readBookmark(execFileSync(process.execPath,
+    [details.wrangler, 'd1', 'time-travel', 'info', expected.database_name, '--json'],
+    { cwd: ROOT, encoding: 'utf8', timeout: 120000, maxBuffer: 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'] }));
   process.stdout.write('Verified EU D1 identity, initial migration history, columns and five pinned files.\n');
+  process.stdout.write(`Time Travel bookmark before upgrade: ${bookmark}\n`);
   if (operation === 'inspect') return;
   execFileSync(process.execPath, [details.wrangler, 'd1', 'migrations', 'apply', expected.database_name, '--remote'],
     { cwd: ROOT, timeout: 180000, stdio: 'inherit' });
