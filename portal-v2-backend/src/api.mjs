@@ -22,7 +22,7 @@ function allowedOrigin(request) {
 }
 
 const lists = Object.freeze({
-  locations: 'id, client_id, label, address, city, county, active, created_at',
+  locations: 'id, client_id, label, address, city, county, contact_name, contact_phone, contact_email, active, created_at',
   appointments: 'a.id, a.client_id, a.location_id, a.starts_at, a.ends_at, a.status, a.client_note, a.estimated_cost_bani, c.display_name AS client_name, l.label AS location_name, l.address AS location_address',
   jobs: 'id, client_id, appointment_id, service_name, description, status, price_bani, completed_at',
   payments: 'id, client_id, job_id, amount_bani, status, recorded_at',
