@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { assertMigrated, assertMigrationFiles, tableNames } from './migrate-phone.mjs';
 import { expectedDatabase, verifyRemoteD1 } from './verify-remote-d1.mjs';
 import { readFileSync } from 'node:fs';
+import { verifyPublicWorker } from './verify-worker-phone.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ACCOUNT = '47b9f8498a9865c0fbbaca8f0f5cf59d';
@@ -97,12 +98,9 @@ export async function run(operation, confirmation) {
     });
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 
-  // Only probe public endpoints without credentials or customer data.
-  const login = await fetch(`${URL}/login.html`, { redirect: 'error' });
-  const api = await fetch(`${URL}/api/me`, { redirect: 'error' });
-  if (login.status !== 200 || api.status !== 401) {
-    throw new Error(`Worker smoke check failed: login HTTP ${login.status}, anonymous API HTTP ${api.status}`);
-  }
+  // Workers routes can take a short time to become visible. Verify only public
+  // endpoints without credentials or customer data; this never redeploys.
+  await verifyPublicWorker();
   process.stdout.write('Worker deployed with its secret. Login serves HTTP 200; anonymous API correctly returns HTTP 401. No accounts or client data were created.\n');
 }
 
