@@ -75,7 +75,7 @@ function wrangler(executable, args) {
   });
 }
 
-function remoteState(details) {
+export function remoteState(details) {
   const execute = sql => queryRows(wrangler(details.wrangler, [
     'execute', details.expected.database_name, '--remote', '--json', '--command', sql,
   ]));
