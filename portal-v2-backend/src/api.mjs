@@ -90,25 +90,34 @@ export async function handleApi(request, { db, auth }) {
   if (name === 'notifications' && recordId === 'read' && request.method === 'POST') {
     if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
     if (initialPassword) return error(403, 'initial_password_required');
+    if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return error(415, 'json_required');
     let clientId;
     let body;
-    try { body = await request.json(); } catch { return error(400, 'invalid_json'); }
+    const raw = await request.text();
+    if (raw.length > 4000) return error(413, 'payload_too_large');
+    try { body = JSON.parse(raw); } catch { return error(400, 'invalid_json'); }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return error(400, 'invalid_json');
+    const ids = body.ids;
+    if (!Array.isArray(ids) || !ids.length || ids.length > 30 ||
+        ids.some(id => typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(id)) ||
+        new Set(ids).size !== ids.length) return error(400, 'invalid_message_ids');
     if (staff) {
-      if (!body || Object.keys(body).length !== 1 || !/^[a-zA-Z0-9_-]{1,100}$/.test(body.client_id))
+      if (Object.keys(body).length !== 2 || !/^[a-zA-Z0-9_-]{1,100}$/.test(body.client_id))
         return error(400, 'invalid_client_id');
       clientId = body.client_id;
       const exists = await db.prepare("SELECT id FROM clients WHERE id = ? AND deleted_at IS NULL AND status = 'active' LIMIT 1").bind(clientId).all();
       if (!exists.results.length) return error(404, 'client_not_found');
     }
-    else if (Object.keys(body).length) return error(403, 'forbidden');
+    else if (Object.keys(body).length !== 1) return error(403, 'forbidden');
     const restriction = staff ? 'AND m.client_id = ?' : `AND m.client_id IN (
       SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id
       WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active')`;
+    const placeholders = ids.map(() => '?').join(', ');
     await db.prepare(`UPDATE messages SET read_at = ? WHERE id IN (
       SELECT m.id FROM messages m JOIN "user" u ON u.id = m.sender_user_id
-      WHERE m.read_at IS NULL AND m.deleted_at IS NULL AND u.role = ? ${restriction})`)
-      .bind(new Date().toISOString(), staff ? 'user' : 'admin', staff ? clientId : userId).run();
+      WHERE m.read_at IS NULL AND m.deleted_at IS NULL AND u.role = ? ${restriction}
+      AND m.id IN (${placeholders}))`)
+      .bind(new Date().toISOString(), staff ? 'user' : 'admin', staff ? clientId : userId, ...ids).run();
     return json({ read: true });
   }
 
@@ -154,6 +163,7 @@ export async function handleApi(request, { db, auth }) {
     const clientId = url.searchParams.get('client_id');
     if (search !== null && (!['clients', 'messages'].includes(name) || search.trim().length > 120)) return error(400, 'invalid_search');
     if (clientId !== null && (!staff || name === 'clients' || !/^[a-zA-Z0-9_-]{1,100}$/.test(clientId))) return error(400, 'invalid_filter');
+    if (staff && name === 'messages' && !clientId) return json({ rows: [], nextOffset: null });
     // Only constant SQL fragments are interpolated. IDs never become SQL source.
     let sql, params;
     if (name === 'clients') {

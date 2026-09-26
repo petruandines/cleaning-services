@@ -148,6 +148,7 @@ test('live message search matches literal text but never crosses client accounts
   assert.deepEqual((await (await call('messages?search=Canapea', 'a')).json()).rows.map(row => row.id), ['one']);
   assert.deepEqual((await (await call('messages?search=50%25', 'a')).json()).rows.map(row => row.id), ['one']);
   assert.deepEqual((await (await call('messages?search=Canapea&client_id=b', 'admin')).json()).rows.map(row => row.id), ['three']);
+  assert.deepEqual((await (await call('messages', 'admin')).json()).rows, []);
   assert.equal((await call('messages?search=Canapea&client_id=b', 'a')).status, 400);
   assert.equal((await call('payments?search=Canapea', 'admin')).status, 400);
   sqlite.close();
@@ -159,7 +160,7 @@ test('in-app alerts count only inbound messages and show only the client upcomin
     sqlite.prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,?,?,?,?)')
       .run(id, id, id + '@example.test', 1, now, now, role);
   }
-  for (const [id, client, sender] of [['ma', 'a', 'user_a'], ['mb', 'b', 'user_b'], ['staff_a', 'a', 'owner']]) {
+  for (const [id, client, sender] of [['ma', 'a', 'user_a'], ['ma2', 'a', 'user_a'], ['mb', 'b', 'user_b'], ['staff_a', 'a', 'owner']]) {
     sqlite.prepare('INSERT INTO messages (id,client_id,sender_user_id,body,created_at) VALUES (?,?,?,?,?)')
       .run(id, client, sender, 'Test notificare', now);
   }
@@ -169,17 +170,23 @@ test('in-app alerts count only inbound messages and show only the client upcomin
   assert.equal((await call('overview', 'admin_pending')).status, 403);
   const staff = await (await call('overview', 'admin')).json();
   const client = await (await call('overview', 'a')).json();
-  assert.equal(staff.unreadMessages, 2);
+  assert.equal(staff.unreadMessages, 3);
   assert.equal(staff.nextAppointment, null);
   assert.equal(client.unreadMessages, 1);
   assert.equal(client.nextAppointment.location_name, 'Locație');
   assert.equal((await call('overview', 'b').then(response => response.json())).nextAppointment, null);
   const read = payload => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-  assert.equal((await call('notifications/read', 'admin', read({ client_id: 'a' }))).status, 200);
-  assert.equal((await (await call('overview', 'admin')).json()).unreadMessages, 1);
+  assert.equal((await call('notifications/read', 'admin', read({ client_id: 'a' }))).status, 400);
+  assert.equal((await call('notifications/read', 'admin', read({ client_id: 'a', ids: ['ma', 'ma'] }))).status, 400);
+  assert.equal((await call('notifications/read', 'admin', read({ client_id: 'a', ids: ['mb'] }))).status, 200);
+  assert.equal((await (await call('overview', 'admin')).json()).unreadMessages, 3);
+  assert.equal((await call('notifications/read', 'admin', read({ client_id: 'a', ids: ['ma'] }))).status, 200);
+  assert.equal((await (await call('overview', 'admin')).json()).unreadMessages, 2);
   assert.equal((await (await call('overview', 'a')).json()).unreadMessages, 1);
-  assert.equal((await call('notifications/read', 'a', read({ client_id: 'b' }))).status, 403);
-  assert.equal((await call('notifications/read', 'a', read({}))).status, 200);
+  assert.equal((await call('notifications/read', 'a', read({ client_id: 'b', ids: ['staff_a'] }))).status, 403);
+  assert.equal((await call('notifications/read', 'a', read({ ids: ['mb'] }))).status, 200);
+  assert.equal((await (await call('overview', 'a')).json()).unreadMessages, 1);
+  assert.equal((await call('notifications/read', 'a', read({ ids: ['staff_a'] }))).status, 200);
   assert.equal((await (await call('overview', 'a')).json()).unreadMessages, 0);
   sqlite.close();
 });
