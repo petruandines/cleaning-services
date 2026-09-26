@@ -21,7 +21,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   const fields = {
     appointments: { starts_at: 'Începe', ends_at: 'Se termină', client_note: 'Detalii', estimated_cost_bani: 'Estimare' },
     jobs: { description: 'Descriere', price_bani: 'Preț', completed_at: 'Finalizată' },
-    payments: { amount_bani: 'Sumă', recorded_at: 'Înregistrată', note: 'Detalii' },
+    payments: { appointment_starts_at: 'Intervenție', location_name: 'Locație', amount_bani: 'Sumă', recorded_at: 'Înregistrată', note: 'Detalii' },
     locations: { address: 'Adresă', city: 'Oraș', county: 'Județ', contact_name: 'Persoană de contact', contact_phone: 'Telefon contact', contact_email: 'E-mail contact' },
     clients: { kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI', internal_note: 'Notițe interne · doar echipa' },
   };
@@ -52,7 +52,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       ['price_bani', 'Preț (lei)', 'money', false],
     ],
     payments: [
-      ['job_id', 'Lucrare', 'related', true, 'jobs'], ['amount_bani', 'Sumă (lei)', 'money', true],
+      ['appointment_id', 'Programare', 'related', true, 'appointments'], ['amount_bani', 'Sumă (lei)', 'money', true],
       ['status', 'Stare', 'select', true, [['pending', 'În așteptare'], ['confirmed', 'Confirmată'], ['reversed', 'Anulată']]],
       ['recorded_at', 'Data înregistrării (opțional)', 'datetime-local', false], ['note', 'Notă', 'textarea', false, 1000],
       ['invoice_url', 'Link factură HTTPS (opțional)', 'url', false, 2048],
@@ -160,7 +160,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     if (value === null || value === undefined || value === '') return '—';
     if (['status', 'kind'].includes(key)) return states[value] || String(value);
     if (key.endsWith('_bani')) return new Intl.NumberFormat('ro-RO', { style: 'currency', currency: 'RON' }).format(value / 100);
-    if (['starts_at', 'ends_at', 'completed_at', 'recorded_at', 'created_at'].includes(key)) {
+    if (['starts_at', 'ends_at', 'completed_at', 'recorded_at', 'created_at', 'appointment_starts_at'].includes(key)) {
       const date = new Date(value);
       if (!Number.isNaN(date.getTime())) return new Intl.DateTimeFormat('ro-RO', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Bucharest' }).format(date);
     }
@@ -205,7 +205,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       top.className = 'card-top';
       const title = document.createElement('h3');
       title.textContent = section === 'appointments' ? (row.client_name || singular.appointments) :
-        row.service_name || row.display_name || row.label || singular[section];
+        section === 'payments' ? 'Plată' : row.service_name || row.display_name || row.label || singular[section];
       top.append(title);
       if (row.status) {
         const badge = document.createElement('span');
@@ -375,7 +375,14 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     if (needClient) return;
     const related = [];
     const definitions = section === 'clients' && editingId ?
-      [...forms.clients, ['status', 'Stare', 'select', true, [['active', 'Activ'], ['inactive', 'Inactiv']]]] : forms[section];
+      [...forms.clients, ['status', 'Stare', 'select', true, [['active', 'Activ'], ['inactive', 'Inactiv']]]] :
+      section === 'payments' && editingId ? forms.payments.slice(1) : forms[section];
+    if (section === 'payments' && editingId) {
+      const hint = document.createElement('p');
+      hint.className = 'form-hint';
+      hint.textContent = 'Intervenția asociată acestei plăți rămâne aceeași.';
+      fieldsBox.append(hint);
+    }
     for (const definition of definitions) {
       const { wrapper, control } = makeInput(definition);
       fieldsBox.append(wrapper);
@@ -503,7 +510,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     if (user.role === 'staff') refreshClientChoices().catch(error => notice(error.message));
     $('tabs').replaceChildren();
     for (const [key, label] of Object.entries(sections)) {
-      if (key === 'clients' && user.role !== 'staff') continue;
+      if (key === 'jobs' || (key === 'clients' && user.role !== 'staff')) continue;
       const button = document.createElement('button');
       button.type = 'button';
       button.dataset.section = key;

@@ -14,3 +14,9 @@ Migrarea 0006 adaugă doar două coloane opționale: `clients.internal_note` (ex
 6. Publicarea noului Worker este un workflow **diferit**, după confirmarea schemei 0006. Necesită temporar `Account → D1 → Read` și `Account → Workers Scripts → Edit`, în secretul `PORTAL_WORKER_FIELDS_TOKEN`; `PORTAL_WORKER_AUTH_SECRET` se păstrează. Pe [Portal Worker fields update](https://github.com/petruandines/cleaning-services/actions/workflows/portal-worker-fields-update.yml), rulează întâi numai `inspect` cu confirmation gol; după verificare, `deploy` într-o rulare nouă cu `UPDATE PORTAL FIELDS 6816004b-dc95-48c9-be52-9bd4131d157e`. Revocă apoi tokenul Workers și șterge numai `PORTAL_WORKER_FIELDS_TOKEN`.
 
 Frontendul nou se publică **doar pe calea de previzualizare**, după Worker. Nu introduce date ale clienților reali până la testele cu client fictiv și exportul independent cu restaurare verificată. Time Travel este temporar.
+
+## Punct de reluare — 26 septembrie 2026
+
+- [`inspect` #36270509997](https://github.com/petruandines/cleaning-services/actions/runs/36270509997) a reușit pe `main`: 45/45 teste, EU D1 0001–0005, exact migrarea 0006, șase hashuri verificate; bookmarkul apare în jurnalul rulării. Nu a rulat `apply`; schema remote este încă 0005.
+- Utilizatorul a renunțat la notificările prin email. Rămân numai notificările în cont. Tabul „Lucrări” este eliminat din interfață; o plată nouă se asociază direct unei programări, iar înregistrarea internă cerută de vechea schemă se creează atomic. Vechea cale API cu `job_id` rămâne compatibilă cu istoricul.
+- Workflow-ul D1 de pe `main` folosește codul imutabil `bf5bd7d00cd1ca8fb44091bd33b371e30fb9e4b3`; nu trebuie modificat pentru migrarea 0006. Workerul trebuie inspectat și publicat cu noua referință revizuită din workflow-ul său; frontendul de previzualizare se actualizează numai după Worker.

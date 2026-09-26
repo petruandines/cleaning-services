@@ -35,7 +35,7 @@ async function exists(db, table, id, clientId) {
 
 export async function changeStaffRecord(db, name, id, data, actor) {
   if (!Object.hasOwn(definitions, name) || !/^[\w-]{1,100}$/.test(id)) return fail(404, 'not_found');
-  const rows = await db.prepare(`SELECT id, ${name === 'clients' ? 'id' : 'client_id'} AS client_id FROM ${name} WHERE id = ? AND deleted_at IS NULL LIMIT 1`)
+  const rows = await db.prepare(`SELECT id, ${name === 'clients' ? 'id' : 'client_id'} AS client_id${name === 'payments' ? ', job_id' : ''} FROM ${name} WHERE id = ? AND deleted_at IS NULL LIMIT 1`)
     .bind(id).all();
   const record = rows.results[0];
   if (!record) return fail(404, 'not_found');
@@ -52,6 +52,14 @@ export async function changeStaffRecord(db, name, id, data, actor) {
       name === 'locations' ? ', active = 0' : ''} WHERE id = ? AND deleted_at IS NULL`)
       .bind(...(name === 'clients' ? [now, now, 'inactive', id] : stamp ? [now, now, id] : [now, id]))];
     if (name === 'clients') operations.push(db.prepare('DELETE FROM client_users WHERE client_id = ?').bind(id));
+    if (name === 'payments' && record.job_id?.startsWith('auto-payment-')) {
+      // This job was created solely as the payment's required internal link.
+      // Keep it if another active payment was attached through the legacy API.
+      const linked = await db.prepare('SELECT id FROM payments WHERE job_id = ? AND id <> ? AND deleted_at IS NULL LIMIT 1')
+        .bind(record.job_id, id).all();
+      if (!linked.results.length) operations.push(db.prepare('UPDATE jobs SET deleted_at = ?, updated_at = ? WHERE id = ? AND client_id = ? AND deleted_at IS NULL')
+        .bind(now, now, record.job_id, clientId));
+    }
     operations.push(db.prepare('INSERT INTO audit_events (id, actor_user_id, client_id, action, entity_type, entity_id, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .bind(crypto.randomUUID(), actor, clientId, 'delete', name, id, now));
     await db.batch(operations);

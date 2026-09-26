@@ -88,6 +88,40 @@ test('client sees only own appointment and no internal note; staff sees both', a
   assert.equal((await call('clients', 'admin')).status, 200);
 });
 
+test('admin records a payment directly against a scoped appointment without a separate job step', async () => {
+  const { call, sqlite } = setup();
+  const post = data => call('payments', 'admin', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  assert.equal((await post({ client_id: 'a', appointment_id: 'ap_b', amount_bani: 35000 })).status, 400);
+  assert.equal((await post({ client_id: 'a', appointment_id: 'ap_a', job_id: 'other', amount_bani: 35000 })).status, 400);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM jobs').get().count, 0);
+  const response = await post({ client_id: 'a', appointment_id: 'ap_a', amount_bani: 35000,
+    invoice_url: 'https://example.test/factura.pdf' });
+  assert.equal(response.status, 201);
+  const paymentId = (await response.json()).id;
+  const job = sqlite.prepare('SELECT j.id, j.appointment_id, j.client_id FROM jobs j JOIN payments p ON p.job_id = j.id WHERE p.id = ?').get(paymentId);
+  assert.equal(job.appointment_id, 'ap_a');
+  assert.equal(job.client_id, 'a');
+  const own = (await (await call('payments', 'a')).json()).rows;
+  assert.equal(own[0].appointment_starts_at, now);
+  assert.equal(own[0].location_name, 'Locație');
+  assert.equal((await (await call('payments', 'b')).json()).rows.length, 0);
+  assert.equal((await call('payments/' + paymentId, 'admin', { method: 'DELETE' })).status, 200);
+  assert.ok(sqlite.prepare('SELECT deleted_at FROM jobs WHERE id = ?').get(job.id).deleted_at);
+  assert.equal((await call('appointments/ap_a', 'admin', { method: 'DELETE' })).status, 200);
+  sqlite.close();
+});
+
+test('failed payment audit rolls back its automatically created job', async () => {
+  const { call, sqlite } = setup();
+  sqlite.exec("CREATE TRIGGER reject_payment_audit BEFORE INSERT ON audit_events WHEN NEW.entity_type = 'payments' BEGIN SELECT RAISE(ABORT, 'audit rejected'); END");
+  await assert.rejects(call('payments', 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: 'a', appointment_id: 'ap_a', amount_bani: 10000 }) }));
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM jobs').get().count, 0);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM payments').get().count, 0);
+  sqlite.close();
+});
+
 test('message write derives company from session, ignores forged client ID', async () => {
   const { call, sqlite } = setup();
   const response = await call('messages', 'a', {

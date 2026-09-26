@@ -32,8 +32,9 @@ export function invoiceUrl(value) {
   } catch { return undefined; }
 }
 
-export async function commitRecord(db, { sql, values, actor, clientId, entity, id, at }) {
+export async function commitRecord(db, { sql, values, actor, clientId, entity, id, at, preceding = [] }) {
   await db.batch([
+    ...preceding,
     db.prepare(sql).bind(...values),
     db.prepare('INSERT INTO audit_events (id, actor_user_id, client_id, action, entity_type, entity_id, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .bind(crypto.randomUUID(), actor, clientId, 'create', entity, id, at),
@@ -44,6 +45,7 @@ export async function createStaffRecord(db, name, data, actor) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   let sql, values, clientId;
+  const preceding = [];
   if (name === 'clients') {
     if (!clean(data, ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui', 'internal_note'])) return bad('invalid_fields');
     const kind = choice(data.kind, ['PF', 'PJ']);
@@ -63,7 +65,7 @@ export async function createStaffRecord(db, name, data, actor) {
       locations: ['client_id', 'label', 'address', 'city', 'county', 'contact_name', 'contact_phone', 'contact_email'],
       appointments: ['client_id', 'location_id', 'starts_at', 'ends_at', 'status', 'client_note', 'estimated_cost_bani'],
       jobs: ['client_id', 'appointment_id', 'service_name', 'description', 'status', 'price_bani'],
-      payments: ['client_id', 'job_id', 'amount_bani', 'status', 'recorded_at', 'note', 'invoice_url'],
+      payments: ['client_id', 'job_id', 'appointment_id', 'amount_bani', 'status', 'recorded_at', 'note', 'invoice_url'],
       messages: ['client_id', 'body'],
     };
     if (!Object.hasOwn(allowed, name) || !clean(data, allowed[name])) return bad('invalid_fields');
@@ -101,14 +103,26 @@ export async function createStaffRecord(db, name, data, actor) {
       sql = 'INSERT INTO jobs (id, client_id, appointment_id, service_name, description, status, price_bani, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
       values = [id, clientId, appointment, service, description, status, price, now, now];
     } else if (name === 'payments') {
-      const job = text(data.job_id, 100), amount = money(data.amount_bani, true, true);
+      const hasJob = Object.hasOwn(data, 'job_id');
+      const hasAppointment = Object.hasOwn(data, 'appointment_id');
+      if (hasJob === hasAppointment) return bad('one_payment_reference_required');
+      const job = hasJob ? text(data.job_id, 100) : 'auto-payment-' + crypto.randomUUID();
+      const appointment = hasAppointment ? text(data.appointment_id, 100) : null;
+      const amount = money(data.amount_bani, true, true);
       const status = choice(data.status, ['pending', 'confirmed', 'reversed'], 'pending');
       const recorded = data.recorded_at === undefined || data.recorded_at === null ?
         (status === 'confirmed' ? now : null) : time(data.recorded_at);
       const note = text(data.note, 1000, false);
       const link = invoiceUrl(data.invoice_url);
-      if (!job || amount === undefined || !status || recorded === undefined || note === undefined || link === undefined) return bad('invalid_payment');
-      if (!await exists(db, 'jobs', job, clientId)) return { status: 400, error: 'job_client_mismatch' };
+      if (!job || (hasAppointment && !appointment) || amount === undefined || !status ||
+          recorded === undefined || note === undefined || link === undefined) return bad('invalid_payment');
+      if (hasAppointment) {
+        if (!await exists(db, 'appointments', appointment, clientId)) return { status: 400, error: 'appointment_client_mismatch' };
+        // Preserve the existing payment -> job foreign key. The internal job
+        // and the payment are committed together, so no incomplete job remains.
+        preceding.push(db.prepare('INSERT INTO jobs (id, client_id, appointment_id, service_name, status, price_bani, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(job, clientId, appointment, 'Intervenție programată', 'planned', amount, now, now));
+      } else if (!await exists(db, 'jobs', job, clientId)) return { status: 400, error: 'job_client_mismatch' };
       sql = 'INSERT INTO payments (id, client_id, job_id, amount_bani, status, recorded_at, note, invoice_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
       values = [id, clientId, job, amount, status, recorded, note, link, now];
     } else {
@@ -118,6 +132,6 @@ export async function createStaffRecord(db, name, data, actor) {
       values = [id, clientId, actor, body, now];
     }
   }
-  await commitRecord(db, { sql, values, actor, clientId, entity: name, id, at: now });
+  await commitRecord(db, { sql, values, actor, clientId, entity: name, id, at: now, preceding });
   return { status: 201, id };
 }
