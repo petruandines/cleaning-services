@@ -51,8 +51,18 @@
           email: form.elements.email.value.trim(), password: form.elements.password.value }),
       });
       if (!response.ok) {
-        if (response.status === 409) throw new Error('Adresa este deja folosită. Verifică datele contului.');
-        throw new Error('Nu am putut crea contul. Verifică datele și încearcă din nou.');
+        const detail = await response.json().catch(() => ({}));
+        if (response.status === 409 && detail.error === 'archived_account_confirmation_required') {
+          if (!window.confirm('Există un cont vechi pentru acest e-mail, fără acces la clienți activi. Îi retragi toate sesiunile, îi schimbi parola cu cea temporară de aici și îl asociezi clientului selectat?')) return;
+          const retry = await fetch('/api/users', {
+            method: 'POST', credentials: 'omit', cache: 'no-store',
+            headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
+            body: JSON.stringify({ client_id: clientId, name: form.elements.name.value.trim(),
+              email: form.elements.email.value.trim(), password: form.elements.password.value, reactivate_existing: true }),
+          });
+          if (!retry.ok) throw new Error('Nu am putut reactiva contul. Verifică din nou asocierea și încearcă mai târziu.');
+        } else if (response.status === 409) throw new Error('Adresa aparține deja unui cont activ. Verifică clientul asociat.');
+        else throw new Error('Nu am putut crea contul. Verifică datele și încearcă din nou.');
       }
       form.reset();
       token = null;

@@ -28,3 +28,10 @@
   .card{padding:18px}.card dl{grid-template-columns:minmax(85px,1fr) minmax(0,1.6fr)}
   .bubble{max-width:92%}.workspace-top .secondary{padding:8px 10px}
 }
+.message-search{display:block;max-width:760px;margin:20px 0 0;font-weight:700;font-size:14px;color:#31563a}
+.message-search input{display:block;width:100%;min-height:48px;margin-top:8px;border:1px solid #b9c9bd;border-radius:12px;padding:10px 16px;background:#fff;font:inherit;color:var(--ink)}
+.conversation{max-width:760px;min-height:180px;padding:20px;background:linear-gradient(155deg,#f0f8f2,#eaf4eb);border:1px solid #d6e8d8;border-radius:20px}
+.conversation-tip{padding:0 6px;margin:0 0 4px}
+@media(max-width:720px){.conversation{padding:13px;gap:10px}.message-search{margin-top:16px}}
+.appointment-banner{margin:22px 0 10px;padding:18px 20px;border:1px solid #b8dfc1;border-radius:16px;background:#e5f8e9;color:#155724;font-weight:650;line-height:1.55}
+.invoice-link{display:inline-flex;margin-top:17px;align-items:center;border-radius:9px;padding:9px 14px;background:#e5f8e9;font-weight:700;text-decoration:none}

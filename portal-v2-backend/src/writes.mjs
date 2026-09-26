@@ -21,6 +21,17 @@ const exists = async (db, table, id, clientId) => {
   return !!(await db.prepare(sql).bind(...(clientId ? [id, clientId] : [id])).all()).results.length;
 };
 
+export function invoiceUrl(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string' || value.length > 2048 || value.trim() !== value) return undefined;
+  try {
+    const link = new URL(value);
+    if (link.protocol !== 'https:' || !link.hostname || link.username || link.password ||
+        link.hostname === 'localhost') return undefined;
+    return link.href;
+  } catch { return undefined; }
+}
+
 export async function commitRecord(db, { sql, values, actor, clientId, entity, id, at }) {
   await db.batch([
     db.prepare(sql).bind(...values),
@@ -34,24 +45,25 @@ export async function createStaffRecord(db, name, data, actor) {
   const now = new Date().toISOString();
   let sql, values, clientId;
   if (name === 'clients') {
-    if (!clean(data, ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui'])) return bad('invalid_fields');
+    if (!clean(data, ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui', 'internal_note'])) return bad('invalid_fields');
     const kind = choice(data.kind, ['PF', 'PJ']);
     const display = text(data.display_name, 160);
     const email = text(data.email, 254, false);
     const phone = text(data.phone, 40, false);
     const company = text(data.company_name, 160, false);
     const cui = text(data.cui, 30, false);
-    if (!kind || !display || [email, phone, company, cui].includes(undefined) ||
+    const note = text(data.internal_note, 4000, false);
+    if (!kind || !display || [email, phone, company, cui, note].includes(undefined) ||
       (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return bad('invalid_client');
     clientId = id;
-    sql = 'INSERT INTO clients (id, kind, display_name, email, phone, company_name, cui, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
-    values = [id, kind, display, email, phone, company, cui, now, now];
+    sql = 'INSERT INTO clients (id, kind, display_name, email, phone, company_name, cui, internal_note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    values = [id, kind, display, email, phone, company, cui, note, now, now];
   } else {
     const allowed = {
       locations: ['client_id', 'label', 'address', 'city', 'county', 'contact_name', 'contact_phone', 'contact_email'],
       appointments: ['client_id', 'location_id', 'starts_at', 'ends_at', 'status', 'client_note', 'estimated_cost_bani'],
       jobs: ['client_id', 'appointment_id', 'service_name', 'description', 'status', 'price_bani'],
-      payments: ['client_id', 'job_id', 'amount_bani', 'status', 'recorded_at', 'note'],
+      payments: ['client_id', 'job_id', 'amount_bani', 'status', 'recorded_at', 'note', 'invoice_url'],
       messages: ['client_id', 'body'],
     };
     if (!Object.hasOwn(allowed, name) || !clean(data, allowed[name])) return bad('invalid_fields');
@@ -94,10 +106,11 @@ export async function createStaffRecord(db, name, data, actor) {
       const recorded = data.recorded_at === undefined || data.recorded_at === null ?
         (status === 'confirmed' ? now : null) : time(data.recorded_at);
       const note = text(data.note, 1000, false);
-      if (!job || amount === undefined || !status || recorded === undefined || note === undefined) return bad('invalid_payment');
+      const link = invoiceUrl(data.invoice_url);
+      if (!job || amount === undefined || !status || recorded === undefined || note === undefined || link === undefined) return bad('invalid_payment');
       if (!await exists(db, 'jobs', job, clientId)) return { status: 400, error: 'job_client_mismatch' };
-      sql = 'INSERT INTO payments (id, client_id, job_id, amount_bani, status, recorded_at, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-      values = [id, clientId, job, amount, status, recorded, note, now];
+      sql = 'INSERT INTO payments (id, client_id, job_id, amount_bani, status, recorded_at, note, invoice_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+      values = [id, clientId, job, amount, status, recorded, note, link, now];
     } else {
       const body = text(data.body, 4000);
       if (!body) return bad('invalid_message');

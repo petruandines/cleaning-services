@@ -65,7 +65,7 @@ test('real Better Auth session, TOTP enrollment and second-factor login', async 
   cookie = '';
   const secondLogin = await post('sign-in/email', { email, password });
   assert.equal(secondLogin.body.twoFactorRedirect, true);
-  const secondFactor = await post('two-factor/verify-totp', { code: totp(enable.body.totpURI), trustDevice: false });
+  const secondFactor = await post('two-factor/verify-totp', { code: totp(enable.body.totpURI), trustDevice: true });
   assert.equal(secondFactor.response.status, 200, JSON.stringify(secondFactor.body));
   const finalToken = secondFactor.response.headers.get('set-auth-token');
   assert.ok(finalToken, 'second-factor login returns the bearer session');
@@ -73,5 +73,9 @@ test('real Better Auth session, TOTP enrollment and second-factor login', async 
   const logout = await post('sign-out', {}, finalToken);
   assert.equal(logout.response.status, 200, JSON.stringify(logout.body));
   assert.equal(await auth.api.getSession({ headers: new Headers({ Authorization: 'Bearer ' + finalToken }) }), null);
+  const trustedLogin = await post('sign-in/email', { email, password });
+  assert.equal(trustedLogin.response.status, 200, JSON.stringify(trustedLogin.body));
+  assert.notEqual(trustedLogin.body.twoFactorRedirect, true, 'trusted device skips the second factor');
+  assert.ok(trustedLogin.response.headers.get('set-auth-token'));
   db.close();
 });

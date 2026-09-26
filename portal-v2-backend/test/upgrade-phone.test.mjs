@@ -24,7 +24,7 @@ test('upgrade requires precise operation, exact UUID confirmation and five pinne
   assert.throws(() => assertChoice('apply', 'APPLY PORTAL UPGRADE 6816004b-dc95-48c9-be52-9bd4131d157e'), /Time Travel recovery/);
   assertChoice('apply', 'APPLY PORTAL UPGRADE 6816004b-dc95-48c9-be52-9bd4131d157e',
     'TIME TRAVEL VERIFIED 6816004b-dc95-48c9-be52-9bd4131d157e');
-  assertFiles();
+  assert.throws(() => assertFiles(), /Unexpected migration files/);
 });
 
 test('upgrade refuses unexpected or partially migrated remote schema', () => {

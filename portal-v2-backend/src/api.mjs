@@ -26,7 +26,7 @@ const lists = Object.freeze({
   locations: 'id, client_id, label, address, city, county, contact_name, contact_phone, contact_email, active, created_at',
   appointments: 'a.id, a.client_id, a.location_id, a.starts_at, a.ends_at, a.status, a.client_note, a.estimated_cost_bani, c.display_name AS client_name, l.label AS location_name, l.address AS location_address',
   jobs: 'id, client_id, appointment_id, service_name, description, status, price_bani, completed_at',
-  payments: 'id, client_id, job_id, amount_bani, status, recorded_at, note',
+  payments: 'id, client_id, job_id, amount_bani, status, recorded_at, note, invoice_url',
   messages: 'm.id, m.client_id, m.sender_user_id, m.body, m.created_at, m.read_at, c.display_name AS client_name, u.name AS sender_name',
 });
 
@@ -59,6 +59,57 @@ export async function handleApi(request, { db, auth }) {
     const access = await db.prepare("SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active' LIMIT 1")
       .bind(userId).all();
     if (!access.results.length) return error(401, 'no_active_client');
+  }
+
+  if (name === 'overview' && !recordId && request.method === 'GET') {
+    if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
+    if (initialPassword) return error(403, 'initial_password_required');
+    const inboundRole = staff ? 'user' : 'admin';
+    const scope = staff ? '' : ` AND m.client_id IN (
+      SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id
+      WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active')`;
+    const unread = await db.prepare(`SELECT COUNT(*) AS total FROM messages m
+      JOIN clients c ON c.id = m.client_id AND c.deleted_at IS NULL AND c.status = 'active'
+      JOIN "user" u ON u.id = m.sender_user_id
+      WHERE m.deleted_at IS NULL AND m.read_at IS NULL AND u.role = ?${scope}`)
+      .bind(...(staff ? [inboundRole] : [inboundRole, userId])).all();
+    let appointment = null;
+    if (!staff) {
+      const result = await db.prepare(`SELECT a.starts_at, l.label AS location_name, l.address AS location_address
+        FROM appointments a JOIN locations l ON l.id = a.location_id AND l.client_id = a.client_id
+        JOIN clients c ON c.id = a.client_id
+        WHERE a.deleted_at IS NULL AND l.deleted_at IS NULL AND c.deleted_at IS NULL
+          AND c.status = 'active' AND a.status IN ('requested', 'confirmed', 'in_progress')
+          AND a.ends_at >= ?
+          AND a.client_id IN (SELECT client_id FROM client_users WHERE user_id = ?)
+        ORDER BY a.starts_at ASC LIMIT 1`).bind(new Date().toISOString(), userId).all();
+      appointment = result.results[0] || null;
+    }
+    return json({ unreadMessages: unread.results[0]?.total || 0, nextAppointment: appointment });
+  }
+  if (name === 'notifications' && recordId === 'read' && request.method === 'POST') {
+    if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
+    if (initialPassword) return error(403, 'initial_password_required');
+    let clientId;
+    let body;
+    try { body = await request.json(); } catch { return error(400, 'invalid_json'); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return error(400, 'invalid_json');
+    if (staff) {
+      if (!body || Object.keys(body).length !== 1 || !/^[a-zA-Z0-9_-]{1,100}$/.test(body.client_id))
+        return error(400, 'invalid_client_id');
+      clientId = body.client_id;
+      const exists = await db.prepare("SELECT id FROM clients WHERE id = ? AND deleted_at IS NULL AND status = 'active' LIMIT 1").bind(clientId).all();
+      if (!exists.results.length) return error(404, 'client_not_found');
+    }
+    else if (Object.keys(body).length) return error(403, 'forbidden');
+    const restriction = staff ? 'AND m.client_id = ?' : `AND m.client_id IN (
+      SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id
+      WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active')`;
+    await db.prepare(`UPDATE messages SET read_at = ? WHERE id IN (
+      SELECT m.id FROM messages m JOIN "user" u ON u.id = m.sender_user_id
+      WHERE m.read_at IS NULL AND m.deleted_at IS NULL AND u.role = ? ${restriction})`)
+      .bind(new Date().toISOString(), staff ? 'user' : 'admin', staff ? clientId : userId).run();
+    return json({ read: true });
   }
 
   if (name === 'me' && request.method === 'GET') {
@@ -101,12 +152,12 @@ export async function handleApi(request, { db, auth }) {
     const offset = Number(offsetValue);
     const search = url.searchParams.get('search');
     const clientId = url.searchParams.get('client_id');
-    if (search !== null && (name !== 'clients' || search.trim().length > 120)) return error(400, 'invalid_search');
+    if (search !== null && (!['clients', 'messages'].includes(name) || search.trim().length > 120)) return error(400, 'invalid_search');
     if (clientId !== null && (!staff || name === 'clients' || !/^[a-zA-Z0-9_-]{1,100}$/.test(clientId))) return error(400, 'invalid_filter');
     // Only constant SQL fragments are interpolated. IDs never become SQL source.
     let sql, params;
     if (name === 'clients') {
-      sql = 'SELECT id, kind, display_name, email, phone, company_name, cui, status FROM clients WHERE deleted_at IS NULL';
+      sql = 'SELECT id, kind, display_name, email, phone, company_name, cui, status, internal_note FROM clients WHERE deleted_at IS NULL';
       params = [];
       if (search?.trim()) { sql += ' AND instr(lower(display_name), lower(?)) > 0'; params.push(search.trim()); }
       sql += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
@@ -122,6 +173,10 @@ export async function handleApi(request, { db, auth }) {
       if (!staff) {
         sql += ` AND ${prefix}client_id IN (SELECT cu.client_id FROM client_users cu JOIN clients c ON c.id = cu.client_id WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active')`;
         params.push(userId);
+      }
+      if (name === 'messages' && search?.trim()) {
+        sql += ' AND instr(lower(m.body), lower(?)) > 0';
+        params.push(search.trim());
       }
       sql += ` ORDER BY ${prefix}${order[name]}, ${prefix}id DESC LIMIT ? OFFSET ?`;
     }

@@ -23,14 +23,14 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     jobs: { description: 'Descriere', price_bani: 'Preț', completed_at: 'Finalizată' },
     payments: { amount_bani: 'Sumă', recorded_at: 'Înregistrată', note: 'Detalii' },
     locations: { address: 'Adresă', city: 'Oraș', county: 'Județ', contact_name: 'Persoană de contact', contact_phone: 'Telefon contact', contact_email: 'E-mail contact' },
-    clients: { kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI' },
+    clients: { kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI', internal_note: 'Notițe interne · doar echipa' },
   };
   const forms = {
     clients: [
       ['kind', 'Tip client', 'select', true, [['PF', 'Persoană fizică'], ['PJ', 'Firmă']]],
       ['display_name', 'Nume afișat', 'text', true, 160], ['email', 'E-mail', 'email', false, 254],
       ['phone', 'Telefon', 'tel', false, 40], ['company_name', 'Nume firmă', 'text', false, 160],
-      ['cui', 'CUI', 'text', false, 30],
+      ['cui', 'CUI', 'text', false, 30], ['internal_note', 'Notițe interne · doar pentru echipă', 'textarea', false, 4000],
     ],
     locations: [
       ['label', 'Nume locație', 'text', true, 160], ['address', 'Adresă', 'text', true, 300],
@@ -55,6 +55,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       ['job_id', 'Lucrare', 'related', true, 'jobs'], ['amount_bani', 'Sumă (lei)', 'money', true],
       ['status', 'Stare', 'select', true, [['pending', 'În așteptare'], ['confirmed', 'Confirmată'], ['reversed', 'Anulată']]],
       ['recorded_at', 'Data înregistrării (opțional)', 'datetime-local', false], ['note', 'Notă', 'textarea', false, 1000],
+      ['invoice_url', 'Link factură HTTPS (opțional)', 'url', false, 2048],
     ],
     messages: [['body', 'Răspuns către client', 'textarea', true, 4000]],
   };
@@ -74,6 +75,8 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   let currentClientLabel = '';
   let formKey = '';
   let searchTimer = null;
+  let messageSearchTimer = null;
+  let overviewTimer = null;
   let editingId = '';
 
   function notice(message) {
@@ -82,6 +85,8 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   }
   function clearSession() {
     generation++;
+    clearInterval(overviewTimer);
+    overviewTimer = null;
     forgetTabSession(window);
     if (accountWindow && !accountWindow.closed) accountWindow.close();
     token = null;
@@ -98,6 +103,9 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     $('staff-tools').hidden = true;
     $('account-panel').hidden = true;
     $('pager').hidden = true;
+    $('message-search-box').hidden = true;
+    $('message-search').value = '';
+    $('appointment-banner').hidden = true;
     currentClientId = '';
     currentClientLabel = '';
     formKey = '';
@@ -122,6 +130,31 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       throw new Error('Cererea nu a putut fi finalizată. Încearcă din nou.');
     }
     return response.json();
+  }
+  async function refreshOverview() {
+    if (!token || !user || document.hidden) return;
+    const atStart = generation;
+    const overview = await api('/api/overview');
+    if (generation !== atStart) return;
+    const button = $('tabs').querySelector('[data-section="messages"]');
+    if (button) {
+      const count = Math.max(0, Number(overview.unreadMessages) || 0);
+      button.textContent = 'Mesaje' + (count ? ' · ' + (count > 99 ? '99+' : count) : '');
+      button.setAttribute('aria-label', count ? `Mesaje, ${count} necitite` : 'Mesaje');
+    }
+    const banner = $('appointment-banner');
+    const next = user.role === 'client' && overview.nextAppointment;
+    banner.hidden = !next;
+    if (next) {
+      const start = new Date(next.starts_at);
+      const roDay = value => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest',
+        year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+      const location = next.location_name + (next.location_address ? ' · ' + next.location_address : '');
+      banner.textContent = roDay(start) === roDay(new Date()) ?
+        `Azi are loc intervenția la locația ${location}, la ora ${new Intl.DateTimeFormat('ro-RO', {
+          timeZone: 'Europe/Bucharest', hour: '2-digit', minute: '2-digit' }).format(start)}.` :
+        `Următoarea intervenție: ${format('starts_at', next.starts_at)} la locația ${location}.`;
+    }
   }
   function format(key, value) {
     if (value === null || value === undefined || value === '') return '—';
@@ -197,6 +230,20 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
         details.append(term, description);
       }
       if (details.childElementCount) card.append(details);
+      if (section === 'payments' && row.invoice_url) {
+        try {
+          const link = new URL(row.invoice_url);
+          if (link.protocol === 'https:') {
+            const invoice = document.createElement('a');
+            invoice.className = 'invoice-link';
+            invoice.href = link.href;
+            invoice.target = '_blank';
+            invoice.rel = 'noopener noreferrer';
+            invoice.textContent = 'Deschide factura ↗';
+            card.append(invoice);
+          }
+        } catch { /* An invalid historical URL is not clickable. */ }
+      }
       addActions(card, row);
       cards.append(card);
     }
@@ -398,17 +445,22 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       params.set('search', $('client-search').value.trim());
     if (user?.role === 'staff' && section !== 'clients' && currentClientId)
       params.set('client_id', currentClientId);
+    if (section === 'messages' && $('message-search').value.trim())
+      params.set('search', $('message-search').value.trim());
     return '/api/' + section + '?' + params;
   }
   async function loadSection() {
     const current = section;
     const requestGeneration = generation;
+    const requestedSearch = current === 'messages' ? $('message-search').value.trim() : '';
     $('section-title').textContent = sections[section];
     $('message-form').hidden = section !== 'messages' || user?.role !== 'client';
+    $('message-search-box').hidden = section !== 'messages';
     $('content').textContent = 'Se încarcă…';
     try {
       const data = await api(pageUrl());
-      if (requestGeneration === generation && section === current) {
+      if (requestGeneration === generation && section === current &&
+          (current !== 'messages' || requestedSearch === $('message-search').value.trim())) {
         render(data.rows);
         nextOffset = data.nextOffset;
         $('pager').hidden = offset === 0 && nextOffset === null;
@@ -416,6 +468,15 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
         $('next').disabled = nextOffset === null;
         $('page-label').textContent = 'Pagina ' + (Math.floor(offset / 30) + 1);
         await renderStaffForm();
+        if (requestGeneration !== generation) return;
+        if (current === 'messages' && !requestedSearch && offset === 0 &&
+            (user.role === 'client' || currentClientId)) {
+          const readPayload = user.role === 'staff' ? { client_id: currentClientId } : {};
+          try {
+            await api('/api/notifications/read', { method: 'POST', body: JSON.stringify(readPayload) });
+            refreshOverview().catch(() => {});
+          } catch { /* Keep the conversation visible if marking read fails. */ }
+        }
       }
     } catch (error) {
       if (requestGeneration !== generation) return;
@@ -451,7 +512,14 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       $('tabs').append(button);
     }
     selectSection('appointments');
+    refreshOverview().catch(() => {});
+    clearInterval(overviewTimer);
+    overviewTimer = setInterval(() => refreshOverview().catch(() => {}), 60000);
   }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshOverview().catch(() => {});
+  });
 
   $('login').addEventListener('click', () => {
     if (!ready()) { notice('Portalul nou este încă în pregătire. Folosește deocamdată portalul publicat.'); return; }
@@ -507,6 +575,10 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   $('client-search').addEventListener('input', () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => refreshClientChoices().catch(error => notice(error.message)), 300);
+  });
+  $('message-search').addEventListener('input', () => {
+    clearTimeout(messageSearchTimer);
+    messageSearchTimer = setTimeout(() => { offset = 0; loadSection(); }, 300);
   });
   $('client-picker').addEventListener('change', event => {
     editingId = '';

@@ -11,7 +11,7 @@ test('admin links a client account; temporary password gate and session rotation
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys = ON');
   for (const path of ['0001_app_schema.sql', '0002_auth.sql', '0003_portal_accounts.sql',
-    '0004_location_contact.sql', '0005_soft_delete.sql'])
+    '0004_location_contact.sql', '0005_soft_delete.sql', '0006_invoice_client_notes.sql'])
     sqlite.exec(readFileSync(new URL('../../docs/portal-v2/' + path, import.meta.url), 'utf8'));
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
@@ -90,6 +90,35 @@ test('admin links a client account; temporary password gate and session rotation
   assert.equal((await signIn(payload.email, tempPassword)).status, 401);
   assert.equal((await signIn(payload.email, newPassword)).status, 200);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM audit_events WHERE actor_user_id = ?').get(id).n, 1);
+
+  for (const clientId of ['archived', 'replacement']) {
+    sqlite.prepare('INSERT INTO clients (id, kind, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+      .run(clientId, 'PF', clientId, '2026-09-24T10:00:00Z', '2026-09-24T10:00:00Z');
+  }
+  const oldAccount = { client_id: 'archived', email: 'returning@example.test',
+    name: 'Persoană veche', password: 'original-temporary-password' };
+  assert.equal((await call('users', admin.token, oldAccount)).status, 201);
+  const oldLogin = await signIn(oldAccount.email, oldAccount.password);
+  assert.ok(oldLogin.token);
+  sqlite.prepare('DELETE FROM client_users WHERE client_id = ?').run('archived');
+  sqlite.prepare("UPDATE clients SET deleted_at = ?, status = 'inactive' WHERE id = ?")
+    .run('2026-09-25T10:00:00Z', 'archived');
+  const replacement = { ...oldAccount, client_id: 'replacement', name: 'Persoană nouă',
+    password: 'new-temporary-password-123' };
+  assert.equal((await (await call('users', admin.token, replacement)).json()).error,
+    'archived_account_confirmation_required');
+  assert.equal((await call('users', admin.token, { ...payload, client_id: 'replacement',
+    reactivate_existing: true })).status, 409, 'active account cannot be silently reassigned');
+  const reactivated = await call('users', admin.token, { ...replacement, reactivate_existing: true });
+  assert.equal(reactivated.status, 201, await reactivated.clone().text());
+  assert.equal(await auth.api.getSession({ headers: new Headers({ Authorization: 'Bearer ' + oldLogin.token }) }), null);
+  assert.equal((await signIn(replacement.email, oldAccount.password)).status, 401);
+  const replacementLogin = await signIn(replacement.email, replacement.password);
+  assert.ok(replacementLogin.token);
+  assert.equal((await (await call('me', replacementLogin.token)).json()).mustChangePassword, true);
+  const associated = sqlite.prepare('SELECT client_id FROM client_users WHERE user_id = (SELECT id FROM "user" WHERE email = ?)').all(replacement.email);
+  assert.deepEqual(associated.map(row => row.client_id), ['replacement']);
+  assert.equal(sqlite.prepare("SELECT action FROM audit_events WHERE action = 'reactivate'").get().action, 'reactivate');
 
   sqlite.exec("CREATE TRIGGER reject_new_links BEFORE INSERT ON client_users BEGIN SELECT RAISE(ABORT, 'test rollback'); END");
   const failed = await call('users', admin.token, { ...payload, email: 'retry@example.test' });

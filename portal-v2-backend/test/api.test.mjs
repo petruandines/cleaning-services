@@ -9,6 +9,7 @@ const authSchema = readFileSync(new URL('../../docs/portal-v2/0002_auth.sql', im
 const accountSchema = readFileSync(new URL('../../docs/portal-v2/0003_portal_accounts.sql', import.meta.url), 'utf8');
 const contactSchema = readFileSync(new URL('../../docs/portal-v2/0004_location_contact.sql', import.meta.url), 'utf8');
 const archiveSchema = readFileSync(new URL('../../docs/portal-v2/0005_soft_delete.sql', import.meta.url), 'utf8');
+const invoiceSchema = readFileSync(new URL('../../docs/portal-v2/0006_invoice_client_notes.sql', import.meta.url), 'utf8');
 const now = '2026-09-24T10:00:00Z';
 
 function setup() {
@@ -19,6 +20,7 @@ function setup() {
   sqlite.exec(accountSchema);
   sqlite.exec(contactSchema);
   sqlite.exec(archiveSchema);
+  sqlite.exec(invoiceSchema);
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
       .run(id, 'PF', id, now, now);
@@ -102,6 +104,52 @@ test('message write derives company from session, ignores forged client ID', asy
   assert.equal((await call('messages', 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"body":"salut"}' })).status, 400);
 });
 
+test('live message search matches literal text but never crosses client accounts', async () => {
+  const { call, sqlite } = setup();
+  for (const [id, client, body] of [['one', 'a', 'Canapea verde 50%'],
+    ['two', 'a', 'Curățenie generală'], ['three', 'b', 'Canapea verde 50%']]) {
+    sqlite.prepare('INSERT INTO messages (id,client_id,sender_user_id,body,created_at) VALUES (?,?,?,?,?)')
+      .run(id, client, 'user_' + client, body, now);
+  }
+  assert.deepEqual((await (await call('messages?search=Canapea', 'a')).json()).rows.map(row => row.id), ['one']);
+  assert.deepEqual((await (await call('messages?search=50%25', 'a')).json()).rows.map(row => row.id), ['one']);
+  assert.deepEqual((await (await call('messages?search=Canapea&client_id=b', 'admin')).json()).rows.map(row => row.id), ['three']);
+  assert.equal((await call('messages?search=Canapea&client_id=b', 'a')).status, 400);
+  assert.equal((await call('payments?search=Canapea', 'admin')).status, 400);
+  sqlite.close();
+});
+
+test('in-app alerts count only inbound messages and show only the client upcoming location', async () => {
+  const { call, sqlite } = setup();
+  for (const [id, role] of [['owner', 'admin'], ['user_a', 'user'], ['user_b', 'user']]) {
+    sqlite.prepare('INSERT INTO "user" (id,name,email,emailVerified,createdAt,updatedAt,role) VALUES (?,?,?,?,?,?,?)')
+      .run(id, id, id + '@example.test', 1, now, now, role);
+  }
+  for (const [id, client, sender] of [['ma', 'a', 'user_a'], ['mb', 'b', 'user_b'], ['staff_a', 'a', 'owner']]) {
+    sqlite.prepare('INSERT INTO messages (id,client_id,sender_user_id,body,created_at) VALUES (?,?,?,?,?)')
+      .run(id, client, sender, 'Test notificare', now);
+  }
+  const future = new Date(Date.now() + 86400000).toISOString();
+  sqlite.prepare('UPDATE appointments SET starts_at = ?, ends_at = ? WHERE id = ?')
+    .run(future, new Date(Date.now() + 90000000).toISOString(), 'ap_a');
+  assert.equal((await call('overview', 'admin_pending')).status, 403);
+  const staff = await (await call('overview', 'admin')).json();
+  const client = await (await call('overview', 'a')).json();
+  assert.equal(staff.unreadMessages, 2);
+  assert.equal(staff.nextAppointment, null);
+  assert.equal(client.unreadMessages, 1);
+  assert.equal(client.nextAppointment.location_name, 'Locație');
+  assert.equal((await call('overview', 'b').then(response => response.json())).nextAppointment, null);
+  const read = payload => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  assert.equal((await call('notifications/read', 'admin', read({ client_id: 'a' }))).status, 200);
+  assert.equal((await (await call('overview', 'admin')).json()).unreadMessages, 1);
+  assert.equal((await (await call('overview', 'a')).json()).unreadMessages, 1);
+  assert.equal((await call('notifications/read', 'a', read({ client_id: 'b' }))).status, 403);
+  assert.equal((await call('notifications/read', 'a', read({}))).status, 200);
+  assert.equal((await (await call('overview', 'a')).json()).unreadMessages, 0);
+  sqlite.close();
+});
+
 test('staff data stays closed until TOTP is enabled', async () => {
   const { call } = setup();
   assert.equal((await call('clients', 'admin_pending')).status, 403);
@@ -177,6 +225,31 @@ test('location contact is optional, validated and visible only within client sco
   assert.equal(own.rows.find(row => row.id === emptyId).contact_name, null);
   assert.equal(own.rows.find(row => row.id === contactId).contact_email, 'ana@example.test');
   assert.equal(other.rows.some(row => row.contact_email === 'ana@example.test'), false);
+});
+
+test('staff-only client notes and HTTPS invoice links respect account isolation', async () => {
+  const { call, sqlite } = setup();
+  const post = (name, data) => call(name, 'admin', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  const patch = (name, data) => call(name, 'admin', { method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  assert.equal((await patch('clients/a', { internal_note: 'Cheia se ia de la recepție' })).status, 200);
+  assert.equal((await (await call('clients', 'admin')).json()).rows.find(row => row.id === 'a').internal_note,
+    'Cheia se ia de la recepție');
+  assert.equal((await call('clients', 'a')).status, 403);
+  assert.equal((await post('clients', { kind: 'PF', display_name: 'Altul', internal_note: 'x'.repeat(4001) })).status, 400);
+  const job = (await (await post('jobs', { client_id: 'a', service_name: 'Curățenie' })).json()).id;
+  const draft = { client_id: 'a', job_id: job, amount_bani: 50000 };
+  assert.equal((await post('payments', { ...draft, invoice_url: 'javascript:alert(1)' })).status, 400);
+  assert.equal((await post('payments', { ...draft, invoice_url: 'http://example.test/factura' })).status, 400);
+  const link = 'https://example.test/factura/123';
+  const payment = (await (await post('payments', { ...draft, invoice_url: link })).json()).id;
+  assert.equal((await (await call('payments', 'a')).json()).rows[0].invoice_url, link);
+  assert.equal((await (await call('payments', 'b')).json()).rows.length, 0);
+  assert.equal((await patch('payments/' + payment, { invoice_url: 'data:text/html,unsafe' })).status, 400);
+  assert.equal((await patch('payments/' + payment, { invoice_url: null })).status, 200);
+  assert.equal((await (await call('payments', 'a')).json()).rows[0].invoice_url, null);
+  sqlite.close();
 });
 
 test('failed audit rolls back the business record', async () => {

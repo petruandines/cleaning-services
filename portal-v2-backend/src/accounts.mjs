@@ -5,7 +5,7 @@ export async function mustChangePassword(db, userId) {
 
 export async function createClientUser({ db, auth, headers, actor, data }) {
   if (!data || typeof data !== 'object' || Array.isArray(data) ||
-    Object.keys(data).some(key => !['client_id', 'email', 'name', 'password'].includes(key)))
+    Object.keys(data).some(key => !['client_id', 'email', 'name', 'password', 'reactivate_existing'].includes(key)))
     return { status: 400, error: 'invalid_fields' };
   const clientId = data.client_id;
   const email = data.email?.trim().toLowerCase();
@@ -14,10 +14,37 @@ export async function createClientUser({ db, auth, headers, actor, data }) {
   if (typeof clientId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(clientId) ||
     typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
     typeof name !== 'string' || name.length < 1 || name.length > 160 ||
-    typeof password !== 'string' || password.length < 12 || password.length > 128)
+    typeof password !== 'string' || password.length < 12 || password.length > 128 ||
+    (data.reactivate_existing !== undefined && data.reactivate_existing !== true))
     return { status: 400, error: 'invalid_account' };
   const client = await db.prepare("SELECT id FROM clients WHERE id = ? AND deleted_at IS NULL AND status = 'active' LIMIT 1").bind(clientId).all();
   if (!client.results.length) return { status: 404, error: 'client_not_found' };
+
+  const matches = await db.prepare('SELECT id, role FROM "user" WHERE lower(email) = ? LIMIT 1').bind(email).all();
+  const existing = matches.results[0];
+  if (existing) {
+    const linked = await db.prepare('SELECT client_id FROM client_users WHERE user_id = ? LIMIT 1').bind(existing.id).all();
+    if (existing.role !== 'user' || linked.results.length) return { status: 409, error: 'account_already_linked' };
+    if (!data.reactivate_existing) return { status: 409, error: 'archived_account_confirmation_required' };
+    // An old session must not gain access to the new client. Revoke every
+    // session before resetting the password and linking this orphaned user.
+    try {
+      await auth.api.revokeUserSessions({ headers, body: { userId: existing.id } });
+      await auth.api.setUserPassword({ headers, body: { userId: existing.id, newPassword: password } });
+    } catch { return { status: 500, error: 'account_reactivation_failed' }; }
+    const at = new Date().toISOString();
+    try {
+      await db.batch([
+        db.prepare('INSERT INTO client_users (user_id, client_id, created_at) VALUES (?, ?, ?)').bind(existing.id, clientId, at),
+        db.prepare('INSERT INTO portal_accounts (user_id, must_change_password, created_at, updated_at) VALUES (?, 1, ?, ?) ON CONFLICT(user_id) DO UPDATE SET must_change_password = 1, updated_at = excluded.updated_at').bind(existing.id, at, at),
+        db.prepare('UPDATE "user" SET name = ? WHERE id = ? AND role = ?').bind(name, existing.id, 'user'),
+        db.prepare('INSERT INTO audit_events (id, actor_user_id, client_id, action, entity_type, entity_id, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .bind(crypto.randomUUID(), actor, clientId, 'reactivate', 'client_user', existing.id, at),
+      ]);
+    } catch { return { status: 500, error: 'account_link_failed' }; }
+    return { status: 201, id: existing.id, reactivated: true };
+  }
+  if (data.reactivate_existing) return { status: 409, error: 'no_archived_account' };
 
   let userId;
   try {

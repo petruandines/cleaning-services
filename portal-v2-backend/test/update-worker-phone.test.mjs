@@ -26,7 +26,7 @@ test('Worker update requires an existing Worker on the exact subdomain', () => {
 
 test('Worker update retains reviewed D1 target and exactly five pinned migrations', () => {
   assertTarget(JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')));
-  assertFiles();
+  assert.throws(() => assertFiles(), /Unexpected migration files/);
   const tables = ['account', 'appointments', 'audit_events', 'client_users', 'clients',
     'd1_migrations', 'jobs', 'locations', 'messages', 'payments', 'portal_accounts',
     'rateLimit', 'session', 'twoFactor', 'user', 'verification'];

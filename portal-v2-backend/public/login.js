@@ -5,6 +5,7 @@
   const $ = id => document.getElementById(id);
   const views = ['sign-in', 'totp', 'enroll', 'change-password'];
   let pendingToken = null;
+  let trustThisDevice = false;
 
   function show(view) {
     for (const id of views) $(id).hidden = id !== view;
@@ -55,6 +56,7 @@
     const button = form.querySelector('button');
     button.disabled = true;
     try {
+      trustThisDevice = form.elements.trustDevice.checked;
       const { response, body } = await post('sign-in/email', {
         email: form.elements.email.value.trim(), password: form.elements.password.value,
       });
@@ -71,7 +73,7 @@
     const button = form.querySelector('button');
     button.disabled = true;
     try {
-      const { response } = await post('two-factor/verify-totp', { code: form.elements.code.value, trustDevice: false });
+      const { response } = await post('two-factor/verify-totp', { code: form.elements.code.value, trustDevice: trustThisDevice });
       form.elements.code.value = '';
       await complete(response);
     } catch { form.elements.code.value = ''; fail(); }
@@ -126,7 +128,7 @@
     button.disabled = true;
     try {
       const { response } = await post('two-factor/verify-totp', {
-        code: form.elements.code.value, trustDevice: false,
+        code: form.elements.code.value, trustDevice: trustThisDevice,
       }, pendingToken);
       form.elements.code.value = '';
       await complete(response);

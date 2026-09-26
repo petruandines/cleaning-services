@@ -1,11 +1,12 @@
 // Staff-only changes. SQL identifiers come exclusively from literal maps below.
 // The client_id of an existing record is immutable; links stay in that scope.
+import { invoiceUrl } from './writes.mjs';
 const definitions = Object.freeze({
-  clients: ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui', 'status'],
+  clients: ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui', 'status', 'internal_note'],
   locations: ['label', 'address', 'city', 'county', 'contact_name', 'contact_phone', 'contact_email'],
   appointments: ['location_id', 'starts_at', 'ends_at', 'status', 'client_note', 'estimated_cost_bani'],
   jobs: ['appointment_id', 'service_name', 'description', 'status', 'price_bani'],
-  payments: ['job_id', 'amount_bani', 'status', 'recorded_at', 'note'],
+  payments: ['job_id', 'amount_bani', 'status', 'recorded_at', 'note', 'invoice_url'],
   messages: ['body'],
 });
 const dependencies = Object.freeze({
@@ -66,13 +67,14 @@ export async function changeStaffRecord(db, name, id, data, actor) {
       name === 'appointments' ? ['requested', 'confirmed', 'in_progress', 'completed', 'cancelled'] :
         name === 'jobs' ? ['planned', 'in_progress', 'completed', 'cancelled'] : ['pending', 'confirmed', 'reversed']);
     else if (key.endsWith('_bani')) values[key] = amount(value, key === 'amount_bani');
+    else if (key === 'invoice_url') values[key] = invoiceUrl(value);
     else if (['starts_at', 'ends_at'].includes(key)) values[key] = timestamp(value);
     else if (key === 'recorded_at') values[key] = value ? timestamp(value) : null;
     else if (key.endsWith('_id')) values[key] = value === null || value === '' ? null : txt(value, 100, true);
     else values[key] = txt(value, ({ display_name: 160, label: 160, address: 300, city: 120,
       county: 120, contact_name: 160, contact_phone: 40, contact_email: 254, email: 254,
       phone: 40, company_name: 160, cui: 30, service_name: 160, description: 2000,
-      client_note: 2000, note: 1000, body: 4000 })[key],
+      client_note: 2000, note: 1000, internal_note: 4000, body: 4000 })[key],
     ['display_name', 'label', 'address', 'city', 'county', 'service_name', 'body'].includes(key));
     if (values[key] === undefined) return fail(400, 'invalid_fields');
     if (['email', 'contact_email'].includes(key) && !email(values[key])) return fail(400, 'invalid_email');
