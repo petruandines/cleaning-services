@@ -32,7 +32,7 @@ jobs:
       - name: Read reviewed Worker code at a fixed commit
         uses: actions/checkout@v4
         with:
-          ref: REVIEWED_COMMIT
+          ref: bf5bd7d00cd1ca8fb44091bd33b371e30fb9e4b3
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@v4
