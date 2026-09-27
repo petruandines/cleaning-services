@@ -1,6 +1,7 @@
 import { forgetTabSession, readTabSession, rememberTabSession } from './session.mjs';
 import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
 import { createCalendar, fetchAllPages, selectCalendarRows } from './calendar-export.mjs';
+import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs';
 
 (() => {
   'use strict';
@@ -113,6 +114,7 @@ import { createCalendar, fetchAllPages, selectCalendarRows } from './calendar-ex
     $('message-search').value = '';
     $('appointment-banner').hidden = true;
     $('calendar-export').hidden = true;
+    $('payments-export').hidden = true;
     calendarLocationKey = '';
     calendarLoadId++;
     currentClientId = '';
@@ -520,6 +522,11 @@ import { createCalendar, fetchAllPages, selectCalendarRows } from './calendar-ex
     $('message-form').hidden = section !== 'messages' || user?.role !== 'client';
     $('message-search-box').hidden = section !== 'messages' || (user?.role === 'staff' && !selectedClient);
     refreshCalendarLocations();
+    $('payments-export').hidden = current !== 'payments';
+    $('payments-download').disabled = user?.role === 'staff' && !selectedClient;
+    $('payments-hint').textContent = user?.role === 'staff' && !selectedClient ?
+      'Alege mai întâi un client pentru export.' :
+      'Perioada folosește data plății sau, pentru cele în așteptare, data creării.';
     if (current === 'messages' && user?.role === 'staff' && !selectedClient) {
       $('content').textContent = 'Alege un client pentru a vedea conversația.';
       $('pager').hidden = true;
@@ -673,6 +680,45 @@ import { createCalendar, fetchAllPages, selectCalendarRows } from './calendar-ex
       if (session === generation && client === currentClientId) $('calendar-hint').textContent = error.message;
     } finally {
       if (session === generation && client === currentClientId && section === 'appointments') button.disabled = false;
+    }
+  });
+  $('payments-download').addEventListener('click', async event => {
+    if (!token || section !== 'payments' || (user?.role === 'staff' && !currentClientId)) return;
+    const button = event.currentTarget;
+    const session = generation;
+    const client = currentClientId;
+    const start = $('payments-from').value;
+    const end = $('payments-to').value;
+    if (start && end && start > end) {
+      $('payments-hint').textContent = 'Alege un interval de date valid.';
+      return;
+    }
+    button.disabled = true;
+    $('payments-hint').textContent = 'Se pregătește fișierul Excel…';
+    try {
+      const rows = await fetchAllPages(api, 'payments', user.role === 'staff' ? client : '');
+      if (session !== generation || client !== currentClientId || section !== 'payments') return;
+      const selected = paymentsInPeriod(rows, start, end);
+      if (!selected.length) {
+        $('payments-hint').textContent = 'Nu există plăți în perioada aleasă.';
+        return;
+      }
+      const blob = new Blob([createPaymentsWorkbook(selected)], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'plati-petru-ines-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      $('payments-hint').textContent = `Fișierul conține ${selected.length} plăți.`;
+    } catch (error) {
+      if (session === generation && client === currentClientId) $('payments-hint').textContent = error.message;
+    } finally {
+      if (session === generation && client === currentClientId && section === 'payments') button.disabled = false;
     }
   });
   $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 30); loadSection(); });
