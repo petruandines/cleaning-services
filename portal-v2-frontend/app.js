@@ -77,6 +77,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   let searchTimer = null;
   let messageSearchTimer = null;
   let overviewTimer = null;
+  let overviewSequence = 0;
   let editingId = '';
 
   function notice(message) {
@@ -85,6 +86,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   }
   function clearSession() {
     generation++;
+    overviewSequence++;
     clearInterval(overviewTimer);
     overviewTimer = null;
     forgetTabSession(window);
@@ -134,8 +136,9 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   async function refreshOverview() {
     if (!token || !user || document.hidden) return;
     const atStart = generation;
+    const requestSequence = ++overviewSequence;
     const overview = await api('/api/overview');
-    if (generation !== atStart) return;
+    if (generation !== atStart || requestSequence !== overviewSequence) return;
     const button = $('tabs').querySelector('[data-section="messages"]');
     if (button) {
       const count = Math.max(0, Number(overview.unreadMessages) || 0);
@@ -178,12 +181,6 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
     }
     const cards = document.createElement('div');
     cards.className = section === 'messages' ? 'conversation' : 'cards';
-    if (section === 'messages' && user?.role === 'staff' && !currentClientId) {
-      const tip = document.createElement('p');
-      tip.className = 'conversation-tip';
-      tip.textContent = 'Alege un client din lista de mai sus pentru a vedea conversația lui.';
-      container.append(tip);
-    }
     for (const row of section === 'messages' ? [...rows].reverse() : rows) {
       if (section === 'messages') {
         const bubble = document.createElement('article');
@@ -248,6 +245,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       cards.append(card);
     }
     container.append(cards);
+    if (section === 'messages') cards.scrollTop = cards.scrollHeight;
   }
   function addActions(container, row) {
     if (user?.role !== 'staff') return;
@@ -459,14 +457,21 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   async function loadSection() {
     const current = section;
     const requestGeneration = generation;
+    const selectedClient = currentClientId;
     const requestedSearch = current === 'messages' ? $('message-search').value.trim() : '';
     $('section-title').textContent = sections[section];
     $('message-form').hidden = section !== 'messages' || user?.role !== 'client';
-    $('message-search-box').hidden = section !== 'messages';
+    $('message-search-box').hidden = section !== 'messages' || (user?.role === 'staff' && !selectedClient);
+    if (current === 'messages' && user?.role === 'staff' && !selectedClient) {
+      $('content').textContent = 'Alege un client pentru a vedea conversația.';
+      $('pager').hidden = true;
+      await renderStaffForm();
+      return;
+    }
     $('content').textContent = 'Se încarcă…';
     try {
       const data = await api(pageUrl());
-      if (requestGeneration === generation && section === current &&
+      if (requestGeneration === generation && section === current && currentClientId === selectedClient &&
           (current !== 'messages' || requestedSearch === $('message-search').value.trim())) {
         render(data.rows);
         nextOffset = data.nextOffset;
@@ -475,18 +480,20 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
         $('next').disabled = nextOffset === null;
         $('page-label').textContent = 'Pagina ' + (Math.floor(offset / 30) + 1);
         await renderStaffForm();
-        if (requestGeneration !== generation) return;
-        if (current === 'messages' && !requestedSearch && offset === 0 &&
-            (user.role === 'client' || currentClientId)) {
-          const readPayload = user.role === 'staff' ? { client_id: currentClientId } : {};
+        if (requestGeneration !== generation || section !== current || currentClientId !== selectedClient) return;
+        if (current === 'messages' && !document.hidden) {
+          const ids = data.rows.filter(row => row.read_at === null && row.sender_user_id !== user.id)
+            .map(row => row.id);
+          if (!ids.length) return;
+          const readPayload = user.role === 'staff' ? { client_id: selectedClient, ids } : { ids };
           try {
             await api('/api/notifications/read', { method: 'POST', body: JSON.stringify(readPayload) });
-            refreshOverview().catch(() => {});
+            await refreshOverview();
           } catch { /* Keep the conversation visible if marking read fails. */ }
         }
       }
     } catch (error) {
-      if (requestGeneration !== generation) return;
+      if (requestGeneration !== generation || section !== current || currentClientId !== selectedClient) return;
       $('content').textContent = '';
       notice(error.message);
     }
@@ -590,6 +597,8 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
   $('client-picker').addEventListener('change', event => {
     editingId = '';
     formKey = '';
+    clearTimeout(messageSearchTimer);
+    $('message-search').value = '';
     currentClientId = event.target.value;
     currentClientLabel = event.target.selectedOptions[0]?.textContent || '';
     offset = 0;
