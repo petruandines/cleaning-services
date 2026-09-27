@@ -1,5 +1,6 @@
 import { forgetTabSession, readTabSession, rememberTabSession } from './session.mjs';
 import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
+import { createCalendar, fetchAllPages, selectCalendarRows } from './calendar-export.mjs';
 
 (() => {
   'use strict';
@@ -80,6 +81,8 @@ import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
   let overviewTimer = null;
   let overviewSequence = 0;
   let editingId = '';
+  let calendarLocationKey = '';
+  let calendarLoadId = 0;
 
   function notice(message) {
     $('notice').textContent = message;
@@ -109,6 +112,9 @@ import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
     $('message-search-box').hidden = true;
     $('message-search').value = '';
     $('appointment-banner').hidden = true;
+    $('calendar-export').hidden = true;
+    calendarLocationKey = '';
+    calendarLoadId++;
     currentClientId = '';
     currentClientLabel = '';
     formKey = '';
@@ -468,6 +474,43 @@ import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
       params.set('search', $('message-search').value.trim());
     return '/api/' + section + '?' + params;
   }
+  async function refreshCalendarLocations() {
+    const panel = $('calendar-export');
+    panel.hidden = section !== 'appointments';
+    if (panel.hidden) { calendarLoadId++; calendarLocationKey = ''; return; }
+    if (user?.role === 'staff' && !currentClientId) {
+      calendarLoadId++;
+      calendarLocationKey = '';
+      $('calendar-download').disabled = true;
+      $('calendar-location').disabled = true;
+      $('calendar-hint').textContent = 'Alege mai întâi un client pentru export.';
+      return;
+    }
+    const key = user?.role === 'staff' ? currentClientId : 'client-account';
+    if (calendarLocationKey === key) return;
+    calendarLocationKey = key;
+    const ticket = ++calendarLoadId;
+    const session = generation;
+    $('calendar-download').disabled = true;
+    $('calendar-location').disabled = true;
+    $('calendar-hint').textContent = 'Se încarcă locațiile…';
+    try {
+      const locations = await fetchAllPages(api, 'locations', user?.role === 'staff' ? key : '');
+      if (ticket !== calendarLoadId || session !== generation || section !== 'appointments') return;
+      const select = $('calendar-location');
+      select.replaceChildren(new Option('Toate locațiile', ''));
+      for (const location of locations) {
+        select.add(new Option(location.label + ' · ' + location.address, location.id));
+      }
+      select.disabled = false;
+      $('calendar-download').disabled = false;
+      $('calendar-hint').textContent = 'Fișierul se creează pe dispozitivul tău, la descărcare.';
+    } catch (error) {
+      if (ticket !== calendarLoadId || session !== generation) return;
+      calendarLocationKey = '';
+      $('calendar-hint').textContent = error.message;
+    }
+  }
   async function loadSection() {
     const current = section;
     const requestGeneration = generation;
@@ -476,6 +519,7 @@ import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
     $('section-title').textContent = sections[section];
     $('message-form').hidden = section !== 'messages' || user?.role !== 'client';
     $('message-search-box').hidden = section !== 'messages' || (user?.role === 'staff' && !selectedClient);
+    refreshCalendarLocations();
     if (current === 'messages' && user?.role === 'staff' && !selectedClient) {
       $('content').textContent = 'Alege un client pentru a vedea conversația.';
       $('pager').hidden = true;
@@ -598,6 +642,39 @@ import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
   });
 
   $('refresh').addEventListener('click', loadSection);
+  $('calendar-download').addEventListener('click', async event => {
+    if (!token || section !== 'appointments' || (user?.role === 'staff' && !currentClientId)) return;
+    const button = event.currentTarget;
+    const session = generation;
+    const client = currentClientId;
+    const location = $('calendar-location').value;
+    const futureOnly = $('calendar-scope').value === 'future';
+    button.disabled = true;
+    $('calendar-hint').textContent = 'Se pregătește calendarul…';
+    try {
+      const rows = await fetchAllPages(api, 'appointments', user.role === 'staff' ? client : '');
+      if (session !== generation || client !== currentClientId || section !== 'appointments') return;
+      const selected = selectCalendarRows(rows, { locationId: location, futureOnly });
+      if (!selected.length) {
+        $('calendar-hint').textContent = 'Nu există programări pentru selecția aleasă.';
+        return;
+      }
+      const blob = new Blob([createCalendar(selected)], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'programari-petru-ines-' + new Date().toISOString().slice(0, 10) + '.ics';
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      $('calendar-hint').textContent = `Fișierul conține ${selected.length} programări.`;
+    } catch (error) {
+      if (session === generation && client === currentClientId) $('calendar-hint').textContent = error.message;
+    } finally {
+      if (session === generation && client === currentClientId && section === 'appointments') button.disabled = false;
+    }
+  });
   $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 30); loadSection(); });
   $('next').addEventListener('click', () => { if (nextOffset !== null) { offset = nextOffset; loadSection(); } });
   $('client-search').addEventListener('input', () => {
@@ -670,6 +747,7 @@ import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
       }
       editingId = '';
       formKey = '';
+      if (sectionAtStart === 'locations') calendarLocationKey = '';
       await loadSection();
     } catch (error) { notice(error.message); }
     finally { button.disabled = false; }
