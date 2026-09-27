@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assertCounts, assertEmpty, assertRequest, assertTarget } from '../scripts/restore-remote-phone.mjs';
 
-const uuid = '00000000-0000-4000-8000-000000000008';
+const uuid = 'bf95f2d5-04a9-47e4-abfc-755ba05cf122';
 const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'petruandines/cleaning-services',
   GITHUB_REF: 'refs/heads/main', CLOUDFLARE_ACCOUNT_ID: '47b9f8498a9865c0fbbaca8f0f5cf59d',
   CLOUDFLARE_API_TOKEN: 'test-only' };
@@ -10,7 +10,8 @@ const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'petruandines/cleaning-
 test('remote recovery refuses production UUID, unapproved context and mistaken confirmation', () => {
   assert.doesNotThrow(() => assertRequest('inspect', '', uuid, env));
   assert.doesNotThrow(() => assertRequest('restore', `RESTORE INTO TEST D1 ${uuid}`, uuid, env));
-  for (const bad of ['', '6816004b-dc95-48c9-be52-9bd4131d157e', 'not-a-uuid'])
+  for (const bad of ['', '6816004b-dc95-48c9-be52-9bd4131d157e',
+    '00000000-0000-4000-8000-000000000008', 'not-a-uuid'])
     assert.throws(() => assertRequest('inspect', '', bad, env));
   assert.throws(() => assertRequest('restore', '', uuid, env));
   assert.throws(() => assertRequest('inspect', `RESTORE INTO TEST D1 ${uuid}`, uuid, env));
