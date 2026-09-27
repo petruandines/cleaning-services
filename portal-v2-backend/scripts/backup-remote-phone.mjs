@@ -52,6 +52,19 @@ export function archiveDigest(path) {
   } finally { closeSync(fd); }
 }
 
+export function safeVaultError(error) {
+  const message = String(error?.stderr || '').match(/Backup operation failed: ([^\r\n]+)/)?.[1];
+  // Python only emits fixed diagnostic categories for an export failure.
+  const known = [
+    'Cloudflare rejected D1 export authorization; check token\'s D1 export permission',
+    'D1 export failed due to a network or timeout error',
+    'Cloudflare completed export, but the runner could not download its temporary SQL URL',
+    'Cloudflare rejected or interrupted the D1 export request',
+    'Wrangler D1 export failed before completion; no encrypted artifact was uploaded',
+  ];
+  return known.includes(message) ? message : 'Backup operation failed before an encrypted artifact was uploaded';
+}
+
 export function run(operation, confirmation, env = process.env) {
   assertChoice(operation, confirmation);
   assertRunner(env);
@@ -81,9 +94,11 @@ export function run(operation, confirmation, env = process.env) {
       cwd: ROOT, timeout: 300000, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024,
       env: pythonEnv,
     });
-    invoke(['export', '--database', DATABASE, '--scope', 'remote', '--out', archive, '--key', keyFile]);
-    invoke(['verify', '--input', archive, '--key', keyFile]);
-    invoke(['restore-local-test', '--input', archive, '--key', keyFile]);
+    try {
+      invoke(['export', '--database', DATABASE, '--scope', 'remote', '--out', archive, '--key', keyFile]);
+      invoke(['verify', '--input', archive, '--key', keyFile]);
+      invoke(['restore-local-test', '--input', archive, '--key', keyFile]);
+    } catch (error) { throw new Error(safeVaultError(error)); }
     const digest = archiveDigest(archive);
     process.stdout.write(`Encrypted D1 export verified and restored into isolated local D1. SHA-256: ${digest}\n`);
     process.stdout.write('Download the artifact and store it outside GitHub and Cloudflare; keep the key separately.\n');
