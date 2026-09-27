@@ -122,9 +122,31 @@ def decrypt(source, key, output=None):
 def run_wrangler(*args, capture=False):
     if not WRANGLER.is_file():
         raise ValueError("Run npm ci in portal-v2-backend first")
-    return subprocess.run([str(WRANGLER), *args], cwd=ROOT, check=True,
-                          text=True, stdout=subprocess.PIPE if capture else None,
-                          stderr=subprocess.STDOUT if capture else None)
+    try:
+        return subprocess.run([str(WRANGLER), *args], cwd=ROOT, check=True,
+                              text=True, stdout=subprocess.PIPE if capture else None,
+                              stderr=subprocess.STDOUT if capture else None)
+    except subprocess.CalledProcessError as error:
+        if capture and args[:2] == ("d1", "export"):
+            raise ExportDiagnostic(classify_export_error(error.stdout or "")) from None
+        raise
+
+
+class ExportDiagnostic(ValueError):
+    """A fixed diagnostic category safe to display in GitHub Actions logs."""
+
+
+def classify_export_error(output):
+    """Report a useful category without logging signed download URLs or secrets."""
+    if re.search(r"\b(?:403|10000|10001)\b|permission|forbidden|not authorized|authentication error", output, re.I):
+        return "Cloudflare rejected D1 export authorization; check token's D1 export permission"
+    if re.search(r"\b(?:fetch failed|network error|timed out|ECONNRESET|ETIMEDOUT)\b", output, re.I):
+        return "D1 export failed due to a network or timeout error"
+    if "Downloading SQL to" in output or "download from the presigned URL" in output:
+        return "Cloudflare completed export, but the runner could not download its temporary SQL URL"
+    if "Creating export" in output or "Executing on remote database" in output:
+        return "Cloudflare rejected or interrupted the D1 export request"
+    return "Wrangler D1 export failed before completion; no encrypted artifact was uploaded"
 
 
 def export_database(name, scope, target, key):
@@ -217,6 +239,8 @@ def main():
             restore_local_test(args.input, read_key(args.key), args.expect_client_id)
         else:
             export_database(args.database, args.scope, args.out, read_key(args.key))
+    except ExportDiagnostic as error:
+        parser.exit(1, f"Backup operation failed: {error}\n")
     except (ValueError, InvalidTag, FileExistsError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Backup operation failed: {type(error).__name__}\n")
 
