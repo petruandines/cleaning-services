@@ -13,6 +13,7 @@ import { queryRows } from './upgrade-phone.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROD_UUID = '6816004b-dc95-48c9-be52-9bd4131d157e';
 const TEST_NAME = 'petru-ines-restore-test-eu';
+const TEST_UUID = 'bf95f2d5-04a9-47e4-abfc-755ba05cf122';
 const EXPECTED_SHA = '9f57064178c22bf39c733b27e57a862e0e30ff3d6350c57a29c6218642cd49b8';
 const TABLES = ['account', 'appointments', 'audit_events', 'client_users', 'clients',
   'd1_migrations', 'jobs', 'locations', 'messages', 'payments',
@@ -20,8 +21,8 @@ const TABLES = ['account', 'appointments', 'audit_events', 'client_users', 'clie
 
 export function assertRequest(operation, confirmation, uuid, env) {
   if (!['inspect', 'restore'].includes(operation)) throw new Error('Unknown recovery operation');
-  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(uuid || '') || uuid === PROD_UUID)
-    throw new Error('Recovery requires a distinct D1 UUID; production UUID is forbidden');
+  if (uuid !== TEST_UUID || uuid === PROD_UUID)
+    throw new Error('Recovery requires the fixed, reviewed test D1 UUID; production is forbidden');
   if (operation === 'inspect' && confirmation) throw new Error('Inspect confirmation must be empty');
   if (operation === 'restore' && confirmation !== `RESTORE INTO TEST D1 ${uuid}`)
     throw new Error('Restore requires exact test database confirmation');
