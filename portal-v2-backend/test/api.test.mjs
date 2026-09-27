@@ -10,6 +10,7 @@ const accountSchema = readFileSync(new URL('../../docs/portal-v2/0003_portal_acc
 const contactSchema = readFileSync(new URL('../../docs/portal-v2/0004_location_contact.sql', import.meta.url), 'utf8');
 const archiveSchema = readFileSync(new URL('../../docs/portal-v2/0005_soft_delete.sql', import.meta.url), 'utf8');
 const invoiceSchema = readFileSync(new URL('../../docs/portal-v2/0006_invoice_client_notes.sql', import.meta.url), 'utf8');
+const contractSchema = readFileSync(new URL('../../docs/portal-v2/0007_client_contract.sql', import.meta.url), 'utf8');
 const now = '2026-09-24T10:00:00Z';
 
 function setup() {
@@ -21,6 +22,7 @@ function setup() {
   sqlite.exec(contactSchema);
   sqlite.exec(archiveSchema);
   sqlite.exec(invoiceSchema);
+  sqlite.exec(contractSchema);
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
       .run(id, 'PF', id, now, now);
@@ -86,6 +88,36 @@ test('client sees only own appointment and no internal note; staff sees both', a
   assert.equal('internal_note' in a.rows[0], false);
   assert.equal((await call('clients', 'a')).status, 403);
   assert.equal((await call('clients', 'admin')).status, 200);
+});
+
+test('optional contract fields remain scoped and hidden until at least one is set', async () => {
+  const { call, sqlite } = setup();
+  const patch = (id, data, token = 'admin') => call('clients/' + id, token, { method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  assert.deepEqual((await (await call('contracts', 'a')).json()).rows, []);
+  assert.equal((await call('contracts?client_id=a', 'a')).status, 400);
+  assert.equal((await call('contracts', 'admin')).status, 400);
+  assert.equal((await patch('a', { manager_email: 'manager@example.test' }, 'a')).status, 403);
+  assert.equal((await patch('a', { manager_email: 'not-an-email' })).status, 400);
+  assert.equal((await patch('a', { contract_rate_bani: 40000 })).status, 400);
+  assert.equal((await patch('a', { billing_type: 'fixed' })).status, 400);
+  assert.equal((await patch('a', { billing_type: 'hourly', contract_rate_bani: 45000,
+    manager_email: 'manager@example.test', contract_details: 'Intervenții lunare' })).status, 200);
+  const own = (await (await call('contracts', 'a')).json()).rows;
+  assert.equal(own.length, 1);
+  assert.equal(own[0].contract_rate_bani, 45000);
+  assert.equal(own[0].manager_email, 'manager@example.test');
+  assert.equal(own[0].contract_details, 'Intervenții lunare');
+  assert.equal('internal_note' in own[0], false);
+  assert.deepEqual((await (await call('contracts', 'b')).json()).rows, []);
+  assert.deepEqual((await (await call('contracts?client_id=b', 'admin')).json()).rows[0].manager_email, null);
+  assert.equal((await patch('a', { billing_type: 'fixed' })).status, 400);
+  assert.equal((await patch('a', { billing_type: 'fixed', contract_rate_bani: null })).status, 200);
+  assert.equal((await patch('a', { billing_type: null, contract_rate_bani: null,
+    manager_email: null, contract_details: null })).status, 200);
+  assert.deepEqual((await (await call('contracts', 'a')).json()).rows, []);
+  assert.equal(sqlite.prepare('SELECT billing_type FROM clients WHERE id = ?').get('a').billing_type, null);
+  sqlite.close();
 });
 
 test('admin records a payment directly against a scoped appointment without a separate job step', async () => {
