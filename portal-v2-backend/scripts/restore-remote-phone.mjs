@@ -7,8 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { archiveDigest, decodeKey } from './backup-remote-phone.mjs';
 import { assertFiles, assertVersion } from './upgrade-fields-phone.mjs';
 import { tableNames } from './migrate-phone.mjs';
-import { parseWranglerJson } from './verify-remote-d1.mjs';
-import { queryRows } from './upgrade-phone.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROD_UUID = '6816004b-dc95-48c9-be52-9bd4131d157e';
@@ -49,6 +47,25 @@ export function assertCounts(actual, expected) {
     throw new Error('Restored D1 table counts differ from the authenticated backup');
 }
 
+export function parseRecoveryJson(raw) {
+  // Wrangler may print a configuration/update hint before --json output.
+  // Parse only a complete JSON payload beginning at a new line. Never log
+  // warnings or API responses, which could contain database details.
+  const starts = [...raw.matchAll(/(?:^|\n)([\[{])/g)].map(match => match.index + (match[0].startsWith('\n') ? 1 : 0));
+  for (const start of starts) {
+    try { return JSON.parse(raw.slice(start)); } catch { /* try next JSON start */ }
+  }
+  throw new Error('Wrangler did not return complete JSON for recovery inspection');
+}
+
+export function recoveryRows(raw) {
+  const response = parseRecoveryJson(raw);
+  if (!Array.isArray(response) || response.length !== 1 || response[0]?.success !== true ||
+      !Array.isArray(response[0].results))
+    throw new Error('Unexpected recovery D1 query response');
+  return response[0].results;
+}
+
 function command(wrangler, args, timeout = 120000) {
   try {
     return execFileSync(process.execPath, [wrangler, 'd1', ...args], {
@@ -81,9 +98,9 @@ export function run(operation, confirmation, uuid, env = process.env) {
         database_name: TEST_NAME, database_id: uuid, jurisdiction: 'eu' }] }), { mode: 0o600 });
     const wrangler = join(ROOT, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
     const base = ['execute', TEST_NAME, '--remote', '--config', config];
-    const identity = parseWranglerJson(command(wrangler, ['info', TEST_NAME, '--json', '--config', config]));
+    const identity = parseRecoveryJson(command(wrangler, ['info', TEST_NAME, '--json', '--config', config]));
     assertTarget(identity, uuid);
-    const query = sql => queryRows(command(wrangler, [...base, '--json', '--command', sql]));
+    const query = sql => recoveryRows(command(wrangler, [...base, '--json', '--command', sql]));
     const tableQuery = "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name";
     assertEmpty(query(tableQuery));
     process.stdout.write('Verified distinct EU recovery D1 identity, empty application schema and exact encrypted artifact. No remote writes.\n');
