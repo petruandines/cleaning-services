@@ -38,7 +38,7 @@ jobs:
       - name: Read reviewed recovery code at a fixed commit
         uses: actions/checkout@v4
         with:
-          ref: 529439eee4e533a75b0aed3175d0207aab4733ee
+          ref: 859e1456edb897cdb5dd2a8d6a188880069d8067
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@v4
