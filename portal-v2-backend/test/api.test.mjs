@@ -105,7 +105,10 @@ test('admin records a payment directly against a scoped appointment without a se
   const own = (await (await call('payments', 'a')).json()).rows;
   assert.equal(own[0].appointment_starts_at, now);
   assert.equal(own[0].location_name, 'Locație');
+  assert.equal(own[0].recorded_at, null);
+  assert.equal(own[0].created_at, sqlite.prepare('SELECT created_at FROM payments WHERE id = ?').get(paymentId).created_at);
   assert.equal((await (await call('payments', 'b')).json()).rows.length, 0);
+  assert.deepEqual((await (await call('payments?client_id=b', 'admin')).json()).rows, []);
   assert.equal((await call('payments/' + paymentId, 'admin', { method: 'DELETE' })).status, 200);
   assert.ok(sqlite.prepare('SELECT deleted_at FROM jobs WHERE id = ?').get(job.id).deleted_at);
   assert.equal((await call('appointments/ap_a', 'admin', { method: 'DELETE' })).status, 200);
