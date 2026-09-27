@@ -4,14 +4,14 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { assertChoice, assertFiles, assertVersion } from '../scripts/upgrade-fields-phone.mjs';
 
-test('fields upgrade accepts only exact confirmation, recovery and six pinned files', () => {
+test('obsolete fields upgrade still refuses extra migration files in a newer checkout', () => {
   assertChoice('inspect', '');
   assert.throws(() => assertChoice('inspect', 'APPLY'), /empty/);
   assert.throws(() => assertChoice('apply', ''), /exact D1/);
   assert.throws(() => assertChoice('apply', 'APPLY PORTAL FIELDS 6816004b-dc95-48c9-be52-9bd4131d157e'), /recovery/);
   assertChoice('apply', 'APPLY PORTAL FIELDS 6816004b-dc95-48c9-be52-9bd4131d157e',
     'TIME TRAVEL VERIFIED 6816004b-dc95-48c9-be52-9bd4131d157e');
-  assertFiles();
+  assert.throws(() => assertFiles(), /Unexpected migration files/);
 });
 
 test('migration 0006 retains existing records and requires exact version transition', () => {
