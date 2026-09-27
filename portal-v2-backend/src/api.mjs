@@ -127,6 +127,23 @@ export async function handleApi(request, { db, auth }) {
   }
   if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
   if (initialPassword && name !== 'password') return error(403, 'initial_password_required');
+  if (name === 'contracts' && !recordId && request.method === 'GET') {
+    const clientId = url.searchParams.get('client_id');
+    if ((staff && (!clientId || !/^[a-zA-Z0-9_-]{1,100}$/.test(clientId))) ||
+        (!staff && clientId !== null)) return error(400, 'invalid_filter');
+    const columns = `c.id AS client_id, c.display_name AS client_name, c.billing_type,
+      c.contract_rate_bani, c.manager_name, c.manager_email, c.manager_phone,
+      c.contract_reference, c.contract_details`;
+    const sql = staff ? `SELECT ${columns} FROM clients c WHERE c.id = ? AND c.deleted_at IS NULL` :
+      `SELECT ${columns} FROM clients c JOIN client_users cu ON cu.client_id = c.id
+       WHERE cu.user_id = ? AND c.deleted_at IS NULL AND c.status = 'active'
+         AND (c.billing_type IS NOT NULL OR c.contract_rate_bani IS NOT NULL
+           OR c.manager_name IS NOT NULL OR c.manager_email IS NOT NULL
+           OR c.manager_phone IS NOT NULL OR c.contract_reference IS NOT NULL
+           OR c.contract_details IS NOT NULL) ORDER BY c.display_name, c.id`;
+    const result = await db.prepare(sql).bind(staff ? clientId : userId).all();
+    return json({ rows: result.results });
+  }
   if (!['clients', 'users', 'password'].includes(name) && !Object.hasOwn(lists, name)) return error(404, 'not_found');
   if (recordId && (request.method === 'PATCH' || request.method === 'DELETE')) {
     if (!staff || (name !== 'clients' && !Object.hasOwn(lists, name))) return error(403, 'forbidden');
