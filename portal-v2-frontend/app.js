@@ -1,4 +1,5 @@
 import { forgetTabSession, readTabSession, rememberTabSession } from './session.mjs';
+import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
 
 (() => {
   'use strict';
@@ -179,73 +180,86 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
       container.append(empty);
       return;
     }
-    const cards = document.createElement('div');
-    cards.className = section === 'messages' ? 'conversation' : 'cards';
-    for (const row of section === 'messages' ? [...rows].reverse() : rows) {
-      if (section === 'messages') {
-        const bubble = document.createElement('article');
-        bubble.className = 'bubble ' + (row.sender_user_id === user?.id ? 'bubble-mine' : 'bubble-theirs');
-        const sender = document.createElement('strong');
-        sender.textContent = row.sender_user_id === user?.id ? 'Tu' : row.sender_name || 'Petru & Inés';
-        const body = document.createElement('p');
-        body.textContent = row.body;
-        const meta = document.createElement('small');
-        meta.textContent = (user?.role === 'staff' && !currentClientId ? row.client_name + ' · ' : '') + format('created_at', row.created_at);
-        bubble.append(sender, body, meta);
-        addActions(bubble, row);
-        cards.append(bubble);
-        continue;
+    const groups = section === 'appointments' ? groupAppointments(rows) :
+      [{ rows: section === 'messages' ? [...rows].reverse() : rows }];
+    for (const group of groups) {
+      const cards = document.createElement('div');
+      cards.className = section === 'messages' ? 'conversation' : 'cards';
+      for (const row of group.rows) {
+        if (section === 'messages') {
+          const bubble = document.createElement('article');
+          bubble.className = 'bubble ' + (row.sender_user_id === user?.id ? 'bubble-mine' : 'bubble-theirs');
+          const sender = document.createElement('strong');
+          sender.textContent = row.sender_user_id === user?.id ? 'Tu' : row.sender_name || 'Petru & Inés';
+          const body = document.createElement('p');
+          body.textContent = row.body;
+          const meta = document.createElement('small');
+          meta.textContent = (user?.role === 'staff' && !currentClientId ? row.client_name + ' · ' : '') + format('created_at', row.created_at);
+          bubble.append(sender, body, meta);
+          addActions(bubble, row);
+          cards.append(bubble);
+          continue;
+        }
+        const card = document.createElement('article');
+        card.className = 'card' + (isMuted(section, row.status) ? ' card--muted' : '');
+        const top = document.createElement('div');
+        top.className = 'card-top';
+        const title = document.createElement(section === 'appointments' ? 'h4' : 'h3');
+        title.textContent = section === 'appointments' ? (row.client_name || singular.appointments) :
+          section === 'payments' ? 'Plată' : row.service_name || row.display_name || row.label || singular[section];
+        top.append(title);
+        if (row.status) {
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          const tone = statusTone(section, row.status);
+          if (tone) badge.classList.add('badge--' + tone);
+          badge.textContent = format('status', row.status);
+          top.append(badge);
+        }
+        card.append(top);
+        if (section === 'appointments') {
+          const location = document.createElement('p');
+          location.className = 'card-location';
+          location.textContent = '⌖ ' + (row.location_name || 'Locație') + (row.location_address ? ' · ' + row.location_address : '');
+          card.append(location);
+        }
+        const details = document.createElement('dl');
+        for (const [key, label] of Object.entries(fields[section])) {
+          if (row[key] === null || row[key] === undefined || row[key] === '') continue;
+          const term = document.createElement('dt');
+          const description = document.createElement('dd');
+          term.textContent = label;
+          description.textContent = format(key, row[key]);
+          details.append(term, description);
+        }
+        if (details.childElementCount) card.append(details);
+        if (section === 'payments' && row.invoice_url) {
+          try {
+            const link = new URL(row.invoice_url);
+            if (link.protocol === 'https:') {
+              const invoice = document.createElement('a');
+              invoice.className = 'invoice-link';
+              invoice.href = link.href;
+              invoice.target = '_blank';
+              invoice.rel = 'noopener noreferrer';
+              invoice.textContent = 'Deschide factura ↗';
+              card.append(invoice);
+            }
+          } catch { /* An invalid historical URL is not clickable. */ }
+        }
+        addActions(card, row);
+        cards.append(card);
       }
-      const card = document.createElement('article');
-      card.className = 'card';
-      const top = document.createElement('div');
-      top.className = 'card-top';
-      const title = document.createElement('h3');
-      title.textContent = section === 'appointments' ? (row.client_name || singular.appointments) :
-        section === 'payments' ? 'Plată' : row.service_name || row.display_name || row.label || singular[section];
-      top.append(title);
-      if (row.status) {
-        const badge = document.createElement('span');
-        badge.className = 'badge';
-        badge.textContent = format('status', row.status);
-        top.append(badge);
-      }
-      card.append(top);
       if (section === 'appointments') {
-        const location = document.createElement('p');
-        location.className = 'card-location';
-        location.textContent = '⌖ ' + (row.location_name || 'Locație') + (row.location_address ? ' · ' + row.location_address : '');
-        card.append(location);
-      }
-      const details = document.createElement('dl');
-      for (const [key, label] of Object.entries(fields[section])) {
-        if (row[key] === null || row[key] === undefined || row[key] === '') continue;
-        const term = document.createElement('dt');
-        const description = document.createElement('dd');
-        term.textContent = label;
-        description.textContent = format(key, row[key]);
-        details.append(term, description);
-      }
-      if (details.childElementCount) card.append(details);
-      if (section === 'payments' && row.invoice_url) {
-        try {
-          const link = new URL(row.invoice_url);
-          if (link.protocol === 'https:') {
-            const invoice = document.createElement('a');
-            invoice.className = 'invoice-link';
-            invoice.href = link.href;
-            invoice.target = '_blank';
-            invoice.rel = 'noopener noreferrer';
-            invoice.textContent = 'Deschide factura ↗';
-            card.append(invoice);
-          }
-        } catch { /* An invalid historical URL is not clickable. */ }
-      }
-      addActions(card, row);
-      cards.append(card);
+        const day = document.createElement('section');
+        day.className = 'appointment-day';
+        const heading = document.createElement('h3');
+        heading.textContent = group.label;
+        day.append(heading, cards);
+        container.append(day);
+      } else container.append(cards);
+      if (section === 'messages') cards.scrollTop = cards.scrollHeight;
     }
-    container.append(cards);
-    if (section === 'messages') cards.scrollTop = cards.scrollHeight;
   }
   function addActions(container, row) {
     if (user?.role !== 'staff') return;
