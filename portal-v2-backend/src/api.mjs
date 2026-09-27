@@ -26,7 +26,7 @@ const lists = Object.freeze({
   locations: 'id, client_id, label, address, city, county, contact_name, contact_phone, contact_email, active, created_at',
   appointments: 'a.id, a.client_id, a.location_id, a.starts_at, a.ends_at, a.status, a.client_note, a.estimated_cost_bani, c.display_name AS client_name, l.label AS location_name, l.address AS location_address',
   jobs: 'id, client_id, appointment_id, service_name, description, status, price_bani, completed_at',
-  payments: 'p.id, p.client_id, p.job_id, p.amount_bani, p.status, p.recorded_at, p.note, p.invoice_url, a.starts_at AS appointment_starts_at, l.label AS location_name, j.service_name',
+  payments: 'p.id, p.client_id, p.job_id, p.amount_bani, p.status, p.recorded_at, p.created_at, p.note, p.invoice_url, a.starts_at AS appointment_starts_at, l.label AS location_name, j.service_name',
   messages: 'm.id, m.client_id, m.sender_user_id, m.body, m.created_at, m.read_at, c.display_name AS client_name, u.name AS sender_name',
 });
 
