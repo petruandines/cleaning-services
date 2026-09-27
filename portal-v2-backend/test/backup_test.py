@@ -12,6 +12,13 @@ spec.loader.exec_module(vault)
 
 
 class BackupTest(unittest.TestCase):
+    def test_export_diagnostic_is_useful_without_disclosing_signed_url(self):
+        self.assertIn('authorization', vault.classify_export_error('Error 403: permission denied'))
+        self.assertIn('network', vault.classify_export_error('fetch failed'))
+        sample = 'Downloading SQL to /tmp/backup\nhttps://private.example/?signature=very-secret'
+        self.assertIn('download', vault.classify_export_error(sample))
+        self.assertNotIn('very-secret', vault.classify_export_error(sample))
+
     def test_streamed_encryption_authentication_and_no_plaintext_on_failure(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
