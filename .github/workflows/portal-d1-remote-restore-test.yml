@@ -1,0 +1,89 @@
+name: Portal D1 isolated EU recovery test (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect test D1 first; restore only after reviewing inspect
+        type: choice
+        options:
+          - inspect
+          - restore
+        required: true
+        default: inspect
+      test_database_uuid:
+        description: UUID of NEW petru-ines-restore-test-eu D1; never production UUID
+        type: string
+        required: true
+      confirmation:
+        description: Empty for inspect; RESTORE INTO TEST D1 followed by test UUID for restore
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: portal-d1-isolated-recovery
+  cancel-in-progress: false
+
+jobs:
+  recovery:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Read reviewed recovery code at a fixed commit
+        uses: actions/checkout@v4
+        with:
+          ref: b75bf0f6f8a5092393b4e0fa3c31ed39e3508b7f
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal-v2-backend/package-lock.json
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies without D1 token or backup key
+        working-directory: portal-v2-backend
+        run: |
+          npm ci --no-audit --no-fund
+          python -m pip install -r scripts/requirements-backup.txt
+      - name: Test recovery guards and encryption without secrets
+        working-directory: portal-v2-backend
+        run: |
+          npm test
+          python -m unittest discover -s test -p backup_test.py
+      - name: Download only the reviewed encrypted backup artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: portal-d1-encrypted-36320567342
+          run-id: 36320567342
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/restore-artifact
+      - name: Inspect separate EU D1 with read-only token
+        if: inputs.operation == 'inspect'
+        working-directory: portal-v2-backend
+        env:
+          CI: 'true'
+          CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_RESTORE_D1_READ_TOKEN }}
+          TEST_UUID: ${{ inputs.test_database_uuid }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: node scripts/restore-remote-phone.mjs inspect "$CONFIRMATION" "$TEST_UUID"
+      - name: Restore ONLY into inspected empty test D1 with edit token
+        if: inputs.operation == 'restore'
+        working-directory: portal-v2-backend
+        env:
+          CI: 'true'
+          CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_RESTORE_D1_EDIT_TOKEN }}
+          PORTAL_BACKUP_KEY_HEX: ${{ secrets.PORTAL_BACKUP_KEY_HEX }}
+          TEST_UUID: ${{ inputs.test_database_uuid }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: node scripts/restore-remote-phone.mjs restore "$CONFIRMATION" "$TEST_UUID"
