@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { archiveDigest, assertChoice, assertRunner, assertTarget, decodeKey } from '../scripts/backup-remote-phone.mjs';
+import { archiveDigest, assertChoice, assertRunner, assertTarget, decodeKey, safeVaultError } from '../scripts/backup-remote-phone.mjs';
 
 const valid = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'petruandines/cleaning-services',
   GITHUB_REF: 'refs/heads/main', CLOUDFLARE_ACCOUNT_ID: '47b9f8498a9865c0fbbaca8f0f5cf59d',
@@ -49,4 +49,10 @@ test('backup digest streams the actual encrypted artifact', () => {
     writeFileSync(path, content);
     assert.equal(archiveDigest(path), createHash('sha256').update(content).digest('hex'));
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('backup logs only a fixed error category and never the signed export URL', () => {
+  assert.match(safeVaultError({ stderr: 'Backup operation failed: Cloudflare rejected D1 export authorization; check token\'s D1 export permission\n' }), /authorization/);
+  const raw = 'Backup operation failed: https://private.example/?signature=secret\n';
+  assert.doesNotMatch(safeVaultError({ stderr: raw }), /private\.example|secret/);
 });
