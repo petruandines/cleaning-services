@@ -2,7 +2,9 @@
 // The client_id of an existing record is immutable; links stay in that scope.
 import { invoiceUrl } from './writes.mjs';
 const definitions = Object.freeze({
-  clients: ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui', 'status', 'internal_note'],
+  clients: ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui', 'status', 'internal_note',
+    'billing_type', 'contract_rate_bani', 'manager_name', 'manager_email', 'manager_phone',
+    'contract_reference', 'contract_details'],
   locations: ['label', 'address', 'city', 'county', 'contact_name', 'contact_phone', 'contact_email'],
   appointments: ['location_id', 'starts_at', 'ends_at', 'status', 'client_note', 'estimated_cost_bani'],
   jobs: ['appointment_id', 'service_name', 'description', 'status', 'price_bani'],
@@ -71,6 +73,8 @@ export async function changeStaffRecord(db, name, id, data, actor) {
   const values = {};
   for (const [key, value] of Object.entries(data)) {
     if (key === 'kind') values[key] = enumValue(value, ['PF', 'PJ']);
+    else if (key === 'billing_type') values[key] = value === null || value === '' ? null :
+      enumValue(value, ['hourly', 'fixed']);
     else if (key === 'status') values[key] = enumValue(value, name === 'clients' ? ['active', 'inactive'] :
       name === 'appointments' ? ['requested', 'confirmed', 'in_progress', 'completed', 'cancelled'] :
         name === 'jobs' ? ['planned', 'in_progress', 'completed', 'cancelled'] : ['pending', 'confirmed', 'reversed']);
@@ -82,10 +86,21 @@ export async function changeStaffRecord(db, name, id, data, actor) {
     else values[key] = txt(value, ({ display_name: 160, label: 160, address: 300, city: 120,
       county: 120, contact_name: 160, contact_phone: 40, contact_email: 254, email: 254,
       phone: 40, company_name: 160, cui: 30, service_name: 160, description: 2000,
-      client_note: 2000, note: 1000, internal_note: 4000, body: 4000 })[key],
+      client_note: 2000, note: 1000, internal_note: 4000, body: 4000,
+      manager_name: 160, manager_email: 254, manager_phone: 40,
+      contract_reference: 160, contract_details: 2000 })[key],
     ['display_name', 'label', 'address', 'city', 'county', 'service_name', 'body'].includes(key));
     if (values[key] === undefined) return fail(400, 'invalid_fields');
-    if (['email', 'contact_email'].includes(key) && !email(values[key])) return fail(400, 'invalid_email');
+    if (['email', 'contact_email', 'manager_email'].includes(key) && !email(values[key])) return fail(400, 'invalid_email');
+  }
+  if (name === 'clients' && ('billing_type' in values || 'contract_rate_bani' in values)) {
+    const current = (await db.prepare('SELECT billing_type, contract_rate_bani FROM clients WHERE id = ?')
+      .bind(id).all()).results[0];
+    const mode = 'billing_type' in values ? values.billing_type : current.billing_type;
+    const rate = 'contract_rate_bani' in values ? values.contract_rate_bani : current.contract_rate_bani;
+    if ((rate !== null && mode === null) ||
+        ('billing_type' in values && values.billing_type !== current.billing_type &&
+          !('contract_rate_bani' in values))) return fail(400, 'invalid_contract_rate');
   }
   if (name === 'appointments' && ((values.starts_at || values.ends_at) || values.location_id)) {
     const current = (await db.prepare('SELECT starts_at, ends_at, location_id FROM appointments WHERE id = ?').bind(id).all()).results[0];
