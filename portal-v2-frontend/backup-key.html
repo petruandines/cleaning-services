@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-neIQuRkB8+s6DvvjTsVhsM62e0gZmyZPX8eaMiI6AuQ='; style-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Cheie privată pentru copia D1 · Petru &amp; Inés</title>
+  <style>
+    :root{font-family:system-ui,sans-serif;color:#17332d;background:#f3f7f4;color-scheme:light}
+    body{max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.6}
+    main{background:white;border:1px solid #d7e5dc;border-radius:1rem;padding:1.5rem;box-shadow:0 10px 25px #15352b0c}
+    h1{font-size:1.65rem;line-height:1.25}
+    button{font:inherit;background:#147153;color:#fff;border:0;border-radius:.6rem;padding:.75rem 1rem;margin:.4rem .4rem .4rem 0;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    output{display:block;overflow-wrap:anywhere;background:#edf4ef;border-radius:.6rem;padding:1rem;margin:1rem 0;font-family:ui-monospace,monospace;font-size:1.05rem;user-select:all;min-height:3rem}
+    .note{background:#fff6de;border-left:4px solid #c98b19;padding:.8rem 1rem}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Cheia pentru copia criptată D1</h1>
+    <p>Cheia se generează numai în browserul tău. Pagina nu transmite nimic și nu păstrează cheia după ce o închizi.</p>
+    <button id="generate" type="button">Generează cheia</button>
+    <button id="copy" type="button" disabled>Copiază cheia</button>
+    <output id="key" aria-label="Cheia generată">Cheia va apărea aici.</output>
+    <p id="status" role="status"></p>
+    <p class="note"><strong>Păstrează cheia într-un loc sigur, separat de fișierul de backup.</strong> Fără ea, copia nu poate fi restaurată. Nu trimite cheia în chat și nu o pune în codul GitHub. După ce o salvezi, introdu-o numai în secretul GitHub <code>PORTAL_BACKUP_KEY_HEX</code>.</p>
+  </main>
+  <script>
+    const key = document.getElementById('key');
+    const status = document.getElementById('status');
+    const copy = document.getElementById('copy');
+    document.getElementById('generate').addEventListener('click', () => {
+      if (!globalThis.crypto?.getRandomValues) {
+        status.textContent = 'Browserul nu poate genera o cheie sigură. Deschide pagina prin HTTPS.';
+        return;
+      }
+      const bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      key.textContent = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+      bytes.fill(0);
+      copy.disabled = false;
+      status.textContent = 'Cheie nouă: 64 de caractere. Salveaz-o înainte să închizi pagina.';
+    });
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(key.textContent);
+        status.textContent = 'Cheia a fost copiată. Salveaz-o acum într-un loc sigur.';
+      } catch {
+        status.textContent = 'Copierea automată nu este disponibilă. Apasă lung pe cheie și copiaz-o manual.';
+      }
+    });
+  </script>
+</body>
+</html>
