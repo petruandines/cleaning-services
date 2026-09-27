@@ -12,9 +12,10 @@ on:
         required: true
         default: inspect
       test_database_uuid:
-        description: UUID of NEW petru-ines-restore-test-eu D1; never production UUID
+        description: UUID of NEW petru-ines-restore-test-eu D1; prefilled and pinned in code
         type: string
         required: true
+        default: bf95f2d5-04a9-47e4-abfc-755ba05cf122
       confirmation:
         description: Empty for inspect; RESTORE INTO TEST D1 followed by test UUID for restore
         type: string
@@ -37,7 +38,7 @@ jobs:
       - name: Read reviewed recovery code at a fixed commit
         uses: actions/checkout@v4
         with:
-          ref: b75bf0f6f8a5092393b4e0fa3c31ed39e3508b7f
+          ref: 529439eee4e533a75b0aed3175d0207aab4733ee
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@v4
