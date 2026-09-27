@@ -78,6 +78,7 @@ class BackupTest(unittest.TestCase):
                                    '--file', str(migrations / name), capture=True)
             seed = source_dir / 'seed.sql'
             seed.write_text("""
+CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY, name TEXT);
 INSERT INTO clients (id,kind,display_name,created_at,updated_at)
 VALUES ('fixture-client','PF','Client fictiv','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
 INSERT INTO locations (id,client_id,label,address,city,county,created_at,updated_at)
@@ -105,6 +106,10 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
                 vault.restore_local_test(archive, vault.read_key(key_file), 'missing-client')
             restored_sql = root / 'restored.sql'
             vault.decrypt(archive, vault.read_key(key_file), restored_sql)
+            counts = vault.sql_counts(restored_sql)
+            self.assertEqual(counts['clients'], 1)
+            self.assertEqual(counts['payments'], 1)
+            self.assertEqual(counts['d1_migrations'], 0)
             restored_db = root / 'inspected.sqlite'
             with sqlite3.connect(restored_db) as db:
                 db.executescript(restored_sql.read_text())
@@ -112,6 +117,13 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
                     'SELECT price_bani, amount_bani FROM jobs JOIN payments ON payments.job_id = jobs.id'
                 ).fetchone(), (12345, 12345))
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+
+    def test_sql_counts_refuse_incomplete_schema(self):
+        with tempfile.TemporaryDirectory() as folder:
+            sql = Path(folder) / 'incomplete.sql'
+            sql.write_text('CREATE TABLE clients (id TEXT);')
+            with self.assertRaises(ValueError):
+                vault.sql_counts(sql)
 
 
 if __name__ == '__main__':
