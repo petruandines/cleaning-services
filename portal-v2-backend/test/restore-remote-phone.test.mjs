@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertCounts, assertEmpty, assertRequest, assertTarget } from '../scripts/restore-remote-phone.mjs';
+import { assertCounts, assertEmpty, assertRequest, assertTarget, parseRecoveryJson, recoveryRows } from '../scripts/restore-remote-phone.mjs';
 
 const uuid = 'bf95f2d5-04a9-47e4-abfc-755ba05cf122';
 const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'petruandines/cleaning-services',
@@ -43,4 +43,12 @@ test('all 16 restored table counts must equal authenticated backup', () => {
   assert.throws(() => assertCounts({ ...expected, clients: 1 }, expected));
   const { clients: _removed, ...missing } = expected;
   assert.throws(() => assertCounts(missing, expected));
+});
+
+test('Wrangler config hints before JSON do not invalidate guarded identity and table parsing', () => {
+  const hint = 'There is a newer version of Wrangler available (current: 4.102.0).\n';
+  assert.deepEqual(parseRecoveryJson(hint + '{"uuid":"test","name":"test"}\n'), { uuid: 'test', name: 'test' });
+  assert.deepEqual(recoveryRows(hint + '[{"success":true,"results":[{"name":"_cf_KV"}]}]\n'), [{ name: '_cf_KV' }]);
+  assert.throws(() => parseRecoveryJson(hint));
+  assert.throws(() => recoveryRows('[{"success":false,"results":[]}]'));
 });
