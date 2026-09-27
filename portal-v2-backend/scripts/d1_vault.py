@@ -158,7 +158,10 @@ def restore_local_test(source, key, expect_client_id=None):
         run_wrangler("d1", "execute", "pi-d1-restore-test", "--local",
                      "--config", str(config), "--persist-to", str(persist),
                      "--file", str(plaintext), capture=True)
-        files = list(persist.rglob("*.sqlite"))
+        # Wrangler also stores its own metadata.sqlite alongside the actual
+        # D1 database. Never mistake this metadata for restored client data.
+        files = [file for file in persist.rglob("*.sqlite")
+                 if file.name != "metadata.sqlite"]
         if len(files) != 1:
             raise ValueError("Could not locate the isolated local D1 database")
         with sqlite3.connect(f"file:{files[0]}?mode=ro", uri=True) as restored:

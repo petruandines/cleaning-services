@@ -1,0 +1,74 @@
+name: Portal D1 encrypted export and local recovery test (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect first; export only after separately saving the key
+        required: true
+        type: choice
+        options:
+          - inspect
+          - export
+        default: inspect
+      confirmation:
+        description: For export, type EXPORT PORTAL BACKUP followed by D1 UUID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-d1-encrypted-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Read reviewed backup code at a fixed commit
+        uses: actions/checkout@v4
+        with:
+          ref: REVIEWED_COMMIT
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal-v2-backend/package-lock.json
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies without Cloudflare token or backup key
+        working-directory: portal-v2-backend
+        run: |
+          npm ci --no-audit --no-fund
+          python -m pip install -r scripts/requirements-backup.txt
+      - name: Test backend and backup encryption without secrets
+        working-directory: portal-v2-backend
+        run: |
+          npm test
+          python -m unittest discover -s test -p backup_test.py
+      - name: Inspect EU D1 or export encrypted archive and test recovery locally
+        working-directory: portal-v2-backend
+        env:
+          CI: 'true'
+          CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_BACKUP_D1_READ_TOKEN }}
+          PORTAL_BACKUP_KEY_HEX: ${{ inputs.operation == 'export' && secrets.PORTAL_BACKUP_KEY_HEX || '' }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: node scripts/backup-remote-phone.mjs "$OPERATION" "$CONFIRMATION"
+      - name: Upload only the encrypted result (download and store elsewhere within one day)
+        if: success() && inputs.operation == 'export'
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-d1-encrypted-${{ github.run_id }}
+          path: ${{ runner.temp }}/portal-d1-backup.pi-d1
+          if-no-files-found: error
+          retention-days: 1
