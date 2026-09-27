@@ -49,3 +49,11 @@
 .badge--slate{background:#e1e8e3;color:#3f5548}
 .badge--rose{background:#fce2e3;color:#8b2934}
 @media(max-width:720px){.appointment-day{margin:22px 0 29px}.appointment-day h3{font-size:17px}}
+
+.calendar-export{margin:20px 0 8px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px}
+.calendar-export h3{font-size:17px;margin:0 0 14px}
+.calendar-export-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.calendar-export label{font-size:14px;font-weight:650}
+.calendar-export select{display:block;width:100%;min-height:44px;margin-top:6px;border:1px solid #b9c9bd;border-radius:9px;padding:8px;background:#fff;color:var(--ink);font:inherit}
+.calendar-export p{color:var(--muted);font-size:13px;margin:10px 0 0}
+@media(max-width:720px){.calendar-export-fields{grid-template-columns:1fr}.calendar-export{padding:17px}}
