@@ -23,6 +23,9 @@ MAGIC = b"PI-D1-AES256-GCM-1\n"
 NONCE_SIZE = 12
 TAG_SIZE = 16
 CHUNK_SIZE = 1024 * 1024
+PORTAL_TABLES = ("account", "appointments", "audit_events", "client_users", "clients",
+                 "d1_migrations", "jobs", "locations", "messages", "payments",
+                 "portal_accounts", "rateLimit", "session", "twoFactor", "user", "verification")
 
 
 def outside_repo(path):
@@ -204,6 +207,23 @@ def restore_local_test(source, key, expect_client_id=None):
     print("Encrypted backup restored into an isolated local D1; integrity and foreign keys verified.")
 
 
+def sql_counts(source):
+    """Expected row counts from an authenticated, decrypted SQL backup; no rows in logs."""
+    with sqlite3.connect(":memory:") as database:
+        database.executescript(Path(source).read_text())
+        names = {name for (name,) in database.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+        ) if name not in ("_cf_KV", "_cf_METADATA")}
+        if names != set(PORTAL_TABLES):
+            raise ValueError("Backup schema does not match the expected portal tables")
+        if database.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise ValueError("Backup SQL failed integrity check")
+        if database.execute("PRAGMA foreign_key_check").fetchone() is not None:
+            raise ValueError("Backup SQL has broken foreign keys")
+        return {name: database.execute(f'SELECT count(*) FROM "{name}"').fetchone()[0]
+                for name in PORTAL_TABLES}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     actions = parser.add_subparsers(dest="action", required=True)
@@ -224,6 +244,7 @@ def main():
     command.add_argument("--scope", choices=("local", "remote"), required=True)
     command.add_argument("--out", required=True)
     command.add_argument("--key", required=True)
+    actions.add_parser("counts").add_argument("--input", required=True)
     args = parser.parse_args()
     try:
         if args.action == "keygen":
@@ -237,6 +258,8 @@ def main():
             print("Encrypted backup authentication succeeded.")
         elif args.action == "restore-local-test":
             restore_local_test(args.input, read_key(args.key), args.expect_client_id)
+        elif args.action == "counts":
+            print(json.dumps(sql_counts(args.input), sort_keys=True))
         else:
             export_database(args.database, args.scope, args.out, read_key(args.key))
     except ExportDiagnostic as error:
