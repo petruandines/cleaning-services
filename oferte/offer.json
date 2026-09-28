@@ -1,37 +1,38 @@
 {
   "active": true,
-  "campaignId": "toamna-2026-apartamente-700",
-  "eyebrow": "OFERTA TOAMNEI",
-  "kicker": "Ofertă pentru apartamente",
-  "title": "Noi ne ocupăm de curățenie. Tu te bucuri de casă.",
-  "subtitle": "Curățenie generală pentru apartamente cu 2 sau 3 camere. Venim cu produsele, materialele și echipamentele necesare.",
-  "price": "700",
-  "priceUnit": " lei",
-  "priceContext": "Apartament cu 2 sau 3 camere",
-  "offerDescription": "Curățenie generală, cu produsele și echipamentele necesare incluse.",
-  "hourlyTitle": "Poți alege și taxarea la oră",
-  "hourlyPrice": "100 lei / oră",
-  "hourlyDescription": " · potrivită pentru intervenții punctuale sau o listă clară de sarcini.",
-  "ctaLabel": "Cere oferta pe WhatsApp",
-  "whatsappMessage": "Bună! Am văzut oferta de 700 lei pentru curățenia unui apartament cu 2 sau 3 camere și doresc mai multe detalii. Localitatea/sectorul meu este: ",
-  "validUntil": "2026-09-28T20:00:00+03:00",
-  "validUntilLabel": "28 septembrie 2026",
-  "updatedAtLabel": "21 septembrie 2026",
-  "image": "/cleaning-services/oferte/assets/curatenie-apartament-toamna-2026.webp",
-  "imageAlt": "Apartament luminos și proaspăt curățat – oferta Petru & Inés pentru apartamente cu 2 sau 3 camere",
-  "benefits": [
+  "campaignId": "reset-de-toamna-2026",
+  "campaignName": "Reset de Toamnă",
+  "validFrom": "2026-10-14T00:00:00+03:00",
+  "validUntil": "2026-10-31T23:59:59+02:00",
+  "validityLabel": "14–31 octombrie 2026",
+  "area": "București & Ilfov",
+  "packages": [
     {
-      "title": "Produse profesionale",
-      "text": "Venim cu soluțiile și consumabilele necesare lucrării stabilite."
+      "name": "Apartament 2 camere",
+      "price": 499,
+      "currency": "RON",
+      "sizeLimit": "până la aproximativ 60 m²"
     },
     {
-      "title": "Echipamente incluse",
-      "text": "Pregătim echipamentele potrivite serviciilor confirmate în avans."
-    },
-    {
-      "title": "Deplasare inclusă",
-      "text": "Ne deplasăm la locația clientului în București și Ilfov."
+      "name": "Apartament 3 camere",
+      "price": 599,
+      "currency": "RON",
+      "sizeLimit": "până la aproximativ 80 m²"
     }
   ],
-  "terms": "Oferta de 700 lei este valabilă pentru curățenia generală a apartamentelor cu 2 sau 3 camere. Varianta cu taxare la oră este de 100 lei/oră. Disponibilitatea și serviciile incluse se confirmă înaintea programării, pe baza detaliilor sau fotografiilor primite. Lucrările speciale ori suplimentare se stabilesc separat."
+  "bonus": {
+    "label": "Bonus de Toamnă",
+    "options": ["1 fotoliu", "4 scaune tapițate"],
+    "value": "până la 70 lei"
+  },
+  "hourly": {
+    "price": 150,
+    "currency": "RON",
+    "unit": "oră",
+    "teamSize": 2,
+    "minimumHours": 2,
+    "includes": ["produse", "echipamente", "deplasare"]
+  },
+  "phone": "0772053562",
+  "whatsappMessage": "Bună! Am văzut oferta Reset de Toamnă (2 camere 499 lei / 3 camere 599 lei) și doresc o programare. Localitatea/sectorul meu este: "
 }
