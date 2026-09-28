@@ -350,3 +350,22 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
   .home-offer-prices>div{min-width:0}
   .home-offer-cta{grid-column:auto;grid-row:auto;width:100%}
 }
+
+
+/* Shared offer countdown */
+.offer-countdown{display:grid;gap:8px}
+.offer-countdown-label{font-size:.82rem;letter-spacing:.02em}
+.offer-countdown-values{display:flex;flex-wrap:wrap;gap:7px}
+.offer-countdown-values>span{display:grid;min-width:58px;padding:7px 8px;border-radius:10px;text-align:center}
+.offer-countdown-values b{font-variant-numeric:tabular-nums;font-size:1.05rem;line-height:1}
+.offer-countdown-values small{margin-top:3px;font-size:.62rem;text-transform:uppercase;letter-spacing:.06em}
+.home-offer-countdown{margin-top:15px}
+.home-offer-countdown .offer-countdown-label{color:#b8ed45}
+.home-offer-countdown .offer-countdown-values>span{border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.07)}
+.home-offer-countdown .offer-countdown-values b{color:#fff}
+.home-offer-countdown .offer-countdown-values small{color:rgba(255,255,255,.62)}
+.home-offer-countdown[data-offer-state="expired"] .offer-countdown-label{display:inline-flex;width:max-content;padding:8px 12px;border-radius:999px;color:#173522;background:#b8ed45;font-weight:950}
+@media (max-width:680px){
+  .home-offer-countdown .offer-countdown-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+  .home-offer-countdown .offer-countdown-values>span{min-width:0;padding:7px 4px}
+}
