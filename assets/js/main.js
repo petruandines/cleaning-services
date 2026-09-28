@@ -155,6 +155,9 @@
       });
       const details = String(data.get('details') || '').trim();
       if (details) lines.push(`Detalii: ${details}`);
+      if (data.get('terms_accept') === 'da') {
+        lines.push('', 'Confirm că am citit și accept Condițiile de prestare a serviciilor și, dacă este cazul, Politica privind accesul și deplasarea.');
+      }
       lines.push('', 'Dacă este util, pot atașa fotografii direct în WhatsApp. Mulțumesc!');
       const url = `https://wa.me/40772053562?text=${encodeURIComponent(lines.join('\n'))}`;
       if (status) status.textContent = 'Se deschide WhatsApp cu mesajul pregătit.';
