@@ -83,6 +83,9 @@
     const existingWrap = groutCalculator.querySelector('[data-grout-existing-wrap]');
     const existingInput = groutCalculator.querySelector('[data-grout-existing]');
     const rawTotalEl = groutCalculator.querySelector('[data-grout-raw-total]');
+    const transportSummary = groutCalculator.querySelector('[data-grout-transport-summary]');
+    const transportTotalEl = groutCalculator.querySelector('[data-grout-transport-total]');
+    const transportLabelEl = groutCalculator.querySelector('[data-grout-transport-label]');
     const baseSummary = groutCalculator.querySelector('[data-grout-base-summary]');
     const baseTotalEl = groutCalculator.querySelector('[data-grout-base-total]');
     const baseLabelEl = groutCalculator.querySelector('[data-grout-base-label]');
@@ -156,10 +159,18 @@
 
       const separate = (booking?.value || 'separate') === 'separate';
       const base = separate ? { valid: true, price: 0, label: '', message: '' } : getBaseSelection();
-      const groutPayable = rawTotal > 0 && separate ? Math.max(149, rawTotal) : rawTotal;
+      const transportFee = separate && rawTotal > 0 && rawTotal < 100 ? 50 : 0;
+      const groutPayable = rawTotal + transportFee;
       const combinedTotal = separate ? groutPayable : rawTotal + (base.valid ? base.price : 0);
 
       if (rawTotalEl) rawTotalEl.textContent = formatLei(rawTotal);
+      if (transportSummary) transportSummary.hidden = !separate;
+      if (transportTotalEl) transportTotalEl.textContent = transportFee ? formatLei(transportFee) : '0 lei';
+      if (transportLabelEl) {
+        transportLabelEl.textContent = rawTotal > 0 && rawTotal < 100
+          ? 'Se aplică deoarece serviciile sunt sub 100 lei.'
+          : 'Gratuit pentru comenzi de minimum 100 lei.';
+      }
 
       if (baseSummary) baseSummary.hidden = separate;
       if (!separate && baseTotalEl) {
@@ -171,17 +182,17 @@
 
       if (minimumNoteEl) {
         if (!rawTotal) {
-          minimumNoteEl.textContent = separate ? 'La serviciul separat se aplică minimum 149 lei.' : (base.valid ? 'Adaugă suprafața pentru rosturi.' : base.message);
-        } else if (separate && rawTotal < 149) {
-          minimumNoteEl.textContent = `Calculul rosturilor este ${formatLei(rawTotal)}, dar pentru deplasare separată se aplică minimum 149 lei.`;
+          minimumNoteEl.textContent = separate ? 'Transport 50 lei doar pentru comenzi sub 100 lei. De la 100 lei, transportul este gratuit.' : (base.valid ? 'Adaugă suprafața pentru rosturi.' : base.message);
+        } else if (separate && transportFee > 0) {
+          minimumNoteEl.textContent = `Servicii: ${formatLei(rawTotal)} + transport: ${formatLei(transportFee)} = ${formatLei(groutPayable)}. Transportul este gratuit de la 100 lei.`;
         } else if (separate) {
-          minimumNoteEl.textContent = 'Estimarea depășește valoarea minimă pentru deplasare separată.';
+          minimumNoteEl.textContent = 'Transport gratuit — valoarea serviciilor este de minimum 100 lei.';
         } else if (!base.valid) {
           minimumNoteEl.textContent = base.message;
         } else if (base.price > 0) {
-          minimumNoteEl.textContent = `Total combinat: ${formatLei(base.price)} serviciul de bază + ${formatLei(rawTotal)} rosturile.`;
+          minimumNoteEl.textContent = `Total combinat: ${formatLei(base.price)} serviciul de bază + ${formatLei(rawTotal)} rosturile. Nu se adaugă transport separat.`;
         } else {
-          minimumNoteEl.textContent = 'Curățarea rosturilor se adaugă la programarea existentă.';
+          minimumNoteEl.textContent = 'Curățarea rosturilor se adaugă la programarea existentă, fără transport separat.';
         }
       }
 
@@ -196,6 +207,7 @@
         if (separate) {
           lines.push('Mod rezervare: serviciu separat');
           lines.push(`Rosturi: ${formatLei(rawTotal)}`);
+          lines.push(`Transport: ${transportFee ? formatLei(transportFee) : 'gratuit'}`);
           lines.push(`Estimare pentru rezervare: ${formatLei(groutPayable)}`);
         } else {
           lines.push('Mod rezervare: adaug la o altă lucrare');
