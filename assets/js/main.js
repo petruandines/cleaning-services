@@ -45,6 +45,15 @@
     revealEls.forEach((el) => el.classList.add('is-visible'));
   }
 
+  // Open compact extra-service panels when arriving through an anchor link.
+  function openExtraPanelFromHash() {
+    if (!window.location.hash) return;
+    const target = document.querySelector(window.location.hash);
+    if (target?.matches?.('[data-extra-panel]')) target.open = true;
+  }
+  openExtraPanelFromHash();
+  window.addEventListener('hashchange', openExtraPanelFromHash);
+
   // Current year.
   document.querySelectorAll('[data-year]').forEach((el) => {
     el.textContent = String(new Date().getFullYear());
@@ -68,12 +77,12 @@
       quick: 'Quick Clean',
       deep: 'Deep Clean',
       premium: 'Premium Clean',
-      kitchen: 'Kitchen Degrease',
-      'kitchen-deep': 'Kitchen Deep Degrease',
+      kitchen: 'Degresare bucătărie',
+      'kitchen-deep': 'Degresare intensivă bucătărie',
       existing: 'Lucrare deja programată',
     };
     const sizeLabels = { large: 'plăci mari', medium: 'plăci medii', small: 'plăci mici / multe rosturi' };
-    const levelLabels = { refresh: 'Grout Refresh', deep: 'Grout Deep Clean' };
+    const levelLabels = { refresh: 'Curățare rosturi – Standard', deep: 'Curățare rosturi – Intensivă' };
     const zones = Array.from(groutCalculator.querySelectorAll('[data-grout-zone]'));
     const booking = groutCalculator.querySelector('[data-grout-booking]');
     const addonConfig = groutCalculator.querySelector('[data-grout-addon-config]');
@@ -83,6 +92,7 @@
     const existingWrap = groutCalculator.querySelector('[data-grout-existing-wrap]');
     const existingInput = groutCalculator.querySelector('[data-grout-existing]');
     const rawTotalEl = groutCalculator.querySelector('[data-grout-raw-total]');
+    const minimumSummary = groutCalculator.querySelector('[data-grout-minimum-summary]');
     const baseSummary = groutCalculator.querySelector('[data-grout-base-summary]');
     const baseTotalEl = groutCalculator.querySelector('[data-grout-base-total]');
     const baseLabelEl = groutCalculator.querySelector('[data-grout-base-label]');
@@ -160,6 +170,7 @@
       const combinedTotal = separate ? groutPayable : rawTotal + (base.valid ? base.price : 0);
 
       if (rawTotalEl) rawTotalEl.textContent = formatLei(rawTotal);
+      if (minimumSummary) minimumSummary.hidden = !(separate && rawTotal > 0 && rawTotal < 100);
 
       if (baseSummary) baseSummary.hidden = separate;
       if (!separate && baseTotalEl) {
@@ -250,6 +261,24 @@
       'Curățenie locuință': [
         ['tip_locuinta', 'Tip locuință', 'select', ['Garsonieră / studio', 'Apartament 2 camere', 'Apartament 3 camere', 'Apartament 4+ camere', 'Casă / vilă']],
       ],
+      'Curățare cuptor': [
+        ['grad_murdarie', 'Grad aproximativ de murdărie', 'select', ['Normal / mediu', 'Depuneri vechi / carbonizate', 'Nu știu — trimit fotografii']],
+      ],
+      'Degresare bucătărie': [
+        ['suprafata', 'Dimensiune / suprafață aproximativă', 'text', 'ex. bucătărie 10 m²'],
+      ],
+      'Degresare intensivă bucătărie': [
+        ['suprafata', 'Dimensiune / suprafață aproximativă', 'text', 'ex. bucătărie 10 m²'],
+      ],
+      'Curățare rosturi': [
+        ['zona_rosturi', 'Zona', 'select', ['Baie', 'Bucătărie', 'Alte încăperi', 'Mai multe zone']],
+        ['suprafata', 'Suprafață placată aproximativă', 'text', 'ex. 12 m²'],
+        ['nivel_rosturi', 'Nivel dorit', 'select', ['Standard', 'Intensivă', 'Nu știu — doresc recomandare']],
+      ],
+      'Curățenie după constructor / renovare': [
+        ['tip_locuinta', 'Tip locuință', 'select', ['Garsonieră / studio', 'Apartament 2 camere', 'Apartament 3 camere', 'Apartament 4+ camere', 'Casă / vilă']],
+        ['suprafata', 'Suprafață aproximativă', 'text', 'ex. 75 m²'],
+      ],
       'Curățenie birouri / spații comerciale': [
         ['suprafata', 'Suprafață aproximativă', 'text', 'ex. 120 m²'],
       ],
@@ -324,7 +353,8 @@
       const labels = {
         tip_obiect: 'Obiect', tip_canapea: 'Tip canapea', tip_saltea: 'Tip saltea',
         tip_auto: 'Tip auto', tip_locuinta: 'Tip locuință', suprafata: 'Suprafață',
-        nr_ac: 'Număr aparate AC', tip_spatiu: 'Tip spațiu', companie: 'Companie / locație'
+        nr_ac: 'Număr aparate AC', tip_spatiu: 'Tip spațiu', companie: 'Companie / locație',
+        grad_murdarie: 'Grad murdărie', zona_rosturi: 'Zona rosturi', nivel_rosturi: 'Nivel rosturi'
       };
       Object.keys(labels).forEach((key) => {
         const value = data.get(key);
