@@ -175,12 +175,38 @@
   <div class="grout-calculator" data-grout-calculator>
     <div class="grout-calc-head">
       <div><span class="package-kicker">Calculator orientativ</span><h3>Calculează transparent pentru fiecare zonă</h3><p>Completează doar zonele care te interesează. Poți combina baie, bucătărie și alte încăperi.</p></div>
-      <label class="grout-booking-mode">Cum îl rezervi?
-        <select data-grout-booking>
-          <option value="separate">Serviciu separat</option>
-          <option value="addon">Extra la o lucrare deja programată</option>
-        </select>
-      </label>
+      <div class="grout-booking-config">
+        <label class="grout-booking-mode">Cum îl rezervi?
+          <select data-grout-booking>
+            <option value="separate">Serviciu separat</option>
+            <option value="addon">Adaug la o altă lucrare</option>
+          </select>
+        </label>
+        <div class="grout-addon-config" data-grout-addon-config hidden>
+          <label>La ce serviciu îl adaugi?
+            <select data-grout-base-service>
+              <option value="">Selectează serviciul</option>
+              <option value="quick">Quick Clean</option>
+              <option value="deep">Deep Clean</option>
+              <option value="premium">Premium Clean</option>
+              <option value="kitchen">Kitchen Degrease</option>
+              <option value="kitchen-deep">Kitchen Deep Degrease</option>
+              <option value="existing">Am deja o altă lucrare programată</option>
+            </select>
+          </label>
+          <label data-grout-room-wrap hidden>Tip locuință
+            <select data-grout-rooms>
+              <option value="">Selectează</option>
+              <option value="2">Apartament 2 camere</option>
+              <option value="3">Apartament 3 camere</option>
+              <option value="4">Apartament 4 camere</option>
+            </select>
+          </label>
+          <label data-grout-existing-wrap hidden>Identificare programare
+            <input type="text" data-grout-existing placeholder="ex. nume + data aproximativă">
+          </label>
+        </div>
+      </div>
     </div>
 
     <div class="grout-zone-grid">
@@ -249,8 +275,9 @@
     </div>
 
     <div class="grout-summary">
-      <div><span>Total calculat</span><strong data-grout-raw-total>0 lei</strong></div>
-      <div class="grout-payable"><span>Estimare pentru rezervare</span><strong data-grout-payable>0 lei</strong><small data-grout-minimum-note>La serviciul separat se aplică minimum 149 lei.</small></div>
+      <div><span>Rosturi</span><strong data-grout-raw-total>0 lei</strong></div>
+      <div data-grout-base-summary hidden><span>Serviciu de bază</span><strong data-grout-base-total>—</strong><small data-grout-base-label></small></div>
+      <div class="grout-payable"><span>Total estimativ</span><strong data-grout-payable>0 lei</strong><small data-grout-minimum-note>La serviciul separat se aplică minimum 149 lei.</small></div>
       <a class="btn btn-primary grout-whatsapp" data-grout-whatsapp href="https://wa.me/40772053562" target="_blank" rel="noopener">Trimite estimarea pe WhatsApp</a>
     </div>
   </div>
