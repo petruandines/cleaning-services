@@ -99,6 +99,11 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
 /* Contact */
 .contact-grid{display:grid;grid-template-columns:.82fr 1.18fr;gap:34px}.contact-list{display:grid;gap:12px;margin-top:24px}.contact-item{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff}.contact-item:hover{border-color:#bac8bf}.contact-item .icon-box{margin:0;flex:0 0 auto}.contact-item strong{display:block}.contact-item span{color:var(--muted);font-size:.91rem}
 .form-card{border:1px solid var(--line);border-radius:var(--radius-xl);padding:30px;background:#fff;box-shadow:var(--shadow-soft)}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.field{display:grid;gap:7px}.field.full{grid-column:1/-1}.field label{font-weight:800;font-size:.9rem}.field input,.field select,.field textarea{width:100%;border:1px solid #cfd9d3;border-radius:13px;padding:12px 14px;color:var(--ink);background:#fff;outline:none;transition:.18s}.field textarea{min-height:130px;resize:vertical}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(33,170,58,.10)}.dynamic-fields{display:contents}.form-note{font-size:.83rem;color:var(--muted);margin-top:10px}.form-status{font-size:.9rem;font-weight:700;margin-top:12px;color:var(--brand-dark)}
+.terms-consent{display:flex!important;gap:.75rem;align-items:flex-start!important;cursor:pointer;font-weight:600!important;line-height:1.45}
+.field .terms-consent input[type="checkbox"]{appearance:auto;-webkit-appearance:checkbox;width:20px!important;height:20px!important;min-width:20px;margin:.15rem 0 0!important;padding:0!important;border:initial!important;border-radius:initial!important;box-shadow:none!important;accent-color:var(--brand);flex:0 0 20px}
+.terms-consent span{display:block}
+.terms-consent a{text-decoration:underline;text-underline-offset:2px}
+
 
 /* Commercial */
 .info-list{display:grid;gap:12px}.info-row{display:grid;grid-template-columns:190px 1fr;gap:20px;padding:18px 0;border-bottom:1px solid var(--line)}.info-row strong{color:#24312b}.info-row span{color:var(--muted)}
