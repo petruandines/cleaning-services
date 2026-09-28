@@ -291,3 +291,7 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
 @media (max-width:480px){
   .recent-review{flex-basis:92%}
 }
+
+/* Ensure secondary CTA stays readable on dark apartment banner */
+.conversion-cta .btn-ghost{color:var(--ink);background:#fff;border-color:#fff}
+.conversion-cta .btn-ghost:hover{color:var(--ink);background:#f7faf8;border-color:#f7faf8}
