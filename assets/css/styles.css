@@ -249,3 +249,45 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
 .grout-summary [data-grout-minimum-summary][hidden]{display:none!important}
 .grout-summary [data-grout-minimum-summary] strong{color:#fff}
 .renovation-panel .content-wrap{margin-top:22px}
+
+
+/* Final responsive overrides for apartment conversion sections */
+@media (max-width:1050px){
+  .recent-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .result-proof{grid-template-columns:1fr;gap:28px}
+  .result-proof-media{max-width:760px;width:100%;margin-inline:auto}
+  .conversion-cta{display:grid}
+  .conversion-cta .actions{width:100%}
+}
+@media (max-width:760px){
+  .reviews-priority{overflow:hidden}
+  .recent-review-grid{
+    display:flex;
+    grid-template-columns:none;
+    gap:14px;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    padding:0 2px 12px;
+    scrollbar-width:none;
+  }
+  .recent-review-grid::-webkit-scrollbar{display:none}
+  .recent-review{flex:0 0 88%;min-width:0;scroll-snap-align:start}
+  .google-rating-chip{max-width:100%;flex-wrap:wrap;border-radius:16px}
+  .result-proof-section{padding-top:44px;padding-bottom:44px}
+  .result-proof{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+  .result-proof-media{width:100%;max-width:none;aspect-ratio:4/3}
+  .result-proof-copy{min-width:0}
+  .result-proof-copy h2{font-size:clamp(2rem,10vw,2.75rem)}
+  .benefit-strip{display:grid;grid-template-columns:1fr;gap:10px}
+  .conversion-cta-section{padding-top:0;padding-bottom:52px}
+  .conversion-cta{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;padding:24px 22px}
+  .conversion-cta>div{min-width:0}
+  .conversion-cta h2{font-size:clamp(2rem,10vw,2.75rem);overflow-wrap:anywhere}
+  .conversion-cta .actions{display:grid;grid-template-columns:1fr;gap:10px;width:100%}
+  .conversion-cta .actions .btn{width:100%;min-width:0;white-space:normal;text-align:center}
+  .extra-panel>summary{align-items:flex-start;padding:18px}
+  .extra-summary-copy{min-width:0}
+}
+@media (max-width:480px){
+  .recent-review{flex-basis:92%}
+}
