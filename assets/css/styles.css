@@ -201,6 +201,10 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
   .hero-grid,.page-hero-grid{grid-template-columns:1fr;gap:34px}.hero-media{max-width:760px}.floating-note{left:18px}.content-wrap{grid-template-columns:minmax(0,1fr)}.content,.sidebar{min-width:0}.sidebar{position:static}.contact-grid{grid-template-columns:1fr}.footer-grid{grid-template-columns:1.2fr 1fr 1fr}.footer-grid>div:last-child{grid-column:1/-1}
 }
 @media (max-width:760px){
+  .recent-review-grid,.result-proof,.benefit-strip{grid-template-columns:1fr}
+  .conversion-cta{display:grid;padding:22px}.conversion-cta .actions{width:100%}
+  .extra-panel>summary{align-items:flex-start;padding:18px}.extra-summary-action{display:none}.extra-panel-body{padding:4px 18px 22px}
+
   .travel-fee-banner{grid-template-columns:1fr;padding:18px}.travel-fee-banner>div:first-child{grid-template-columns:1fr}.travel-free{min-width:0;text-align:left}
   .grout-pricing-grid,.grout-howto,.grout-zone-grid{grid-template-columns:1fr}.grout-calc-head{display:grid;align-items:start}.grout-booking-mode{min-width:0}.grout-booking-config{min-width:0}.grout-calculator{padding:20px}.grout-summary{grid-template-columns:1fr}.grout-whatsapp{grid-column:auto}
   .kitchen-upgrade{display:grid;padding:22px}.kitchen-upgrade .btn{width:100%}.kitchen-extras-grid{grid-template-columns:1fr}
@@ -210,3 +214,38 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
 }
 @media (max-width:480px){.proof-side{grid-template-columns:1fr}.footer-grid{grid-template-columns:1fr}.footer-grid>div{grid-column:1/-1}.form-card{padding:22px}.card{padding:22px}.segment-card{padding:28px}.btn{width:100%}.actions{display:grid;grid-template-columns:1fr}.mobile-actions .btn{width:auto}.page-hero h1{font-size:2.45rem}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}[data-reveal]{opacity:1;transform:none}}
+
+
+/* Apartment page conversion hierarchy */
+.reviews-priority{background:var(--bg-soft)}
+.google-rating-chip{display:inline-flex;align-items:center;gap:10px;margin:0 0 22px;padding:10px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font-size:.9rem}
+.google-rating-chip strong{font-size:1.08rem}
+.recent-review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.recent-review .review-context{font-size:1.08rem;line-height:1.65}
+.result-proof-section{padding-top:54px;padding-bottom:54px}
+.result-proof{display:grid;grid-template-columns:.95fr 1.05fr;gap:42px;align-items:center}
+.result-proof-media{overflow:hidden;border-radius:var(--radius-xl);box-shadow:var(--shadow);aspect-ratio:4/3;background:#edf2ef}
+.result-proof-media img{width:100%;height:100%;object-fit:cover}
+.result-proof-copy h2{font-size:clamp(2rem,4vw,3.2rem)}
+.benefit-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px}
+.benefit-strip>div{display:grid;gap:3px;padding:16px;border:1px solid var(--line);border-radius:15px;background:var(--bg-soft)}
+.benefit-strip span{color:var(--muted);font-size:.88rem}
+.conversion-cta-section{padding-top:0}
+.conversion-cta{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:28px 30px;border-radius:var(--radius-xl);background:var(--ink);color:#fff}
+.conversion-cta h2{margin-bottom:.3em}.conversion-cta p{margin:0;color:#d9e1dd;max-width:720px}.conversion-cta .eyebrow{color:#8de59c}.conversion-cta .actions{flex:0 0 auto}
+.extras-section{background:linear-gradient(180deg,#fff 0,#f7faf8 100%)}
+.extra-panels{display:grid;gap:14px}
+.extra-panel{border:1px solid var(--line);border-radius:var(--radius-lg);background:#fff;overflow:hidden;box-shadow:var(--shadow-soft)}
+.extra-panel>summary{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:22px 24px;cursor:pointer;list-style:none}
+.extra-panel>summary::-webkit-details-marker{display:none}
+.extra-panel>summary::after{content:"+";display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--brand-soft);color:var(--brand-dark);font-size:1.5rem;font-weight:900;flex:0 0 auto;transition:.2s}
+.extra-panel[open]>summary::after{transform:rotate(45deg)}
+.extra-summary-copy{display:grid;gap:3px;min-width:0}.extra-summary-copy .package-kicker{margin:0}.extra-summary-copy strong{font-size:1.2rem}.extra-summary-copy small{color:var(--muted);font-size:.86rem}
+.extra-summary-action{margin-left:auto;color:var(--brand-dark);font-size:.84rem;font-weight:900;white-space:nowrap}
+.extra-panel-body{padding:6px 24px 26px;border-top:1px solid var(--line)}
+.extra-panel-body>.price-grid,.extra-panel-body>.grout-pricing-grid,.extra-panel-body>.content-wrap{margin-top:22px}
+.extra-intro{margin:20px 0 0;color:var(--muted);max-width:850px}
+.service-brand-name{display:block;margin-top:4px;color:var(--muted);font-size:.72rem;font-weight:700;letter-spacing:.02em}
+.grout-summary [data-grout-minimum-summary][hidden]{display:none!important}
+.grout-summary [data-grout-minimum-summary] strong{color:#fff}
+.renovation-panel .content-wrap{margin-top:22px}
