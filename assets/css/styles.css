@@ -107,6 +107,14 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
 .kitchen-extras-grid>div{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:12px;background:var(--bg-soft)}
 .kitchen-extras-grid span{color:var(--muted);font-weight:700}
 .kitchen-extras-grid strong{white-space:nowrap}
+.travel-fee-banner{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;margin:22px 0;padding:22px 24px;border:2px solid var(--brand);border-radius:var(--radius-lg);background:var(--bg-green);box-shadow:var(--shadow-soft)}
+.travel-fee-banner>div:first-child{display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:baseline}
+.travel-fee-banner .package-kicker{grid-column:1/-1;margin:0}
+.travel-fee-banner strong{font-size:1.65rem;color:var(--brand-dark)}
+.travel-fee-banner p{margin:0;color:var(--ink)}
+.travel-free{display:grid;min-width:180px;padding:14px 16px;border-radius:14px;background:#fff;border:1px solid rgba(33,170,58,.28);text-align:center}
+.travel-free strong{font-size:1.15rem}
+.travel-free span{font-size:.78rem;color:var(--muted);font-weight:700}
 .grout-section{background:#fff}
 .grout-pricing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .grout-price-card{position:relative}
@@ -193,6 +201,7 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
   .hero-grid,.page-hero-grid{grid-template-columns:1fr;gap:34px}.hero-media{max-width:760px}.floating-note{left:18px}.content-wrap{grid-template-columns:minmax(0,1fr)}.content,.sidebar{min-width:0}.sidebar{position:static}.contact-grid{grid-template-columns:1fr}.footer-grid{grid-template-columns:1.2fr 1fr 1fr}.footer-grid>div:last-child{grid-column:1/-1}
 }
 @media (max-width:760px){
+  .travel-fee-banner{grid-template-columns:1fr;padding:18px}.travel-fee-banner>div:first-child{grid-template-columns:1fr}.travel-free{min-width:0;text-align:left}
   .grout-pricing-grid,.grout-howto,.grout-zone-grid{grid-template-columns:1fr}.grout-calc-head{display:grid;align-items:start}.grout-booking-mode{min-width:0}.grout-booking-config{min-width:0}.grout-calculator{padding:20px}.grout-summary{grid-template-columns:1fr}.grout-whatsapp{grid-column:auto}
   .kitchen-upgrade{display:grid;padding:22px}.kitchen-upgrade .btn{width:100%}.kitchen-extras-grid{grid-template-columns:1fr}
   :root{--header-h:68px}.container{width:min(100% - 28px,var(--container))}.section{padding:72px 0}.section-sm{padding:52px 0}.section-head{display:block}.section-head .actions{margin-top:18px}
