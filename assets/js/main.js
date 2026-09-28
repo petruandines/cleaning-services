@@ -54,6 +54,67 @@
   openExtraPanelFromHash();
   window.addEventListener('hashchange', openExtraPanelFromHash);
 
+  // Reset de Toamnă countdown (Romania time).
+  const offerCountdowns = [...document.querySelectorAll('[data-offer-countdown]')];
+  if (offerCountdowns.length) {
+    const offerStartsAt = new Date('2026-10-14T00:00:00+03:00').getTime();
+    const offerEndsAt = new Date('2026-11-01T00:00:00+02:00').getTime();
+
+    const updateOfferCountdowns = () => {
+      const now = Date.now();
+      let label = '';
+      let diff = 0;
+      let state = '';
+
+      if (now < offerStartsAt) {
+        label = 'Oferta va începe în:';
+        diff = offerStartsAt - now;
+        state = 'before';
+      } else if (now < offerEndsAt) {
+        label = 'Oferta expiră în:';
+        diff = offerEndsAt - now;
+        state = 'active';
+      } else {
+        label = 'Oferta a expirat';
+        state = 'expired';
+      }
+
+      const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      offerCountdowns.forEach((countdown) => {
+        countdown.dataset.offerState = state;
+        const labelEl = countdown.querySelector('[data-offer-countdown-label]');
+        const valuesEl = countdown.querySelector('[data-offer-countdown-values]');
+        if (labelEl) labelEl.textContent = label;
+        if (valuesEl) valuesEl.hidden = state === 'expired';
+
+        const dayEl = countdown.querySelector('[data-offer-days]');
+        const hourEl = countdown.querySelector('[data-offer-hours]');
+        const minuteEl = countdown.querySelector('[data-offer-minutes]');
+        const secondEl = countdown.querySelector('[data-offer-seconds]');
+        if (dayEl) dayEl.textContent = String(days);
+        if (hourEl) hourEl.textContent = String(hours).padStart(2, '0');
+        if (minuteEl) minuteEl.textContent = String(minutes).padStart(2, '0');
+        if (secondEl) secondEl.textContent = String(seconds).padStart(2, '0');
+
+        countdown.setAttribute(
+          'aria-label',
+          state === 'expired'
+            ? 'Oferta a expirat'
+            : `${label} ${days} zile, ${hours} ore, ${minutes} minute, ${seconds} secunde`
+        );
+      });
+    };
+
+    updateOfferCountdowns();
+    window.setInterval(updateOfferCountdowns, 1000);
+    window.addEventListener('pageshow', updateOfferCountdowns);
+  }
+
   // Current year.
   document.querySelectorAll('[data-year]').forEach((el) => {
     el.textContent = String(new Date().getFullYear());
