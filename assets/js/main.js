@@ -83,9 +83,6 @@
     const existingWrap = groutCalculator.querySelector('[data-grout-existing-wrap]');
     const existingInput = groutCalculator.querySelector('[data-grout-existing]');
     const rawTotalEl = groutCalculator.querySelector('[data-grout-raw-total]');
-    const transportSummary = groutCalculator.querySelector('[data-grout-transport-summary]');
-    const transportTotalEl = groutCalculator.querySelector('[data-grout-transport-total]');
-    const transportLabelEl = groutCalculator.querySelector('[data-grout-transport-label]');
     const baseSummary = groutCalculator.querySelector('[data-grout-base-summary]');
     const baseTotalEl = groutCalculator.querySelector('[data-grout-base-total]');
     const baseLabelEl = groutCalculator.querySelector('[data-grout-base-label]');
@@ -159,18 +156,10 @@
 
       const separate = (booking?.value || 'separate') === 'separate';
       const base = separate ? { valid: true, price: 0, label: '', message: '' } : getBaseSelection();
-      const transportFee = separate && rawTotal > 0 && rawTotal < 100 ? 50 : 0;
-      const groutPayable = rawTotal + transportFee;
+      const groutPayable = rawTotal > 0 && separate ? Math.max(100, rawTotal) : rawTotal;
       const combinedTotal = separate ? groutPayable : rawTotal + (base.valid ? base.price : 0);
 
       if (rawTotalEl) rawTotalEl.textContent = formatLei(rawTotal);
-      if (transportSummary) transportSummary.hidden = !separate;
-      if (transportTotalEl) transportTotalEl.textContent = transportFee ? formatLei(transportFee) : '0 lei';
-      if (transportLabelEl) {
-        transportLabelEl.textContent = rawTotal > 0 && rawTotal < 100
-          ? 'Se aplică deoarece serviciile sunt sub 100 lei.'
-          : 'Gratuit pentru comenzi de minimum 100 lei.';
-      }
 
       if (baseSummary) baseSummary.hidden = separate;
       if (!separate && baseTotalEl) {
@@ -182,17 +171,17 @@
 
       if (minimumNoteEl) {
         if (!rawTotal) {
-          minimumNoteEl.textContent = separate ? 'Transport 50 lei doar pentru comenzi sub 100 lei. De la 100 lei, transportul este gratuit.' : (base.valid ? 'Adaugă suprafața pentru rosturi.' : base.message);
-        } else if (separate && transportFee > 0) {
-          minimumNoteEl.textContent = `Servicii: ${formatLei(rawTotal)} + transport: ${formatLei(transportFee)} = ${formatLei(groutPayable)}. Transportul este gratuit de la 100 lei.`;
+          minimumNoteEl.textContent = separate ? 'Pentru o deplasare separată, valoarea minimă a comenzii este de 100 lei.' : (base.valid ? 'Adaugă suprafața pentru rosturi.' : base.message);
+        } else if (separate && rawTotal < 100) {
+          minimumNoteEl.textContent = `Calculul rosturilor este ${formatLei(rawTotal)}. Pentru deplasare separată, comanda minimă este 100 lei. Poți adăuga un alt serviciu sau totalul minim rămâne 100 lei.`;
         } else if (separate) {
-          minimumNoteEl.textContent = 'Transport gratuit — valoarea serviciilor este de minimum 100 lei.';
+          minimumNoteEl.textContent = 'Valoarea serviciilor îndeplinește pragul minim de 100 lei pentru deplasare.';
         } else if (!base.valid) {
           minimumNoteEl.textContent = base.message;
         } else if (base.price > 0) {
-          minimumNoteEl.textContent = `Total combinat: ${formatLei(base.price)} serviciul de bază + ${formatLei(rawTotal)} rosturile. Nu se adaugă transport separat.`;
+          minimumNoteEl.textContent = `Total combinat: ${formatLei(base.price)} serviciul de bază + ${formatLei(rawTotal)} rosturile.`;
         } else {
-          minimumNoteEl.textContent = 'Curățarea rosturilor se adaugă la programarea existentă, fără transport separat.';
+          minimumNoteEl.textContent = 'Curățarea rosturilor se adaugă la programarea existentă; nu se aplică un prag minim separat pentru acest extra.';
         }
       }
 
@@ -206,8 +195,8 @@
 
         if (separate) {
           lines.push('Mod rezervare: serviciu separat');
-          lines.push(`Rosturi: ${formatLei(rawTotal)}`);
-          lines.push(`Transport: ${transportFee ? formatLei(transportFee) : 'gratuit'}`);
+          lines.push(`Rosturi calculate: ${formatLei(rawTotal)}`);
+          if (rawTotal > 0 && rawTotal < 100) lines.push('Comandă minimă pentru deplasare: 100 lei');
           lines.push(`Estimare pentru rezervare: ${formatLei(groutPayable)}`);
         } else {
           lines.push('Mod rezervare: adaug la o altă lucrare');
