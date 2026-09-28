@@ -57,18 +57,83 @@
       refresh: { large: 15, medium: 18, small: 22 },
       deep: { large: 22, medium: 25, small: 30 },
     };
+    const basePrices = {
+      quick: { 2: 350, 3: 450, 4: 550 },
+      deep: { 2: 650, 3: 800, 4: 950 },
+      premium: { 2: 950, 3: 1100, 4: 1250 },
+      kitchen: 249,
+      'kitchen-deep': 349,
+    };
+    const serviceLabels = {
+      quick: 'Quick Clean',
+      deep: 'Deep Clean',
+      premium: 'Premium Clean',
+      kitchen: 'Kitchen Degrease',
+      'kitchen-deep': 'Kitchen Deep Degrease',
+      existing: 'Lucrare deja programată',
+    };
     const sizeLabels = { large: 'plăci mari', medium: 'plăci medii', small: 'plăci mici / multe rosturi' };
     const levelLabels = { refresh: 'Grout Refresh', deep: 'Grout Deep Clean' };
     const zones = Array.from(groutCalculator.querySelectorAll('[data-grout-zone]'));
     const booking = groutCalculator.querySelector('[data-grout-booking]');
+    const addonConfig = groutCalculator.querySelector('[data-grout-addon-config]');
+    const baseService = groutCalculator.querySelector('[data-grout-base-service]');
+    const roomWrap = groutCalculator.querySelector('[data-grout-room-wrap]');
+    const rooms = groutCalculator.querySelector('[data-grout-rooms]');
+    const existingWrap = groutCalculator.querySelector('[data-grout-existing-wrap]');
+    const existingInput = groutCalculator.querySelector('[data-grout-existing]');
     const rawTotalEl = groutCalculator.querySelector('[data-grout-raw-total]');
+    const baseSummary = groutCalculator.querySelector('[data-grout-base-summary]');
+    const baseTotalEl = groutCalculator.querySelector('[data-grout-base-total]');
+    const baseLabelEl = groutCalculator.querySelector('[data-grout-base-label]');
     const payableEl = groutCalculator.querySelector('[data-grout-payable]');
     const minimumNoteEl = groutCalculator.querySelector('[data-grout-minimum-note]');
     const whatsapp = groutCalculator.querySelector('[data-grout-whatsapp]');
 
     const formatLei = (value) => `${Math.round(value)} lei`;
 
+    function getBaseSelection() {
+      const service = baseService?.value || '';
+      if (!service) return { valid: false, price: 0, label: '', message: 'Selectează serviciul de bază.' };
+
+      if (['quick', 'deep', 'premium'].includes(service)) {
+        const room = rooms?.value || '';
+        if (!room) return { valid: false, price: 0, label: serviceLabels[service], message: 'Selectează numărul de camere.' };
+        const price = basePrices[service][room];
+        return { valid: true, price, label: `${serviceLabels[service]} · ${room} camere`, message: '' };
+      }
+
+      if (service === 'kitchen' || service === 'kitchen-deep') {
+        return { valid: true, price: basePrices[service], label: serviceLabels[service], message: '' };
+      }
+
+      if (service === 'existing') {
+        const ref = String(existingInput?.value || '').trim();
+        if (!ref) return { valid: false, price: 0, label: serviceLabels[service], message: 'Completează numele și data aproximativă a programării.' };
+        return { valid: true, price: 0, label: `${serviceLabels[service]} · ${ref}`, message: '' };
+      }
+
+      return { valid: false, price: 0, label: '', message: 'Selectează serviciul de bază.' };
+    }
+
+    function updateAddonVisibility() {
+      const addon = booking?.value === 'addon';
+      if (addonConfig) addonConfig.hidden = !addon;
+
+      const service = baseService?.value || '';
+      const needsRooms = ['quick', 'deep', 'premium'].includes(service);
+      const existing = service === 'existing';
+
+      if (roomWrap) roomWrap.hidden = !needsRooms;
+      if (existingWrap) existingWrap.hidden = !existing;
+
+      if (!needsRooms && rooms) rooms.value = '';
+      if (!existing && existingInput) existingInput.value = '';
+    }
+
     function calculateGrout() {
+      updateAddonVisibility();
+
       let rawTotal = 0;
       const details = [];
 
@@ -90,38 +155,71 @@
       });
 
       const separate = (booking?.value || 'separate') === 'separate';
-      const payable = rawTotal > 0 && separate ? Math.max(149, rawTotal) : rawTotal;
+      const base = separate ? { valid: true, price: 0, label: '', message: '' } : getBaseSelection();
+      const groutPayable = rawTotal > 0 && separate ? Math.max(149, rawTotal) : rawTotal;
+      const combinedTotal = separate ? groutPayable : rawTotal + (base.valid ? base.price : 0);
 
       if (rawTotalEl) rawTotalEl.textContent = formatLei(rawTotal);
-      if (payableEl) payableEl.textContent = formatLei(payable);
+
+      if (baseSummary) baseSummary.hidden = separate;
+      if (!separate && baseTotalEl) {
+        baseTotalEl.textContent = base.valid && base.price > 0 ? formatLei(base.price) : (base.valid ? 'deja programată' : '—');
+      }
+      if (!separate && baseLabelEl) baseLabelEl.textContent = base.label || '';
+
+      if (payableEl) payableEl.textContent = formatLei(combinedTotal);
+
       if (minimumNoteEl) {
         if (!rawTotal) {
-          minimumNoteEl.textContent = separate ? 'La serviciul separat se aplică minimum 149 lei.' : 'Ca extra, se calculează suprafața efectivă.';
+          minimumNoteEl.textContent = separate ? 'La serviciul separat se aplică minimum 149 lei.' : (base.valid ? 'Adaugă suprafața pentru rosturi.' : base.message);
         } else if (separate && rawTotal < 149) {
-          minimumNoteEl.textContent = `Calculul suprafeței este ${formatLei(rawTotal)}, dar pentru deplasare separată se aplică minimum 149 lei.`;
+          minimumNoteEl.textContent = `Calculul rosturilor este ${formatLei(rawTotal)}, dar pentru deplasare separată se aplică minimum 149 lei.`;
         } else if (separate) {
           minimumNoteEl.textContent = 'Estimarea depășește valoarea minimă pentru deplasare separată.';
+        } else if (!base.valid) {
+          minimumNoteEl.textContent = base.message;
+        } else if (base.price > 0) {
+          minimumNoteEl.textContent = `Total combinat: ${formatLei(base.price)} serviciul de bază + ${formatLei(rawTotal)} rosturile.`;
         } else {
-          minimumNoteEl.textContent = 'Extra la o lucrare programată: fără minimum separat pentru acest serviciu.';
+          minimumNoteEl.textContent = 'Curățarea rosturilor se adaugă la programarea existentă.';
         }
       }
 
       if (whatsapp) {
-        const modeText = separate ? 'serviciu separat' : 'extra la o lucrare deja programată';
         const lines = [
           'Bună ziua! Aș dori o estimare pentru curățarea rosturilor.',
           '',
           ...details,
           '',
-          `Mod rezervare: ${modeText}`,
-          `Total calculat: ${formatLei(rawTotal)}`,
-          `Estimare pentru rezervare: ${formatLei(payable)}`,
-          '',
-          'Înțeleg că estimarea se confirmă după fotografii dacă există depuneri severe sau rosturi degradate.'
         ];
+
+        if (separate) {
+          lines.push('Mod rezervare: serviciu separat');
+          lines.push(`Rosturi: ${formatLei(rawTotal)}`);
+          lines.push(`Estimare pentru rezervare: ${formatLei(groutPayable)}`);
+        } else {
+          lines.push('Mod rezervare: adaug la o altă lucrare');
+          lines.push(`Serviciu de bază: ${base.label || 'nespecificat'}`);
+          if (base.price > 0) lines.push(`Preț serviciu de bază: ${formatLei(base.price)}`);
+          lines.push(`Curățare rosturi: ${formatLei(rawTotal)}`);
+          if (base.valid && base.price > 0) lines.push(`Total estimativ combinat: ${formatLei(combinedTotal)}`);
+          if (base.valid && base.price === 0) lines.push('Rosturile se adaugă la programarea existentă.');
+        }
+
+        lines.push('', 'Înțeleg că estimarea se confirmă după fotografii dacă există depuneri severe sau rosturi degradate.');
         whatsapp.href = `https://wa.me/40772053562?text=${encodeURIComponent(lines.join('\n'))}`;
+        whatsapp.setAttribute('aria-disabled', String(!separate && !base.valid));
+        whatsapp.classList.toggle('is-disabled', !separate && !base.valid);
+        whatsapp.tabIndex = (!separate && !base.valid) ? -1 : 0;
       }
     }
+
+    whatsapp?.addEventListener('click', (e) => {
+      if (booking?.value === 'addon' && !getBaseSelection().valid) {
+        e.preventDefault();
+        calculateGrout();
+      }
+    });
 
     groutCalculator.addEventListener('input', calculateGrout);
     groutCalculator.addEventListener('change', calculateGrout);
