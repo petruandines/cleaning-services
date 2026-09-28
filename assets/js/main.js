@@ -50,6 +50,84 @@
     el.textContent = String(new Date().getFullYear());
   });
 
+  // Grout cleaning calculator.
+  const groutCalculator = document.querySelector('[data-grout-calculator]');
+  if (groutCalculator) {
+    const rates = {
+      refresh: { large: 15, medium: 18, small: 22 },
+      deep: { large: 22, medium: 25, small: 30 },
+    };
+    const sizeLabels = { large: 'plăci mari', medium: 'plăci medii', small: 'plăci mici / multe rosturi' };
+    const levelLabels = { refresh: 'Grout Refresh', deep: 'Grout Deep Clean' };
+    const zones = Array.from(groutCalculator.querySelectorAll('[data-grout-zone]'));
+    const booking = groutCalculator.querySelector('[data-grout-booking]');
+    const rawTotalEl = groutCalculator.querySelector('[data-grout-raw-total]');
+    const payableEl = groutCalculator.querySelector('[data-grout-payable]');
+    const minimumNoteEl = groutCalculator.querySelector('[data-grout-minimum-note]');
+    const whatsapp = groutCalculator.querySelector('[data-grout-whatsapp]');
+
+    const formatLei = (value) => `${Math.round(value)} lei`;
+
+    function calculateGrout() {
+      let rawTotal = 0;
+      const details = [];
+
+      zones.forEach((zone) => {
+        const areaInput = zone.querySelector('[data-grout-area]');
+        const sizeInput = zone.querySelector('[data-grout-size]');
+        const levelInput = zone.querySelector('[data-grout-level]');
+        const totalEl = zone.querySelector('[data-grout-zone-total]');
+        const area = Math.max(0, Number.parseFloat(areaInput?.value || '0') || 0);
+        const size = sizeInput?.value || 'medium';
+        const level = levelInput?.value || 'refresh';
+        const rate = rates[level][size];
+        const subtotal = area * rate;
+        rawTotal += subtotal;
+        if (totalEl) totalEl.textContent = formatLei(subtotal);
+        if (area > 0) {
+          details.push(`${zone.dataset.zoneName}: ${area} m² · ${sizeLabels[size]} · ${levelLabels[level]} · ${rate} lei/m² = ${formatLei(subtotal)}`);
+        }
+      });
+
+      const separate = (booking?.value || 'separate') === 'separate';
+      const payable = rawTotal > 0 && separate ? Math.max(149, rawTotal) : rawTotal;
+
+      if (rawTotalEl) rawTotalEl.textContent = formatLei(rawTotal);
+      if (payableEl) payableEl.textContent = formatLei(payable);
+      if (minimumNoteEl) {
+        if (!rawTotal) {
+          minimumNoteEl.textContent = separate ? 'La serviciul separat se aplică minimum 149 lei.' : 'Ca extra, se calculează suprafața efectivă.';
+        } else if (separate && rawTotal < 149) {
+          minimumNoteEl.textContent = `Calculul suprafeței este ${formatLei(rawTotal)}, dar pentru deplasare separată se aplică minimum 149 lei.`;
+        } else if (separate) {
+          minimumNoteEl.textContent = 'Estimarea depășește valoarea minimă pentru deplasare separată.';
+        } else {
+          minimumNoteEl.textContent = 'Extra la o lucrare programată: fără minimum separat pentru acest serviciu.';
+        }
+      }
+
+      if (whatsapp) {
+        const modeText = separate ? 'serviciu separat' : 'extra la o lucrare deja programată';
+        const lines = [
+          'Bună ziua! Aș dori o estimare pentru curățarea rosturilor.',
+          '',
+          ...details,
+          '',
+          `Mod rezervare: ${modeText}`,
+          `Total calculat: ${formatLei(rawTotal)}`,
+          `Estimare pentru rezervare: ${formatLei(payable)}`,
+          '',
+          'Înțeleg că estimarea se confirmă după fotografii dacă există depuneri severe sau rosturi degradate.'
+        ];
+        whatsapp.href = `https://wa.me/40772053562?text=${encodeURIComponent(lines.join('\n'))}`;
+      }
+    }
+
+    groutCalculator.addEventListener('input', calculateGrout);
+    groutCalculator.addEventListener('change', calculateGrout);
+    calculateGrout();
+  }
+
   // WhatsApp form.
   const form = document.querySelector('[data-whatsapp-form]');
   if (form) {
