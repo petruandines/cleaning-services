@@ -108,6 +108,27 @@
             : `${label} ${days} zile, ${hours} ore, ${minutes} minute, ${seconds} secunde`
         );
       });
+
+      const homeOfferBanner = document.querySelector('.home-offer-banner');
+      if (homeOfferBanner) {
+        const topline = homeOfferBanner.querySelector('.home-offer-topline');
+        const title = homeOfferBanner.querySelector('.home-offer-copy h2');
+        const description = homeOfferBanner.querySelector('.home-offer-copy p');
+        const prices = homeOfferBanner.querySelector('.home-offer-prices');
+        const countdown = homeOfferBanner.querySelector('.home-offer-countdown');
+        const cta = homeOfferBanner.querySelector('.home-offer-cta');
+
+        if (state === 'expired') {
+          homeOfferBanner.href = '/cleaning-services/preturi/';
+          homeOfferBanner.setAttribute('aria-label', 'Campania s-a încheiat — vezi tarifele actuale');
+          if (topline) topline.innerHTML = '<span class="home-offer-badge">CAMPANIE ÎNCHEIATĂ</span>';
+          if (title) title.textContent = 'Campania s-a încheiat — vezi tarifele actuale';
+          if (description) description.textContent = 'Consultă prețurile și pachetele actuale Petru & Inés.';
+          if (prices) prices.hidden = true;
+          if (countdown) countdown.hidden = true;
+          if (cta) cta.innerHTML = 'Vezi tarifele actuale <span aria-hidden="true">→</span>';
+        }
+      }
     };
 
     updateOfferCountdowns();
