@@ -23,6 +23,9 @@ function setup() {
   sqlite.exec(archiveSchema);
   sqlite.exec(invoiceSchema);
   sqlite.exec(contractSchema);
+  sqlite.exec('BEGIN');
+  sqlite.exec(readFileSync(new URL('../../docs/portal-v2/0008_appointment_draft.sql', import.meta.url), 'utf8'));
+  sqlite.exec('COMMIT');
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
       .run(id, 'PF', id, now, now);
@@ -431,4 +434,21 @@ test('a failed audit rolls back an archive; inactive clients lose access', async
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'inactive' }) });
   assert.equal(patch.status, 200);
   assert.equal((await call('me', 'a')).status, 401);
+});
+
+test('staff can create and edit Draft; clients cannot write or access another client draft', async () => {
+ const {call, sqlite}=setup();
+ const init=data=>({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});
+ const data={client_id:'a',location_id:'loc_a',starts_at:'2030-10-02T10:00:00.000Z',ends_at:'2030-10-02T11:00:00.000Z',status:'draft'};
+ assert.equal((await call('appointments','a',init(data))).status,403);
+ const response=await call('appointments','admin',init(data)); assert.equal(response.status,201);
+ const {id}=await response.json();
+ assert.equal((await (await call('appointments','a')).json()).rows.find(r=>r.id===id).status,'draft');
+ assert.equal((await (await call('appointments','b')).json()).rows.some(r=>r.id===id),false);
+ const update={...init({status:'confirmed'}),method:'PATCH'};
+ assert.equal((await call('appointments/'+id,'admin',update)).status,200);
+ assert.equal(sqlite.prepare('SELECT status FROM appointments WHERE id=?').get(id).status,'confirmed');
+ update.body=JSON.stringify({status:'draft'});
+ assert.equal((await call('appointments/'+id,'admin',update)).status,200);
+ assert.equal(sqlite.prepare('SELECT status FROM appointments WHERE id=?').get(id).status,'draft');
 });

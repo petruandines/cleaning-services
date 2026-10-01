@@ -15,7 +15,7 @@ test('contract migration requires exact operation, identity and seven pinned fil
   assert.throws(() => assertChoice('apply', 'APPLY PORTAL CONTRACT 6816004b-dc95-48c9-be52-9bd4131d157e'), /recovery/);
   assertChoice('apply', 'APPLY PORTAL CONTRACT 6816004b-dc95-48c9-be52-9bd4131d157e',
     'TIME TRAVEL VERIFIED 6816004b-dc95-48c9-be52-9bd4131d157e');
-  assertFiles();
+  assert.throws(() => assertFiles(), /Unexpected migration files/);
 });
 
 test('contract migration preserves clients, nullable details and previous schema', () => {

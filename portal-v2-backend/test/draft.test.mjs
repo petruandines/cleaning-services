@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { readFileSync, readdirSync } from 'node:fs';
+import { assertChoice, assertFiles } from '../scripts/upgrade-draft-phone.mjs';
+import { assertChoice as deployChoice } from '../scripts/deploy-draft-worker-phone.mjs';
+const uuid = '6816004b-dc95-48c9-be52-9bd4131d157e';
+const dir = new URL('../../docs/portal-v2/', import.meta.url);
+test('draft migration and deployment require exact confirmations and pinned SQL', () => {
+ assertFiles(); assertChoice('inspect', '', '');
+ assert.throws(() => assertChoice('apply', `APPLY PORTAL DRAFT ${uuid}`, ''), /recovery/);
+ assertChoice('apply', `APPLY PORTAL DRAFT ${uuid}`, `TIME TRAVEL VERIFIED ${uuid}`);
+ assert.throws(() => deployChoice('deploy', ''), /exact confirmation/);
+ deployChoice('deploy', `UPDATE PORTAL DRAFT ${uuid}`);
+});
+test('draft table rebuild preserves populated linked and archived history with foreign keys enabled', () => {
+ const db = new DatabaseSync(':memory:'); db.exec('PRAGMA foreign_keys=ON');
+ for (const f of readdirSync(dir).filter(f=>/^000[1-7]_.*sql$/.test(f)).sort()) db.exec(readFileSync(new URL(f,dir),'utf8'));
+ db.exec(`INSERT INTO clients(id,kind,display_name,created_at,updated_at) VALUES('c','PF','test','a','a');
+ INSERT INTO locations(id,client_id,label,address,city,county,created_at,updated_at) VALUES('l','c','L','A','B','IF','a','a');
+ INSERT INTO appointments(id,client_id,location_id,starts_at,ends_at,status,internal_note,created_at,updated_at,deleted_at) VALUES('a','c','l','2026-10-02T10:00:00Z','2026-10-02T11:00:00Z','confirmed','private','a','a','archived');
+ INSERT INTO jobs(id,client_id,appointment_id,service_name,status,created_at,updated_at) VALUES('j','c','a','clean','completed','a','a');
+ INSERT INTO payments(id,client_id,job_id,amount_bani,status,created_at) VALUES('p','c','j',45000,'confirmed','a');`);
+ const snapshot=()=>JSON.stringify(['appointments','jobs','payments'].map(t=>db.prepare(`SELECT * FROM ${t} ORDER BY id`).all()));
+ const before=snapshot();
+ db.exec('BEGIN'); db.exec(readFileSync(new URL('0008_appointment_draft.sql',dir),'utf8')); db.exec('COMMIT');
+ assert.equal(snapshot(),before);
+ assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+ db.exec("UPDATE appointments SET status='draft' WHERE id='a'");
+ assert.throws(()=>db.exec("UPDATE appointments SET status='invalid'"),/CHECK/);
+ assert.throws(()=>db.exec("DELETE FROM appointments WHERE id='a'"),/FOREIGN KEY/);
+ assert.equal(db.prepare("SELECT appointment_id FROM jobs WHERE id='j'").get().appointment_id,'a');
+ db.close();
+});

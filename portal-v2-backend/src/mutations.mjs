@@ -76,7 +76,7 @@ export async function changeStaffRecord(db, name, id, data, actor) {
     else if (key === 'billing_type') values[key] = value === null || value === '' ? null :
       enumValue(value, ['hourly', 'fixed']);
     else if (key === 'status') values[key] = enumValue(value, name === 'clients' ? ['active', 'inactive'] :
-      name === 'appointments' ? ['requested', 'confirmed', 'in_progress', 'completed', 'cancelled'] :
+      name === 'appointments' ? ['draft', 'requested', 'confirmed', 'in_progress', 'completed', 'cancelled'] :
         name === 'jobs' ? ['planned', 'in_progress', 'completed', 'cancelled'] : ['pending', 'confirmed', 'reversed']);
     else if (key.endsWith('_bani')) values[key] = amount(value, key === 'amount_bani');
     else if (key === 'invoice_url') values[key] = invoiceUrl(value);

@@ -86,7 +86,7 @@ export async function createStaffRecord(db, name, data, actor) {
     } else if (name === 'appointments') {
       const location = text(data.location_id, 100);
       const start = time(data.starts_at), end = time(data.ends_at);
-      const status = choice(data.status, ['requested', 'confirmed', 'in_progress', 'completed', 'cancelled'], 'confirmed');
+      const status = choice(data.status, ['draft', 'requested', 'confirmed', 'in_progress', 'completed', 'cancelled'], 'confirmed');
       const note = text(data.client_note, 2000, false);
       const cost = money(data.estimated_cost_bani);
       if (!location || !start || !end || end <= start || !status || note === undefined || cost === undefined) return bad('invalid_appointment');

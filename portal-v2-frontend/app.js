@@ -17,7 +17,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     messages: 'Mesaj', locations: 'Locație', clients: 'Client',
   };
   const states = {
-    requested: 'Solicitată', confirmed: 'Confirmată', in_progress: 'În curs',
+    draft: 'Draft', requested: 'Solicitată', confirmed: 'Confirmată', in_progress: 'În curs',
     completed: 'Finalizată', cancelled: 'Anulată', planned: 'Planificată',
     pending: 'În așteptare', reversed: 'Anulată', active: 'Activ', inactive: 'Inactiv',
     PF: 'Persoană fizică', PJ: 'Firmă',
@@ -46,7 +46,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     appointments: [
       ['location_id', 'Locație', 'related', true, 'locations'],
       ['starts_at', 'Început', 'datetime-local', true], ['ends_at', 'Sfârșit', 'datetime-local', true],
-      ['status', 'Stare', 'select', true, [['confirmed', 'Confirmată'], ['requested', 'Solicitată'], ['in_progress', 'În curs'], ['completed', 'Finalizată'], ['cancelled', 'Anulată']]],
+      ['status', 'Stare', 'select', true, [['confirmed', 'Confirmată'], ['draft', 'Draft'], ['requested', 'Solicitată'], ['in_progress', 'În curs'], ['completed', 'Finalizată'], ['cancelled', 'Anulată']]],
       ['estimated_cost_bani', 'Estimare (lei)', 'money', false], ['client_note', 'Notă pentru client', 'textarea', false, 2000],
     ],
     jobs: [
