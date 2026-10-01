@@ -2,6 +2,7 @@ import { forgetTabSession, readTabSession, rememberTabSession } from './session.
 import { groupAppointments, isMuted, statusTone } from './appointment-view.mjs';
 import { createCalendar, fetchAllPages, selectCalendarRows } from './calendar-export.mjs';
 import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs';
+import { visibleContractDetails } from './contract-view.mjs';
 
 (() => {
   'use strict';
@@ -9,7 +10,7 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
   const API = window.PETRU_INES_API_ORIGIN;
   const sections = {
     appointments: 'Programări', jobs: 'Lucrări', payments: 'Plăți',
-    messages: 'Mesaje', locations: 'Locații', clients: 'Clienți',
+    messages: 'Mesaje', locations: 'Locații', clients: 'Clienți', contracts: 'Contract',
   };
   const singular = {
     appointments: 'Programare', jobs: 'Lucrare', payments: 'Plată',
@@ -115,6 +116,7 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
     $('appointment-banner').hidden = true;
     $('calendar-export').hidden = true;
     $('payments-export').hidden = true;
+    $('contract-panel').hidden = true;
     calendarLocationKey = '';
     calendarLoadId++;
     currentClientId = '';
@@ -269,6 +271,29 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
       if (section === 'messages') cards.scrollTop = cards.scrollHeight;
     }
   }
+  function renderContractInfo(rows) {
+    const container = $('content');
+    container.replaceChildren();
+    for (const row of rows) {
+      const items = visibleContractDetails(row);
+      if (!items.length) continue;
+      const card = document.createElement('article');
+      card.className = 'card';
+      const title = document.createElement('h3');
+      title.textContent = row.client_name;
+      const facts = document.createElement('dl');
+      for (const { key, label, value } of items) {
+        const term = document.createElement('dt');
+        const detail = document.createElement('dd');
+        term.textContent = label;
+        detail.textContent = key === 'billing_type' ? value === 'hourly' ? 'Pe oră' : 'Tarif fix' :
+          key === 'contract_rate_bani' ? format(key, value) : String(value);
+        facts.append(term, detail);
+      }
+      card.append(title, facts);
+      container.append(card);
+    }
+  }
   function addActions(container, row) {
     if (user?.role !== 'staff') return;
     const actions = document.createElement('div');
@@ -280,6 +305,22 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
       button.textContent = label;
       button.addEventListener('click', action);
       actions.append(button);
+    }
+    if (section === 'clients') {
+      const contract = document.createElement('button');
+      contract.type = 'button';
+      contract.className = 'secondary';
+      contract.textContent = 'Contract';
+      contract.addEventListener('click', async () => {
+        currentClientId = row.id;
+        currentClientLabel = row.display_name;
+        try {
+          await refreshClientChoices();
+          await refreshContractPanel();
+          $('contract-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (error) { notice(error.message); }
+      });
+      actions.prepend(contract);
     }
     container.append(actions);
   }
@@ -466,6 +507,48 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
       list.append(line);
     }
   }
+  function updateContractRateLabel(clear = false) {
+    const mode = $('contract-billing-type').value;
+    $('contract-rate-wrap').hidden = !mode;
+    $('contract-rate-wrap').firstChild.textContent = mode === 'hourly' ? 'Tarif pe oră (lei)' : 'Tarif fix (lei)';
+    if (clear) $('contract-rate').value = '';
+  }
+  async function refreshContractPanel() {
+    const client = currentClientId;
+    const session = generation;
+    const panel = $('contract-panel');
+    panel.hidden = user?.role !== 'staff' || section !== 'clients' || !client;
+    if (panel.hidden) return;
+    const response = await api('/api/contracts?client_id=' + encodeURIComponent(client));
+    if (session !== generation || currentClientId !== client || section !== 'clients') return;
+    const row = response.rows[0] || {};
+    const form = $('contract-form');
+    for (const key of ['billing_type', 'manager_name', 'manager_email', 'manager_phone',
+      'contract_reference', 'contract_details']) form.elements.namedItem(key).value = row[key] ?? '';
+    form.elements.namedItem('contract_rate_bani').value = row.contract_rate_bani === null ||
+      row.contract_rate_bani === undefined ? '' : (row.contract_rate_bani / 100).toFixed(2).replace('.', ',');
+    updateContractRateLabel();
+  }
+  async function refreshClientContractTab() {
+    if (user?.role !== 'client') return;
+    const session = generation;
+    const data = await api('/api/contracts');
+    if (session !== generation || user?.role !== 'client') return;
+    const hasDetails = data.rows.some(row => visibleContractDetails(row).length);
+    let button = $('tabs').querySelector('[data-section="contracts"]');
+    if (hasDetails && !button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.section = 'contracts';
+      button.textContent = 'Contract';
+      button.addEventListener('click', () => selectSection('contracts'));
+      $('tabs').append(button);
+    } else if (!hasDetails && button) button.remove();
+    if (section === 'contracts') {
+      if (hasDetails) renderContractInfo(data.rows);
+      else selectSection('appointments');
+    }
+  }
   function pageUrl() {
     const params = new URLSearchParams({ offset: String(offset) });
     if (user?.role === 'staff' && section === 'clients' && $('client-search').value.trim())
@@ -522,11 +605,19 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
     $('message-form').hidden = section !== 'messages' || user?.role !== 'client';
     $('message-search-box').hidden = section !== 'messages' || (user?.role === 'staff' && !selectedClient);
     refreshCalendarLocations();
+    refreshContractPanel().catch(error => notice(error.message));
     $('payments-export').hidden = current !== 'payments';
     $('payments-download').disabled = user?.role === 'staff' && !selectedClient;
     $('payments-hint').textContent = user?.role === 'staff' && !selectedClient ?
       'Alege mai întâi un client pentru export.' :
       'Perioada folosește data plății sau, pentru cele în așteptare, data creării.';
+    if (current === 'contracts' && user?.role === 'client') {
+      $('pager').hidden = true;
+      $('content').textContent = 'Se încarcă…';
+      try { await refreshClientContractTab(); }
+      catch (error) { if (requestGeneration === generation && section === current) notice(error.message); }
+      return;
+    }
     if (current === 'messages' && user?.role === 'staff' && !selectedClient) {
       $('content').textContent = 'Alege un client pentru a vedea conversația.';
       $('pager').hidden = true;
@@ -582,7 +673,7 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
     if (user.role === 'staff') refreshClientChoices().catch(error => notice(error.message));
     $('tabs').replaceChildren();
     for (const [key, label] of Object.entries(sections)) {
-      if (key === 'jobs' || (key === 'clients' && user.role !== 'staff')) continue;
+      if (key === 'jobs' || key === 'contracts' || (key === 'clients' && user.role !== 'staff')) continue;
       const button = document.createElement('button');
       button.type = 'button';
       button.dataset.section = key;
@@ -591,6 +682,7 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
       $('tabs').append(button);
     }
     selectSection('appointments');
+    refreshClientContractTab().catch(error => notice(error.message));
     refreshOverview().catch(() => {});
     clearInterval(overviewTimer);
     overviewTimer = setInterval(() => refreshOverview().catch(() => {}), 60000);
@@ -741,6 +833,30 @@ import { createPaymentsWorkbook, paymentsInPeriod } from './payments-export.mjs'
     offset = 0;
     loadSection();
     refreshAccounts().catch(error => notice(error.message));
+  });
+  $('contract-billing-type').addEventListener('change', () => updateContractRateLabel(true));
+  $('contract-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (user?.role !== 'staff' || section !== 'clients' || !currentClientId) return;
+    const client = currentClientId;
+    const session = generation;
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    const form = event.currentTarget;
+    button.disabled = true;
+    try {
+      const mode = form.elements.namedItem('billing_type').value || null;
+      const amount = form.elements.namedItem('contract_rate_bani').value.trim();
+      const data = { billing_type: mode, contract_rate_bani: mode && amount ? leiToBani(amount) : null };
+      for (const key of ['manager_name', 'manager_email', 'manager_phone', 'contract_reference',
+        'contract_details']) data[key] = form.elements.namedItem(key).value.trim() || null;
+      await api('/api/clients/' + encodeURIComponent(client), {
+        method: 'PATCH', body: JSON.stringify(data),
+      });
+      if (session !== generation || client !== currentClientId) return;
+      notice('Informațiile contractuale au fost salvate.');
+      await refreshContractPanel();
+    } catch (error) { if (session === generation && client === currentClientId) notice(error.message); }
+    finally { button.disabled = false; }
   });
   $('open-account').addEventListener('click', () => {
     if (!ready() || !token || user?.role !== 'staff' || !currentClientId) return;

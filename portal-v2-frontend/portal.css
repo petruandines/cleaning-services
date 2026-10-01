@@ -58,3 +58,13 @@
 .calendar-export input{display:block;width:100%;min-height:44px;margin-top:6px;border:1px solid #b9c9bd;border-radius:9px;padding:8px;background:#fff;color:var(--ink);font:inherit}
 .calendar-export p{color:var(--muted);font-size:13px;margin:10px 0 0}
 @media(max-width:720px){.calendar-export-fields{grid-template-columns:1fr}.calendar-export{padding:17px}}
+
+.contract-panel{margin:20px 0;padding:22px;background:#fff;border:1px solid var(--line);border-radius:16px}
+.contract-panel h3{margin:0 0 6px}
+.contract-panel p{font-size:14px;color:var(--muted)}
+.contract-panel label{display:block;font-size:14px;font-weight:650}
+.contract-panel input,.contract-panel select,.contract-panel textarea{width:100%;min-height:44px;margin-top:6px;border:1px solid #b9c9bd;border-radius:9px;padding:8px 10px;background:#fff;color:var(--ink);font:inherit}
+.contract-panel .contract-wide{grid-column:1/-1}
+.contract-panel textarea{resize:vertical}
+.contract-panel .form-grid{margin-bottom:18px}
+@media(max-width:720px){.contract-panel{padding:18px}}
