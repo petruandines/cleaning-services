@@ -32,7 +32,7 @@ jobs:
       - name: Read reviewed backup code at a fixed commit
         uses: actions/checkout@v4
         with:
-          ref: 430035bedb9fdf18fecb63e634e21d80e88363ae
+          ref: f508367674883ccca47516e9eb6f19a91b9f36f3
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@v4
