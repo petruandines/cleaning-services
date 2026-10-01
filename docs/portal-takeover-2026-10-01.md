@@ -10,3 +10,5 @@
 
 ## Draft implementation prepared
 Owner confirmed contract saving works. Prepared 0008 appointment Draft migration, API create/edit, violet badge and tentative ICS. Draft is visible to its own client as provisional, excluded from upcoming intervention banner. Migration preserves rows/IDs and uses a foreign-key guard before ending deferral. Tests: 66 backend + 11 frontend; local D1 populated migration and Worker compile checked. Not migrated or deployed remotely. Next: inspect with existing PORTAL_D1_CONTRACT_TOKEN, fresh backup accounting for schema 0007 and contract data, then explicit apply and Worker deployment, then preview. Old pinned workflows must not be reused for new schema.
+
+- Draft inspect run 36921915275 succeeded on 2026-10-01: 66 tests, operation inspect, blank confirmations, schema 0007; migration 0008 not applied. Bookmark 0000004d-00000000-000050f7-7087c36eacc2c49f8e60d78b8615b17b. Updated backup script to validate schema 0007 via draft upgrader (eight pinned files, 0008 pending). Next run encrypted export with existing export token and saved key, download archive before apply. No source DB change.
