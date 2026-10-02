@@ -224,6 +224,30 @@ def sql_counts(source):
                 for name in PORTAL_TABLES}
 
 
+def safe_failure(error, action):
+    """Only fixed diagnostics; never include SQL, paths, keys or signed URLs."""
+    known = (
+        "The key and backup files must be outside the public repository",
+        "The key must be a regular file readable only by its owner (chmod 600)",
+        "Expected a 32-byte key created with keygen", "Backup file is incomplete",
+        "Unknown backup format", "Refusing to overwrite a backup",
+        "Could not locate the isolated local D1 database",
+        "Restored database failed SQLite integrity check",
+        "Restored database has broken foreign-key references",
+        "Restored database is missing portal tables",
+    )
+    if isinstance(error, ValueError) and str(error) in known:
+        return str(error)
+    if isinstance(error, subprocess.CalledProcessError) and action == "restore-local-test":
+        output = error.stdout or ""
+        if "FOREIGN KEY constraint failed" in output:
+            return "Local D1 import failed foreign-key validation"
+        if re.search(r"SQLITE_ERROR|syntax error|no such table|already exists", output, re.I):
+            return "Local D1 import failed SQL validation"
+        return "Local D1 import failed before completion"
+    return type(error).__name__
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     actions = parser.add_subparsers(dest="action", required=True)
@@ -265,7 +289,7 @@ def main():
     except ExportDiagnostic as error:
         parser.exit(1, f"Backup operation failed: {error}\n")
     except (ValueError, InvalidTag, FileExistsError, OSError, subprocess.CalledProcessError) as error:
-        parser.exit(1, f"Backup operation failed: {type(error).__name__}\n")
+        parser.exit(1, f"Backup operation failed: {safe_failure(error, args.action)}\n")
 
 
 if __name__ == "__main__":

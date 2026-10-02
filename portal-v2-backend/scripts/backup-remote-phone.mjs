@@ -61,6 +61,17 @@ export function safeVaultError(error) {
     'Cloudflare completed export, but the runner could not download its temporary SQL URL',
     'Cloudflare rejected or interrupted the D1 export request',
     'Wrangler D1 export failed before completion; no encrypted artifact was uploaded',
+    'The key and backup files must be outside the public repository',
+    'The key must be a regular file readable only by its owner (chmod 600)',
+    'Expected a 32-byte key created with keygen', 'Backup file is incomplete',
+    'Unknown backup format', 'Refusing to overwrite a backup',
+    'Could not locate the isolated local D1 database',
+    'Restored database failed SQLite integrity check',
+    'Restored database has broken foreign-key references',
+    'Restored database is missing portal tables',
+    'Local D1 import failed foreign-key validation', 'Local D1 import failed SQL validation',
+    'Local D1 import failed before completion',
+    'ValueError', 'InvalidTag', 'FileExistsError', 'PermissionError', 'FileNotFoundError', 'OSError', 'CalledProcessError',
   ];
   return known.includes(message) ? message : 'Backup operation failed before an encrypted artifact was uploaded';
 }
@@ -94,11 +105,16 @@ export function run(operation, confirmation, env = process.env) {
       cwd: ROOT, timeout: 300000, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024,
       env: pythonEnv,
     });
-    try {
-      invoke(['export', '--database', DATABASE, '--scope', 'remote', '--out', archive, '--key', keyFile]);
-      invoke(['verify', '--input', archive, '--key', keyFile]);
-      invoke(['restore-local-test', '--input', archive, '--key', keyFile]);
-    } catch (error) { throw new Error(safeVaultError(error)); }
+    for (const [stage, args] of [
+      ['export and encryption', ['export', '--database', DATABASE, '--scope', 'remote', '--out', archive, '--key', keyFile]],
+      ['encrypted archive authentication', ['verify', '--input', archive, '--key', keyFile]],
+      ['isolated local D1 recovery', ['restore-local-test', '--input', archive, '--key', keyFile]],
+    ]) {
+      process.stdout.write(`Starting backup stage: ${stage}.\n`);
+      try { invoke(args); }
+      catch (error) { throw new Error(`Backup stage ${stage}: ${safeVaultError(error)}`); }
+      process.stdout.write(`Completed backup stage: ${stage}.\n`);
+    }
     const digest = archiveDigest(archive);
     process.stdout.write(`Encrypted D1 export verified and restored into isolated local D1. SHA-256: ${digest}\n`);
     process.stdout.write('Download the artifact and store it outside GitHub and Cloudflare; keep the key separately.\n');

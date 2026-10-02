@@ -56,3 +56,11 @@ test('backup logs only a fixed error category and never the signed export URL', 
   const raw = 'Backup operation failed: https://private.example/?signature=secret\n';
   assert.doesNotMatch(safeVaultError({ stderr: raw }), /private\.example|secret/);
 });
+
+
+test('backup exposes only a fixed exception category for non-export failures', () => {
+  for (const category of ['ValueError','InvalidTag','FileExistsError','PermissionError','FileNotFoundError','OSError','CalledProcessError']) {
+    assert.equal(safeVaultError({ stderr: `Backup operation failed: ${category}\n` }), category);
+  }
+  assert.doesNotMatch(safeVaultError({ stderr: 'Backup operation failed: ValueError secret-token\n' }), /secret-token/);
+});

@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sqlite3
 import tempfile
+import subprocess
 import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'd1_vault.py'
@@ -18,6 +19,14 @@ class BackupTest(unittest.TestCase):
         sample = 'Downloading SQL to /tmp/backup\nhttps://private.example/?signature=very-secret'
         self.assertIn('download', vault.classify_export_error(sample))
         self.assertNotIn('very-secret', vault.classify_export_error(sample))
+
+    def test_fixed_failure_categories_never_include_private_sql(self):
+        sample = "FOREIGN KEY constraint failed; INSERT secret; https://private/?sig=token"
+        error = subprocess.CalledProcessError(1, ['wrangler'], output=sample)
+        self.assertEqual(vault.safe_failure(error, 'restore-local-test'),
+                         'Local D1 import failed foreign-key validation')
+        self.assertEqual(vault.safe_failure(ValueError('secret-token'), 'export'), 'ValueError')
+        self.assertEqual(vault.safe_failure(ValueError('Unknown backup format'), 'verify'), 'Unknown backup format')
 
     def test_streamed_encryption_authentication_and_no_plaintext_on_failure(self):
         with tempfile.TemporaryDirectory() as folder:

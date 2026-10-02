@@ -40,3 +40,9 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - 70/70 backend tests passed. OPERATION=inspect; both confirmation fields empty. Exact EU D1 is at schema 0008; nine SQL files pinned with 0009 pending. No migration or database write performed.
 - Time Travel bookmark: 00000053-00000000-000050f8-219d2c6643ae90eece5ece364f6cb099.
 - Next owner action: NEW schema-0008 encrypted backup export through the refreshed main backup workflow; same saved key and existing temporary export token. Verify download/offline storage before apply 0009.
+
+
+### Schema-0008 backup attempt 36981356128
+- Failed after target/schema verification; backend 70 and backup 5 tests passed. No artifact uploaded and no source D1 writes. Exact failure stage was hidden by the generic wrapper; root cause not yet established.
+- Add safe stage-level progress and whitelisted diagnostic categories for export/encryption, archive authentication and isolated local recovery. No SQL, keys, paths or signed URLs are displayed.
+- Backup workflow must use the new reviewed diagnostic commit. Owner should start a NEW export, not re-run the failed old-code job. Migration 0009 remains pending.
