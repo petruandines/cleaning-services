@@ -167,11 +167,35 @@ def export_database(name, scope, target, key):
     print("Encrypted export saved. Verify it with 'verify' and keep the key separately.")
 
 
+def schema_first_sql(source, target):
+    """Create all exported tables before inserting dependent records.
+
+    ALTER TABLE rebuilds change sqlite_schema order. D1 exports can therefore
+    insert jobs before CREATE TABLE appointments, even with deferred keys.
+    Only table declaration order changes, in a private recovery copy.
+    """
+    statements, pending = [], []
+    for char in Path(source).read_text():
+        pending.append(char)
+        if char == ';' and sqlite3.complete_statement(''.join(pending)):
+            statements.append(''.join(pending))
+            pending = []
+    if ''.join(pending).strip():
+        statements.append(''.join(pending))
+    tables, rest = [], []
+    for statement in statements:
+        # D1 exports contain SQL statements without leading comments.
+        (tables if re.match(r'\s*CREATE\s+TABLE\b', statement, re.I) else rest).append(statement)
+    Path(target).write_text('PRAGMA defer_foreign_keys = ON;\n' + '\n'.join(tables + rest))
+
+
 def restore_local_test(source, key, expect_client_id=None):
     with tempfile.TemporaryDirectory(prefix="pi-d1-restore-") as directory:
         temp = Path(directory)
         plaintext = temp / "export.sql"
         decrypt(source, key, plaintext)
+        ordered = temp / "recovery.sql"
+        schema_first_sql(plaintext, ordered)
         config = temp / "wrangler.jsonc"
         config.write_text(json.dumps({
             "name": "pi-d1-restore-test", "main": str(ROOT / "src" / "index.mjs"),
@@ -182,7 +206,7 @@ def restore_local_test(source, key, expect_client_id=None):
         persist = temp / "d1-state"
         run_wrangler("d1", "execute", "pi-d1-restore-test", "--local",
                      "--config", str(config), "--persist-to", str(persist),
-                     "--file", str(plaintext), capture=True)
+                     "--file", str(ordered), capture=True)
         # Wrangler also stores its own metadata.sqlite alongside the actual
         # D1 database. Never mistake this metadata for restored client data.
         files = [file for file in persist.rglob("*.sqlite")

@@ -46,3 +46,11 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Failed after target/schema verification; backend 70 and backup 5 tests passed. No artifact uploaded and no source D1 writes. Exact failure stage was hidden by the generic wrapper; root cause not yet established.
 - Add safe stage-level progress and whitelisted diagnostic categories for export/encryption, archive authentication and isolated local recovery. No SQL, keys, paths or signed URLs are displayed.
 - Backup workflow must use the new reviewed diagnostic commit. Owner should start a NEW export, not re-run the failed old-code job. Migration 0009 remains pending.
+
+
+### Schema-0008 backup recovery correction
+- Run 36981803101 (job 110757774333) failed specifically at isolated local D1 recovery. Export/encryption and encrypted archive authentication succeeded. No artifact uploaded; source D1 unchanged.
+- Reproduced the populated schema-0008 restore failure with fictional client/location/appointment/job/payment data. Migration 0008 rebuild places appointments later in sqlite_schema/export order; jobs data can be imported before its referenced table exists.
+- Recovery now prepares a private SQL copy with all CREATE TABLE declarations before original data/index statements. Original encrypted archive is unchanged. SQL statement parsing respects quoted semicolons; D1 deferred FK behavior and final integrity/foreign-key checks retained.
+- All 7 backup tests passed, including real local Wrangler export/restore for populated schema 0008 and matching financial records. Existing backend 71 tests passed before this Python-only fix.
+- Next: owner starts NEW export in refreshed main backup workflow; no key/token changes. Review result and download ZIP before apply 0009. Remote recovery workflows must use the same table-order preparation when upgraded beyond schema 0006.

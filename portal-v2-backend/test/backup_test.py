@@ -20,6 +20,27 @@ class BackupTest(unittest.TestCase):
         self.assertIn('download', vault.classify_export_error(sample))
         self.assertNotIn('very-secret', vault.classify_export_error(sample))
 
+    def test_schema_first_preserves_quoted_semicolons_and_records(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source, target = Path(folder) / 'source.sql', Path(folder) / 'ordered.sql'
+            source.write_text("""PRAGMA defer_foreign_keys=ON;
+CREATE TABLE child(id TEXT, parent_id TEXT REFERENCES parent(id));
+INSERT INTO child VALUES('quoted;value','parent');
+CREATE TABLE parent(id TEXT PRIMARY KEY);
+INSERT INTO parent VALUES('parent');
+""")
+            vault.schema_first_sql(source, target)
+            ordered = target.read_text()
+            self.assertLess(ordered.index('CREATE TABLE parent'), ordered.index('INSERT INTO child'))
+            with sqlite3.connect(':memory:') as db:
+                db.execute('PRAGMA foreign_keys=ON')
+                db.execute('BEGIN')
+                for statement in ordered.splitlines():
+                    db.execute(statement)
+                db.commit()
+                self.assertEqual(db.execute('SELECT id FROM child').fetchone()[0], 'quoted;value')
+                self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+
     def test_fixed_failure_categories_never_include_private_sql(self):
         sample = "FOREIGN KEY constraint failed; INSERT secret; https://private/?sig=token"
         error = subprocess.CalledProcessError(1, ['wrangler'], output=sample)
@@ -102,6 +123,13 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
             vault.run_wrangler('d1', 'execute', database, '--local', '--cwd',
                                str(source_dir), '--config', str(config),
                                '--file', str(seed), capture=True)
+            # Include the rebuilt appointments table and populated dependent jobs.
+            for name in ('0004_location_contact.sql', '0005_soft_delete.sql',
+                         '0006_invoice_client_notes.sql', '0007_client_contract.sql',
+                         '0008_appointment_draft.sql'):
+                vault.run_wrangler('d1', 'execute', database, '--local', '--cwd',
+                                   str(source_dir), '--config', str(config),
+                                   '--file', str(migrations / name), capture=True)
             exported = root / 'source.sql'
             vault.run_wrangler('d1', 'export', database, '--local', '--cwd',
                                str(source_dir), '--config', str(config),
