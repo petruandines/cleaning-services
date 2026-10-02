@@ -62,3 +62,8 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Encrypted file SHA-256: 90ba1e984aab6dd17383f72ee6edde1cee13b4412dbfbdf95734e5fa1b8f7dbe.
 - Artifact portal-d1-encrypted-36982567244, ID 11215901909, size 51406 bytes; expires 2026-10-03 08:11:24Z (10:11 Europe/Madrid).
 - Next: owner downloads ZIP and stores privately outside GitHub/Cloudflare, offline key separate; await ZIP saved confirmation before apply 0009. Workflow remains pinned to reviewed code 064bd76ac79bb1e3beae8702795a6c9190829cd3 for migration/Worker, and 6f9dd9eea4a82afa651a2c76cc73dbadb7d13ee0 for backup.
+
+
+### Owner confirmed ZIP saved
+- 2026-10-02: owner explicitly confirmed ZIP saved for successful backup run 36982567244 following download/private-copy and separate-key instructions.
+- Proceed with manual migration 0009 apply using pinned workflow portal-d1-payment-locations-upgrade.yml; exact APPLY PORTAL PAYMENT LOCATIONS UUID and TIME TRAVEL VERIFIED UUID confirmations. Verify resulting run before Worker update; do not publish frontend ahead of backend.
