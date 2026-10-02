@@ -125,3 +125,5 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - npm run build:portal now copies v2 assets using scripts/build-portal-v2.mjs; npm run test:portal targets v2 tests instead of inactive legacy Appwrite tests. Legacy source remains in git; no backend deployment needed for route change (same origin).
 - 12 frontend tests passed. Pages run 36988259945 succeeded. Pre-cutover main reference 3d32a03f81c6b7dbfe2a17aae873c72c2271f9dd; revert production cutover commit to restore old Appwrite public assets if necessary.
 - Next: canonical-route login confirmation on phone, then revoke only temporary migration/Worker tokens and delete corresponding GitHub secrets. Keep permanent Worker auth secret and backup export token/key for weekly workflow. Do not delete Appwrite during launch verification. First actual weekly cron run remains to be checked after 2026-10-04.
+
+- Post-cutover HTTP verification: all nine /portal/ assets match prepared files byte-for-byte. Browser-origin probe: /login HTTP200 and anonymous /api/me HTTP401, Access-Control-Allow-Origin https://petruandines.github.io. Canonical phone login confirmation remains next.
