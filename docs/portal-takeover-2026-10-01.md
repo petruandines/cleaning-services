@@ -106,3 +106,8 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Artifact portal-d1-encrypted-36984798940, ID11216619721, 52851 bytes, expiry 2026-11-01T09:35:17Z; owner download/private copy pending.
 - Scheduled Sunday02:00UTC is configured; manual run demonstrates same pipeline, not actual cron execution. Confirm first scheduled run after 2026-10-04. Keep export token/key while active; no migration/Worker temporary cleanup yet confirmed.
 - Next: owner ZIP saved confirmation, then first-client phone check. Inventory actual Appwrite data and second-client isolation before controlled cutover.
+
+
+### Owner saved schema-0009 backup
+- 2026-10-02 owner confirmed ZIP saved for weekly backup manual proof 36984798940 after private-copy/separate-key instructions.
+- Next client phone QA: existing client login, own locations/appointments/payments only, conditional Contract tab, single-total multi-location payment, client->admin chat and logout. Then second-client isolation and Appwrite data inventory before cutover. No public portal cutover authorized/performed in this checkpoint.
