@@ -68,3 +68,5 @@
 .contract-panel textarea{resize:vertical}
 .contract-panel .form-grid{margin-bottom:18px}
 @media(max-width:720px){.contract-panel{padding:18px}}
+
+.badge--violet{background:#eee4ff;color:#60349a}

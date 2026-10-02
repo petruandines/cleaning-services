@@ -21,7 +21,7 @@ export function groupAppointments(rows) {
 }
 
 const tones = {
-  appointments: { requested: 'amber', confirmed: 'green', in_progress: 'blue',
+  appointments: { draft: 'violet', requested: 'amber', confirmed: 'green', in_progress: 'blue',
     completed: 'slate', cancelled: 'rose' },
   payments: { pending: 'amber', confirmed: 'slate', reversed: 'rose' },
 };
