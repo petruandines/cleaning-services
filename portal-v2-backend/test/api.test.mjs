@@ -26,6 +26,7 @@ function setup() {
   sqlite.exec('BEGIN');
   sqlite.exec(readFileSync(new URL('../../docs/portal-v2/0008_appointment_draft.sql', import.meta.url), 'utf8'));
   sqlite.exec('COMMIT');
+  sqlite.exec(readFileSync(new URL('../../docs/portal-v2/0009_payment_locations.sql', import.meta.url), 'utf8'));
   for (const id of ['a', 'b']) {
     sqlite.prepare('INSERT INTO clients (id,kind,display_name,created_at,updated_at) VALUES (?,?,?,?,?)')
       .run(id, 'PF', id, now, now);
@@ -451,4 +452,63 @@ test('staff can create and edit Draft; clients cannot write or access another cl
  update.body=JSON.stringify({status:'draft'});
  assert.equal((await call('appointments/'+id,'admin',update)).status,200);
  assert.equal(sqlite.prepare('SELECT status FROM appointments WHERE id=?').get(id).status,'draft');
+});
+
+test('multi-location payment has one total, scoped links, editable selection and no duplicate history', async () => {
+ const {call,sqlite}=setup();
+ sqlite.exec("INSERT INTO locations(id,client_id,label,address,city,county,created_at,updated_at) VALUES('loc_a2','a','Sediu 2','A','B','IF','n','n')");
+ const write=(path,data,method='POST',token='admin')=>call(path,token,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+ for(const ids of [[],['loc_a','loc_a'],['loc_b'],['missing'],null]) {
+   assert.equal((await write('payments',{client_id:'a',location_ids:ids,amount_bani:12345})).status,400);
+ }
+ assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM jobs').get().n,0);
+ assert.equal((await write('payments',{client_id:'a',location_ids:['loc_a'],amount_bani:12345},'POST','a')).status,403);
+ const response=await write('payments',{client_id:'a',location_ids:['loc_a','loc_a2'],amount_bani:12345});
+ assert.equal(response.status,201); const {id}=await response.json();
+ const rows=(await (await call('payments','a')).json()).rows;
+ assert.equal(rows.length,1);assert.equal(rows[0].amount_bani,12345);
+ assert.deepEqual(rows[0].location_ids,['loc_a','loc_a2']);
+ assert.match(rows[0].location_name,/Sediu 2/);
+ assert.equal((await (await call('payments','b')).json()).rows.length,0);
+ assert.equal(sqlite.prepare('SELECT SUM(amount_bani) AS n FROM payments').get().n,12345);
+ assert.equal((await write('payments/'+id,{location_ids:['loc_b']},'PATCH')).status,400);
+ assert.deepEqual((await (await call('payments','a')).json()).rows[0].location_ids,['loc_a','loc_a2']);
+ sqlite.exec("CREATE TRIGGER fail_multi_audit BEFORE INSERT ON audit_events WHEN NEW.action='update' BEGIN SELECT RAISE(ABORT,'audit failed'); END");
+ await assert.rejects(()=>write('payments/'+id,{location_ids:['loc_a2'],amount_bani:99999},'PATCH'));
+ assert.equal(sqlite.prepare('SELECT amount_bani FROM payments WHERE id=?').get(id).amount_bani,12345);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payment_locations WHERE payment_id=?').get(id).n,2);
+ sqlite.exec('DROP TRIGGER fail_multi_audit');
+ assert.equal((await write('payments/'+id,{location_ids:['loc_a2']},'PATCH')).status,200);
+ sqlite.exec("UPDATE locations SET deleted_at='archived',active=0 WHERE id='loc_a2'");
+ assert.equal((await write('payments/'+id,{location_ids:['loc_a2'],note:'Istoric păstrat'},'PATCH')).status,200);
+ assert.equal((await write('payments',{client_id:'a',location_ids:['loc_a2'],amount_bani:100})).status,400);
+ assert.throws(()=>sqlite.exec(`INSERT INTO payment_locations VALUES('${id}','b','loc_b')`),/FOREIGN KEY/);
+ assert.equal((await call('payments/'+id,'admin',{method:'DELETE'})).status,200);
+ assert.equal((await (await call('payments','a')).json()).rows.length,0);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payment_locations WHERE payment_id=?').get(id).n,1);
+ assert.deepEqual(sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
+});
+
+test('legacy appointment payment automatically gets its location and failed create is atomic', async()=>{
+ const {call,sqlite}=setup();
+ const post=()=>call('payments','admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:'a',appointment_id:'ap_a',amount_bani:8000})});
+ const {id}=await (await post()).json();
+ assert.deepEqual((await (await call('payments','a')).json()).rows[0].location_ids,['loc_a']);
+ sqlite.exec("CREATE TRIGGER fail_multi_create BEFORE INSERT ON audit_events WHEN NEW.action='create' BEGIN SELECT RAISE(ABORT,'audit failed'); END");
+ await assert.rejects(()=>post());
+ assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payments').get().n,1);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM jobs').get().n,1);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payment_locations').get().n,1);
+});
+
+test('selecting all 100 locations stays within D1 parameter limits and one payment row',async()=>{
+ const {call,sqlite}=setup();const ids=['loc_a'];
+ for(let i=1;i<100;i++){
+  const id='loc_all_'+i;ids.push(id);
+  sqlite.prepare('INSERT INTO locations(id,client_id,label,address,city,county,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)').run(id,'a',id,'A','B','IF','n','n');
+ }
+ const response=await call('payments','admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:'a',location_ids:ids,amount_bani:10000})});
+ assert.equal(response.status,201);
+ const rows=(await (await call('payments','a')).json()).rows;
+ assert.equal(rows.length,1);assert.equal(rows[0].location_ids.length,100);assert.equal(rows[0].amount_bani,10000);
 });

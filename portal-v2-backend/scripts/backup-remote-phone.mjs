@@ -5,7 +5,7 @@ import { closeSync, existsSync, mkdtempSync, openSync, readSync, rmSync, writeFi
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertFiles, assertVersion } from './upgrade-draft-phone.mjs';
+import { assertFiles, assertVersion } from './upgrade-payment-locations-phone.mjs';
 import { remoteState } from './upgrade-phone.mjs';
 import { verifyRemoteD1 } from './verify-remote-d1.mjs';
 
@@ -72,7 +72,7 @@ export function run(operation, confirmation, env = process.env) {
   const details = verifyRemoteD1();
   assertTarget(details);
   assertVersion(remoteState(details), false);
-  process.stdout.write('Verified exact EU D1 target, version 0007, eight pinned migration files (0008 not applied). No database writes.\n');
+  process.stdout.write('Verified exact EU D1 target, version 0008, nine pinned migration files (0009 not applied). No database writes.\n');
   if (operation === 'inspect') return;
 
   // The runner's temporary directory and the output are outside the public

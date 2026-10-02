@@ -19,3 +19,17 @@ Owner confirmed contract saving works. Prepared 0008 appointment Draft migration
 - Worker inspect 36923226204 and deploy 36923518120 succeeded, 66 tests, login available and anonymous API denied. Verified after credit interruption.
 - Preview activation commit eadbf76dc21e3888afe353927aadf0f0dc416d3d copies four reviewed frontend files from 149526e84c34ceed170393980bc65458043abc0b. Public /portal/ remains unchanged. Await phone QA: create Draft, reload, edit to Confirmată. Existing 11 frontend tests passed before publication; no repeat required without regression.
 - Next implementation: one payment for selected multiple locations, without duplicate sums; backup periodic workflow, full client QA, cutover remain. Temporary access cleanup still pending. Backup workflow is currently pinned to schema 0007; must update before next export on schema 0008.
+
+
+## 2026-10-02 — Payments across selected locations prepared
+
+Owner confirmed Draft appointments work. Next requirement implemented on the draft branch, not yet activated:
+- Migration 0009 adds payment_locations ownership-scoped composite foreign keys, backfills existing payment/appointment links including archived history. Existing financial rows remain unchanged.
+- One payment/total for selected locations; POST supports location_ids as an alternative to existing appointment/job references. Legacy API compatibility retained.
+- Staff can edit selected locations; archived linked locations stay visible and may be retained. No new link to another client's or archived location is permitted.
+- API enriches one paginated payment row with all locations; existing cards and Excel show the combined labels without duplicating amounts.
+- Staff UI checkboxes with select/deselect all, required nonempty selection for new payments. Legacy payments with no location can still be edited without assigning one. Maximum 100 selected locations per payment, parameter chunking for D1 limits.
+- Atomic payment/job/link/audit changes and rollback tested. 70 backend, 12 frontend and 5 backup tests passed; Worker dry-run passed.
+- Manual payment-location migration and Worker workflows pinned to the reviewed commit use existing temporary CONTRACT tokens; permanent PORTAL_WORKER_AUTH_SECRET is preserved.
+- Backup workflow updated to verify schema 0008 with pending 0009 before export. Need NEW encrypted backup downloaded/offline key saved before apply; previous Draft backup was schema 0007.
+Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP saved, migration apply, Worker inspect/deploy, then publish reviewed frontend files and verify phone behavior. No remote database writes or Worker deployment were performed for this feature during preparation.

@@ -210,7 +210,19 @@ export async function handleApi(request, { db, auth }) {
       sql += ` ORDER BY ${prefix}${order[name]}, ${prefix}id DESC LIMIT ? OFFSET ?`;
     }
     const result = await db.prepare(sql).bind(...params, LIMIT + 1, offset).all();
-    return json({ rows: result.results.slice(0, LIMIT), nextOffset: result.results.length > LIMIT ? offset + LIMIT : null });
+    const rows = result.results.slice(0, LIMIT);
+    if (name === 'payments' && rows.length) {
+      // One scoped enrichment query; a payment remains one pagination/export row.
+      const links = await db.prepare(`SELECT pl.payment_id, pl.client_id, l.id, l.label FROM payment_locations pl JOIN locations l ON l.id = pl.location_id AND l.client_id = pl.client_id WHERE pl.payment_id IN (${rows.map(() => '?').join(',')}) ORDER BY l.label, l.id`)
+        .bind(...rows.map(row => row.id)).all();
+      for (const row of rows) {
+        const locations = links.results.filter(link => link.payment_id === row.id && link.client_id === row.client_id);
+        row.location_ids = locations.map(location => location.id);
+        row.location_details = locations.map(({ id, label }) => ({ id, label }));
+        row.location_name = locations.map(location => location.label).join(' · ') || row.location_name;
+      }
+    }
+    return json({ rows, nextOffset: result.results.length > LIMIT ? offset + LIMIT : null });
   }
 
   if (request.method === 'POST') {

@@ -7,7 +7,7 @@ import { assertChoice as deployChoice } from '../scripts/deploy-draft-worker-pho
 const uuid = '6816004b-dc95-48c9-be52-9bd4131d157e';
 const dir = new URL('../../docs/portal-v2/', import.meta.url);
 test('draft migration and deployment require exact confirmations and pinned SQL', () => {
- assertFiles(); assertChoice('inspect', '', '');
+ assert.throws(() => assertFiles(), /Unexpected migration files/); assertChoice('inspect', '', '');
  assert.throws(() => assertChoice('apply', `APPLY PORTAL DRAFT ${uuid}`, ''), /recovery/);
  assertChoice('apply', `APPLY PORTAL DRAFT ${uuid}`, `TIME TRAVEL VERIFIED ${uuid}`);
  assert.throws(() => deployChoice('deploy', ''), /exact confirmation/);

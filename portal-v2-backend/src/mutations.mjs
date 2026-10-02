@@ -1,5 +1,6 @@
 // Staff-only changes. SQL identifiers come exclusively from literal maps below.
 // The client_id of an existing record is immutable; links stay in that scope.
+import { validateLocations, locationInserts, jobLocations } from './payment-locations.mjs';
 import { invoiceUrl } from './writes.mjs';
 const definitions = Object.freeze({
   clients: ['kind', 'display_name', 'email', 'phone', 'company_name', 'cui', 'status', 'internal_note',
@@ -8,7 +9,7 @@ const definitions = Object.freeze({
   locations: ['label', 'address', 'city', 'county', 'contact_name', 'contact_phone', 'contact_email'],
   appointments: ['location_id', 'starts_at', 'ends_at', 'status', 'client_note', 'estimated_cost_bani'],
   jobs: ['appointment_id', 'service_name', 'description', 'status', 'price_bani'],
-  payments: ['job_id', 'amount_bani', 'status', 'recorded_at', 'note', 'invoice_url'],
+  payments: ['location_ids', 'job_id', 'amount_bani', 'status', 'recorded_at', 'note', 'invoice_url'],
   messages: ['body'],
 });
 const dependencies = Object.freeze({
@@ -71,7 +72,13 @@ export async function changeStaffRecord(db, name, id, data, actor) {
   if (!data || typeof data !== 'object' || Array.isArray(data) || !Object.keys(data).length ||
     !Object.keys(data).every(key => definitions[name].includes(key))) return fail(400, 'invalid_fields');
   const values = {};
+  let locations;
+  if (name === 'payments' && Object.hasOwn(data, 'location_ids')) {
+    if (!await validateLocations(db, data.location_ids, clientId, id)) return fail(400, 'invalid_payment_locations');
+    locations = data.location_ids;
+  }
   for (const [key, value] of Object.entries(data)) {
+    if (key === 'location_ids') continue;
     if (key === 'kind') values[key] = enumValue(value, ['PF', 'PJ']);
     else if (key === 'billing_type') values[key] = value === null || value === '' ? null :
       enumValue(value, ['hourly', 'fixed']);
@@ -113,12 +120,18 @@ export async function changeStaffRecord(db, name, id, data, actor) {
     if (Object.hasOwn(values, key) && (values[key] === null ? name !== 'jobs' :
       !await exists(db, table, values[key], clientId))) return fail(400, 'reference_client_mismatch');
   }
+  if (name === 'payments' && Object.hasOwn(values, 'job_id') && locations === undefined)
+    locations = await jobLocations(db, values.job_id, clientId);
   const columns = Object.keys(values);
   const updated = name === 'payments' || name === 'messages' ? '' : ', updated_at = ?';
   const sql = `UPDATE ${name} SET ${columns.map(col => `${col} = ?`).join(', ')}${updated} WHERE id = ? AND deleted_at IS NULL`;
   const args = [...columns.map(col => values[col]), ...(updated ? [now] : []), id];
   await db.batch([
-    db.prepare(sql).bind(...args),
+    ...(columns.length ? [db.prepare(sql).bind(...args)] : []),
+    ...(locations === undefined ? [] : [
+      db.prepare('DELETE FROM payment_locations WHERE payment_id = ? AND client_id = ?').bind(id, clientId),
+      ...locationInserts(db, id, clientId, locations),
+    ]),
     db.prepare('INSERT INTO audit_events (id, actor_user_id, client_id, action, entity_type, entity_id, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .bind(crypto.randomUUID(), actor, clientId, 'update', name, id, now),
   ]);
