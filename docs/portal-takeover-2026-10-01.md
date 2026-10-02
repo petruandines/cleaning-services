@@ -98,3 +98,11 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Main weekly workflow: Sunday 02:00 UTC, also manually dispatchable for proof; reviewed code fixed by SHA, temporary export token and saved key reused. 30-day encrypted artifacts; owner still must download a separate private copy. No email/chat messages sent. Confirm actual schedule execution later; GitHub can delay cron jobs.
 - Preserve PORTAL_BACKUP_D1_EXPORT_TOKEN and PORTAL_BACKUP_KEY_HEX while weekly backups are active; retire migration/Worker temporary tokens after final QA. Preserve PORTAL_WORKER_AUTH_SECRET.
 - Next owner action: manual run of Portal D1 weekly encrypted backup on main; verify schema9 artifact, download/save, then follow docs/portal-v2/final-phone-checks.md with two client accounts. Inventory Appwrite real data before cutover; public /portal/ remains old backend.
+
+
+### Weekly backup first manual proof succeeded
+- Run https://github.com/petruandines/cleaning-services/actions/runs/36984798940, job 110767255974: success. Backend 71/71 and backup 7/7 tests passed; real schema0009 export/encryption, authentication, isolated local restore and result summary completed. Source database unmodified.
+- Encrypted file SHA256 0d1985f97286c1b47b359f5d4b023e7db5f667854107bf0da886ce8397e47284.
+- Artifact portal-d1-encrypted-36984798940, ID11216619721, 52851 bytes, expiry 2026-11-01T09:35:17Z; owner download/private copy pending.
+- Scheduled Sunday02:00UTC is configured; manual run demonstrates same pipeline, not actual cron execution. Confirm first scheduled run after 2026-10-04. Keep export token/key while active; no migration/Worker temporary cleanup yet confirmed.
+- Next: owner ZIP saved confirmation, then first-client phone check. Inventory actual Appwrite data and second-client isolation before controlled cutover.
