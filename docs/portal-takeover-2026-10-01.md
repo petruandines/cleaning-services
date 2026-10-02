@@ -33,3 +33,10 @@ Owner confirmed Draft appointments work. Next requirement implemented on the dra
 - Manual payment-location migration and Worker workflows pinned to the reviewed commit use existing temporary CONTRACT tokens; permanent PORTAL_WORKER_AUTH_SECRET is preserved.
 - Backup workflow updated to verify schema 0008 with pending 0009 before export. Need NEW encrypted backup downloaded/offline key saved before apply; previous Draft backup was schema 0007.
 Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP saved, migration apply, Worker inspect/deploy, then publish reviewed frontend files and verify phone behavior. No remote database writes or Worker deployment were performed for this feature during preparation.
+
+
+### Payment-location migration inspection — verified
+- Run https://github.com/petruandines/cleaning-services/actions/runs/36981035219, job 110755368686: success; checked reviewed commit 064bd76ac79bb1e3beae8702795a6c9190829cd3.
+- 70/70 backend tests passed. OPERATION=inspect; both confirmation fields empty. Exact EU D1 is at schema 0008; nine SQL files pinned with 0009 pending. No migration or database write performed.
+- Time Travel bookmark: 00000053-00000000-000050f8-219d2c6643ae90eece5ece364f6cb099.
+- Next owner action: NEW schema-0008 encrypted backup export through the refreshed main backup workflow; same saved key and existing temporary export token. Verify download/offline storage before apply 0009.
