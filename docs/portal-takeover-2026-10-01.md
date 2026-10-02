@@ -80,3 +80,11 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Run https://github.com/petruandines/cleaning-services/actions/runs/36983161938, job 110762090535: success. Backend 70/70 and Worker dry-run passed; schema 0009, all nine migration hashes and existing Worker target verified.
 - OPERATION=inspect, confirmation empty. No Worker deployment occurred.
 - Next owner action: NEW run in portal-worker-payment-locations-update.yml, main, deploy; confirmation UPDATE PORTAL PAYMENT LOCATIONS 6816004b-dc95-48c9-be52-9bd4131d157e. Review success and anonymous API/auth checks before publishing frontend app.js/portal.css from reviewed feature code.
+
+
+### Multi-location payments activated in preview
+- Worker deploy run https://github.com/petruandines/cleaning-services/actions/runs/36983375829, job 110762783953: success. OPERATION=deploy with exact confirmation; schema 0009 and nine pinned files checked, 70/70 backend tests passed, login visible and anonymous API denied.
+- Main preview publication commit 8a268f91a37cbcb452bdc08fb0b64686e43303a0: app.js and portal.css from reviewed feature commit 064bd76; index.html asset cache version changed to 20261002-payment-locations.
+- Pages run 36983581313, job 110763431212: deployment success. All 12 frontend tests passed; publicly served app.js and portal.css byte-match tested files.
+- Await owner phone check: admin selects client, Payments allows one/several/all locations, single total; edits and Excel retain one row/payment. Old public Appwrite /portal/ remains unchanged.
+- Next after owner check: update backup schema guard and recovery table counts for schema 0009, then remaining QA/cutover plan and temporary access cleanup. Existing backup workflow deliberately verifies schema 0008 and will refuse schema 0009 until updated.
