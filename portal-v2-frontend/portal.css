@@ -75,3 +75,19 @@
 #payment-locations button { margin: 0 8px 12px 0; }
 #payment-locations .payment-location-option { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
 #payment-locations input[type=checkbox] { width: 20px; height: 20px; flex: 0 0 auto; }
+
+
+/* Admin sections have independent lists, exports and forms. */
+#staff-tools{position:sticky;top:8px;z-index:3;box-shadow:0 4px 20px #18392212;grid-template-columns:auto minmax(120px,1fr) auto minmax(180px,1.5fr);padding:14px 18px}
+nav.admin-navigation{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;overflow:visible;margin-right:0;padding-right:0}
+.admin-navigation details{flex:1 1 170px;min-width:0;border:1px solid var(--line);border-radius:12px;background:#fff}
+.admin-navigation summary{padding:12px 16px;font-weight:700;cursor:pointer;color:var(--ink)}
+.admin-navigation .menu-active{border-color:#9bcda5}
+.admin-navigation .menu-active summary{color:#116b22;background:#effaf1;border-radius:12px}
+.admin-submenu{display:grid;padding:6px;gap:4px}
+.admin-submenu button{text-align:left;white-space:normal;width:100%;min-height:44px}
+.admin-navigation>button{min-height:46px;border:1px solid var(--line);background:#fff}
+.admin-navigation summary:focus-visible,.admin-navigation button:focus-visible{outline:3px solid #16842a;outline-offset:2px}
+@media(max-width:720px){#staff-tools{grid-template-columns:1fr;padding:12px;gap:5px;top:0}#staff-tools{grid-template-columns:95px minmax(0,1fr)}#staff-tools label{font-size:12px}.admin-navigation details{flex-basis:100%}.admin-navigation>button{flex:1 1 40%;text-align:left}.admin-submenu button{padding:12px}}
+
+.menu-jump{grid-column:1/-1;font-size:13px;font-weight:700}#tabs{scroll-margin-top:170px}.section-heading,#section-title{scroll-margin-top:170px}
