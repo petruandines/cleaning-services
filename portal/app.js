@@ -66,6 +66,15 @@ import { visibleContractDetails } from './contract-view.mjs';
   let token = null;
   let user = null;
   let section = 'appointments';
+  let view = 'list';
+  let viewSequence = 0;
+  const adminMenus = {
+    appointments: [['list', 'Vezi programări'], ['export', 'Descarcă .ics'], ['create', 'Adaugă programare']],
+    payments: [['list', 'Vezi plăți'], ['export', 'Descarcă Excel'], ['create', 'Adaugă plată']],
+    clients: [['list', 'Vezi clienți'], ['contract', 'Informații contractuale'], ['create', 'Adaugă client'], ['access', 'Acces client selectat']],
+  };
+  const separateView = () => user?.role === 'staff' && !!adminMenus[section];
+  const listVisible = () => !separateView() || view === 'list';
   let loginWindow = null;
   let loginState = null;
   let accountWindow = null;
@@ -92,6 +101,7 @@ import { visibleContractDetails } from './contract-view.mjs';
   }
   function clearSession() {
     generation++;
+    viewSequence++;
     overviewSequence++;
     clearInterval(overviewTimer);
     overviewTimer = null;
@@ -316,7 +326,7 @@ import { visibleContractDetails } from './contract-view.mjs';
         currentClientLabel = row.display_name;
         try {
           await refreshClientChoices();
-          await refreshContractPanel();
+          selectSection('clients', 'contract');
           $('contract-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (error) { notice(error.message); }
       });
@@ -333,11 +343,23 @@ import { visibleContractDetails } from './contract-view.mjs';
   async function beginEdit(row) {
     const editingSection = section;
     const editingGeneration = generation;
-    if (section !== 'clients' && currentClientId !== row.client_id) {
-      currentClientId = row.client_id;
-      currentClientLabel = row.client_name || 'Client selectat';
+    const editClientId = section === 'clients' ? row.id : row.client_id;
+    if (currentClientId !== editClientId) {
+      currentClientId = editClientId;
+      currentClientLabel = row.display_name || row.client_name || 'Client selectat';
       await refreshClientChoices();
       if (editingGeneration !== generation || section !== editingSection) return;
+    }
+    if (adminMenus[section]) {
+      view = 'create';
+      viewSequence++;
+      updateNavigation();
+      $('content').hidden = true;
+      $('pager').hidden = true;
+      $('calendar-export').hidden = true;
+      $('payments-export').hidden = true;
+      $('section-title').textContent = 'Editează · ' + singular[section];
+      $('refresh').hidden = true;
     }
     editingId = row.id;
     formKey = '';
@@ -426,9 +448,9 @@ import { visibleContractDetails } from './contract-view.mjs';
   }
   async function renderStaffForm() {
     const form = $('staff-form');
-    form.hidden = user?.role !== 'staff';
+    form.hidden = user?.role !== 'staff' || (separateView() && view !== 'create');
     if (form.hidden) return;
-    const key = section + ':' + currentClientId + ':' + generation + ':' + editingId;
+    const key = section + ':' + view + ':' + currentClientId + ':' + generation + ':' + editingId;
     if (formKey === key) return;
     formKey = key;
     const sectionAtStart = section;
@@ -517,15 +539,18 @@ import { visibleContractDetails } from './contract-view.mjs';
       picker.append(option);
     }
     picker.value = currentClientId;
-    if (section === 'clients') { offset = 0; loadSection(); }
+    if (section === 'clients' && view === 'list') { offset = 0; loadSection(); }
   }
   async function refreshAccounts() {
     const client = currentClientId;
-    $('account-panel').hidden = user?.role !== 'staff' || !client;
+    $('account-panel').hidden = user?.role !== 'staff' || section !== 'clients' || view !== 'access';
+    $('open-account').disabled = !client;
     if ($('account-panel').hidden) { $('account-list').replaceChildren(); return; }
+    if (!client) { $('account-list').textContent = 'Alege mai întâi un client din selectorul de mai sus.'; return; }
     const requestGeneration = generation;
+    const requestView = viewSequence;
     const result = await api('/api/users?client_id=' + encodeURIComponent(client));
-    if (requestGeneration !== generation || currentClientId !== client) return;
+    if (requestGeneration !== generation || currentClientId !== client || requestView !== viewSequence) return;
     const list = $('account-list');
     list.replaceChildren();
     if (!result.rows.length) { list.textContent = 'Nu există încă utilizatori pentru acest client.'; return; }
@@ -545,10 +570,10 @@ import { visibleContractDetails } from './contract-view.mjs';
     const client = currentClientId;
     const session = generation;
     const panel = $('contract-panel');
-    panel.hidden = user?.role !== 'staff' || section !== 'clients' || !client;
+    panel.hidden = user?.role !== 'staff' || section !== 'clients' || view !== 'contract' || !client;
     if (panel.hidden) return;
     const response = await api('/api/contracts?client_id=' + encodeURIComponent(client));
-    if (session !== generation || currentClientId !== client || section !== 'clients') return;
+    if (session !== generation || currentClientId !== client || section !== 'clients' || view !== 'contract') return;
     const row = response.rows[0] || {};
     const form = $('contract-form');
     for (const key of ['billing_type', 'manager_name', 'manager_email', 'manager_phone',
@@ -589,7 +614,7 @@ import { visibleContractDetails } from './contract-view.mjs';
   }
   async function refreshCalendarLocations() {
     const panel = $('calendar-export');
-    panel.hidden = section !== 'appointments';
+    panel.hidden = section !== 'appointments' || (user?.role === 'staff' && view !== 'export');
     if (panel.hidden) { calendarLoadId++; calendarLocationKey = ''; return; }
     if (user?.role === 'staff' && !currentClientId) {
       calendarLoadId++;
@@ -626,19 +651,38 @@ import { visibleContractDetails } from './contract-view.mjs';
   }
   async function loadSection() {
     const current = section;
+    const requestView = viewSequence;
     const requestGeneration = generation;
     const selectedClient = currentClientId;
     const requestedSearch = current === 'messages' ? $('message-search').value.trim() : '';
-    $('section-title').textContent = sections[section];
+    $('section-title').textContent = separateView() ?
+      (editingId ? 'Editează · ' + singular[section] : adminMenus[section].find(item => item[0] === view)[1]) : sections[section];
+    $('content').hidden = !listVisible();
+    $('pager').hidden = true;
+    $('account-panel').hidden = true;
+    $('staff-form').hidden = true;
+    $('refresh').hidden = separateView() && view === 'create';
     $('message-form').hidden = section !== 'messages' || user?.role !== 'client';
     $('message-search-box').hidden = section !== 'messages' || (user?.role === 'staff' && !selectedClient);
     refreshCalendarLocations();
     refreshContractPanel().catch(error => notice(error.message));
-    $('payments-export').hidden = current !== 'payments';
+    $('payments-export').hidden = current !== 'payments' || (user?.role === 'staff' && view !== 'export');
     $('payments-download').disabled = user?.role === 'staff' && !selectedClient;
     $('payments-hint').textContent = user?.role === 'staff' && !selectedClient ?
       'Alege mai întâi un client pentru export.' :
       'Perioada folosește data plății sau, pentru cele în așteptare, data creării.';
+    if (separateView() && view !== 'list') {
+      $('content').replaceChildren();
+      if (view === 'create') await renderStaffForm();
+      if (view === 'access') {
+        try { await refreshAccounts(); } catch (error) { if (requestView === viewSequence) notice(error.message); }
+      }
+      if (view === 'contract' && !selectedClient) {
+        $('content').hidden = false;
+        $('content').textContent = 'Alege mai întâi un client din selectorul de mai sus.';
+      }
+      return;
+    }
     if (current === 'contracts' && user?.role === 'client') {
       $('pager').hidden = true;
       $('content').textContent = 'Se încarcă…';
@@ -655,7 +699,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     $('content').textContent = 'Se încarcă…';
     try {
       const data = await api(pageUrl());
-      if (requestGeneration === generation && section === current && currentClientId === selectedClient &&
+      if (requestGeneration === generation && requestView === viewSequence && section === current && currentClientId === selectedClient &&
           (current !== 'messages' || requestedSearch === $('message-search').value.trim())) {
         render(data.rows);
         nextOffset = data.nextOffset;
@@ -664,7 +708,7 @@ import { visibleContractDetails } from './contract-view.mjs';
         $('next').disabled = nextOffset === null;
         $('page-label').textContent = 'Pagina ' + (Math.floor(offset / 30) + 1);
         await renderStaffForm();
-        if (requestGeneration !== generation || section !== current || currentClientId !== selectedClient) return;
+        if (requestGeneration !== generation || requestView !== viewSequence || section !== current || currentClientId !== selectedClient) return;
         if (current === 'messages' && !document.hidden) {
           const ids = data.rows.filter(row => row.read_at === null && row.sender_user_id !== user.id)
             .map(row => row.id);
@@ -677,19 +721,29 @@ import { visibleContractDetails } from './contract-view.mjs';
         }
       }
     } catch (error) {
-      if (requestGeneration !== generation || section !== current || currentClientId !== selectedClient) return;
+      if (requestGeneration !== generation || requestView !== viewSequence || section !== current || currentClientId !== selectedClient) return;
       $('content').textContent = '';
       notice(error.message);
     }
   }
-  function selectSection(next) {
-    if (next !== section) { editingId = ''; formKey = ''; }
-    section = next;
-    offset = 0;
+  function updateNavigation() {
     for (const button of $('tabs').querySelectorAll('button')) {
-      if (button.dataset.section === next) button.setAttribute('aria-current', 'page');
+      const active = button.dataset.section === section && (button.dataset.view || 'list') === view;
+      if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     }
+    for (const group of $('tabs').querySelectorAll('details')) {
+      group.classList.toggle('menu-active', group.dataset.section === section);
+      group.open = group.dataset.section === section;
+    }
+  }
+  function selectSection(next, nextView = 'list') {
+    if (next !== section || nextView !== view) { editingId = ''; formKey = ''; }
+    section = next;
+    view = nextView;
+    viewSequence++;
+    offset = 0;
+    updateNavigation();
     loadSection();
   }
   function showWorkspace() {
@@ -700,14 +754,34 @@ import { visibleContractDetails } from './contract-view.mjs';
     $('staff-tools').hidden = user.role !== 'staff';
     if (user.role === 'staff') refreshClientChoices().catch(error => notice(error.message));
     $('tabs').replaceChildren();
+    $('tabs').classList.toggle('admin-navigation', user.role === 'staff');
     for (const [key, label] of Object.entries(sections)) {
       if (key === 'jobs' || key === 'contracts' || (key === 'clients' && user.role !== 'staff')) continue;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.dataset.section = key;
-      button.textContent = label;
-      button.addEventListener('click', () => selectSection(key));
-      $('tabs').append(button);
+      let parent = $('tabs');
+      const options = user.role === 'staff' ? adminMenus[key] : null;
+      if (options) {
+        const group = document.createElement('details');
+        group.dataset.section = key;
+        const summary = document.createElement('summary');
+        summary.textContent = label;
+        const submenu = document.createElement('div');
+        submenu.className = 'admin-submenu';
+        group.append(summary, submenu);
+        parent.append(group);
+        parent = submenu;
+      }
+      for (const [action, text] of options || [['list', label]]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.section = key;
+        button.dataset.view = action;
+        button.textContent = text;
+        button.addEventListener('click', () => {
+          selectSection(key, action);
+          if (user.role === 'staff') $('section-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        parent.append(button);
+      }
     }
     selectSection('appointments');
     refreshClientContractTab().catch(error => notice(error.message));
@@ -859,13 +933,13 @@ import { visibleContractDetails } from './contract-view.mjs';
     currentClientId = event.target.value;
     currentClientLabel = event.target.selectedOptions[0]?.textContent || '';
     offset = 0;
+    viewSequence++;
     loadSection();
-    refreshAccounts().catch(error => notice(error.message));
   });
   $('contract-billing-type').addEventListener('change', () => updateContractRateLabel(true));
   $('contract-form').addEventListener('submit', async event => {
     event.preventDefault();
-    if (user?.role !== 'staff' || section !== 'clients' || !currentClientId) return;
+    if (user?.role !== 'staff' || section !== 'clients' || view !== 'contract' || !currentClientId) return;
     const client = currentClientId;
     const session = generation;
     const button = event.currentTarget.querySelector('button[type="submit"]');
@@ -908,6 +982,9 @@ import { visibleContractDetails } from './contract-view.mjs';
     const form = event.currentTarget;
     const button = form.querySelector('button[type=submit]');
     const sectionAtStart = section;
+    const viewAtStart = viewSequence;
+    const clientAtStart = currentClientId;
+    const sessionAtStart = generation;
     const editAtStart = editingId;
     const data = section === 'clients' ? {} : { client_id: currentClientId };
     button.disabled = true;
@@ -932,6 +1009,7 @@ import { visibleContractDetails } from './contract-view.mjs';
       if (editAtStart) delete data.client_id;
       const result = await api('/api/' + sectionAtStart + (editAtStart ? '/' + encodeURIComponent(editAtStart) : ''),
         { method: editAtStart ? 'PATCH' : 'POST', body: JSON.stringify(data) });
+      if (sessionAtStart !== generation || viewAtStart !== viewSequence || clientAtStart !== currentClientId) return;
       notice(editAtStart ? 'Modificările au fost salvate.' : 'Înregistrarea a fost adăugată.');
       if (sectionAtStart === 'clients' && !editAtStart) {
         currentClientId = result.id;
@@ -947,14 +1025,16 @@ import { visibleContractDetails } from './contract-view.mjs';
       editingId = '';
       formKey = '';
       if (sectionAtStart === 'locations') calendarLocationKey = '';
-      await loadSection();
+      if (section === sectionAtStart && adminMenus[section]) selectSection(section, 'list');
+      else await loadSection();
     } catch (error) { notice(error.message); }
     finally { button.disabled = false; }
   });
   function cancelEdit() {
     editingId = '';
     formKey = '';
-    renderStaffForm();
+    if (adminMenus[section]) selectSection(section, 'list');
+    else renderStaffForm();
   }
   $('cancel-edit').addEventListener('click', cancelEdit);
   $('logout').addEventListener('click', async () => {
@@ -1007,3 +1087,4 @@ import { visibleContractDetails } from './contract-view.mjs';
     }).finally(() => { $('login').disabled = false; });
   }
 })();
+
