@@ -143,3 +143,10 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Owner confirmed completion of instructed cleanup and archive saving: revoke portal-contract-worker-temporary, portal-contract-migrate-temporary, Portal contract inspect, and replaced Token2; delete PORTAL_D1_CONTRACT_TOKEN, PORTAL_WORKER_CONTRACT_TOKEN, and leftover PORTAL_BACKUP_D1_READ_TOKEN if present. This is owner-reported, not independently enumerated.
 - Preserve portal-backup-weekly Cloudflare token and GitHub PORTAL_BACKUP_D1_EXPORT_TOKEN, PORTAL_BACKUP_KEY_HEX, PORTAL_WORKER_AUTH_SECRET; offline archive and key kept separately.
 - Public portal functional and owner-tested. First actual scheduled weekly run remains unobserved; due Sunday 2026-10-04 02:00 UTC (04:00 Europe/Madrid and 05:00 Europe/Bucharest). No automatic monitoring claimed.
+
+## 2026-10-02 — admin submenu preview
+
+- Owner requested grouped admin menus: appointments list / ICS / add; payments list / Excel / add; messages; locations; clients list / contracts / add / selected-client access.
+- Implemented independent list/export/create/contract/access views with accessible native details/summary groups, exact active submenu, sticky selected-client controls and menu jump link for long histories. Existing edit controls open the appropriate form; cancel and successful save return to list. Client UI keeps existing simple tabs and exports. Location and message controls remain available.
+- Frontend only: no Worker or D1 changes or new Cloudflare tokens. Preview deployment modifies portal-v2-frontend only; canonical portal unchanged pending owner review.
+- Validation: node syntax check and all 16 frontend tests pass (including 4 admin navigation integration tests, payment location submission, old exports and client UI). Guarded stale list responses and mutation completion after navigation/client switch. Browser visual check unavailable locally because Chromium download failed; owner mobile preview check remains required.

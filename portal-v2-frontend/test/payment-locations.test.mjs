@@ -22,7 +22,7 @@ test('staff selects one, several or all locations and submits a single total',as
  try{
   w.eval(code);await tick();await tick();
   const picker=w.document.getElementById('client-picker');picker.value='c';picker.dispatchEvent(new w.Event('change'));await tick();await tick();
-  w.document.querySelector('[data-section=payments]').click();await tick();await tick();
+  w.document.querySelector('[data-section=payments][data-view=create]').click();await tick();await tick();
   const box=w.document.getElementById('payment-locations');assert.ok(box);
   const inputs=[...box.querySelectorAll('input')];assert.equal(inputs.length,2);
   box.querySelector('button').click();assert.ok(inputs.every(input=>input.checked));
