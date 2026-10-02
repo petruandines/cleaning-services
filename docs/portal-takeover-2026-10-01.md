@@ -54,3 +54,11 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Recovery now prepares a private SQL copy with all CREATE TABLE declarations before original data/index statements. Original encrypted archive is unchanged. SQL statement parsing respects quoted semicolons; D1 deferred FK behavior and final integrity/foreign-key checks retained.
 - All 7 backup tests passed, including real local Wrangler export/restore for populated schema 0008 and matching financial records. Existing backend 71 tests passed before this Python-only fix.
 - Next: owner starts NEW export in refreshed main backup workflow; no key/token changes. Review result and download ZIP before apply 0009. Remote recovery workflows must use the same table-order preparation when upgraded beyond schema 0006.
+
+
+### Schema-0008 backup successful — owner download pending
+- Run https://github.com/petruandines/cleaning-services/actions/runs/36982567244, job 110760173955: success. Backend 71/71 and backup 7/7 tests passed; all three real backup stages succeeded including isolated local D1 restore.
+- Exact EU source confirmed schema 0008; migration 0009 not applied and source unmodified.
+- Encrypted file SHA-256: 90ba1e984aab6dd17383f72ee6edde1cee13b4412dbfbdf95734e5fa1b8f7dbe.
+- Artifact portal-d1-encrypted-36982567244, ID 11215901909, size 51406 bytes; expires 2026-10-03 08:11:24Z (10:11 Europe/Madrid).
+- Next: owner downloads ZIP and stores privately outside GitHub/Cloudflare, offline key separate; await ZIP saved confirmation before apply 0009. Workflow remains pinned to reviewed code 064bd76ac79bb1e3beae8702795a6c9190829cd3 for migration/Worker, and 6f9dd9eea4a82afa651a2c76cc73dbadb7d13ee0 for backup.
