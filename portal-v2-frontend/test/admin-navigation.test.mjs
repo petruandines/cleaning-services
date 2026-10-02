@@ -53,6 +53,15 @@ test('edit from list opens its form and cancel returns to list',async()=>{
   a.d.getElementById('cancel-edit').click();await tick();await tick();assert.equal(a.d.getElementById('content').hidden,false);assert.equal(a.d.getElementById('staff-form').hidden,true);
  }finally{a.close();}
 });
+test('editing a client synchronizes the selected client context',async()=>{
+ const a=await setup();try{
+  await a.click('clients');
+  [...a.d.querySelectorAll('#content button')].find(b=>b.textContent==='Editează').click();await tick();await tick();
+  assert.equal(a.d.getElementById('client-picker').value,'c');
+  assert.equal(a.d.getElementById('staff-form').elements.namedItem('display_name').value,'Client');
+  assert.equal(a.d.getElementById('staff-form').hidden,false);
+ }finally{a.close();}
+});
 test('late list request cannot expose pager in create view',async()=>{
  const a=await setup();try{
   await a.client();let release;a.setDelay(new Promise(r=>release=r));

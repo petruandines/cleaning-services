@@ -144,9 +144,10 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Preserve portal-backup-weekly Cloudflare token and GitHub PORTAL_BACKUP_D1_EXPORT_TOKEN, PORTAL_BACKUP_KEY_HEX, PORTAL_WORKER_AUTH_SECRET; offline archive and key kept separately.
 - Public portal functional and owner-tested. First actual scheduled weekly run remains unobserved; due Sunday 2026-10-04 02:00 UTC (04:00 Europe/Madrid and 05:00 Europe/Bucharest). No automatic monitoring claimed.
 
-## 2026-10-02 — admin submenu preview
+## 2026-10-02 — admin menu preview completed
 
-- Owner requested grouped admin menus: appointments list / ICS / add; payments list / Excel / add; messages; locations; clients list / contracts / add / selected-client access.
-- Implemented independent list/export/create/contract/access views with accessible native details/summary groups, exact active submenu, sticky selected-client controls and menu jump link for long histories. Existing edit controls open the appropriate form; cancel and successful save return to list. Client UI keeps existing simple tabs and exports. Location and message controls remain available.
-- Frontend only: no Worker or D1 changes or new Cloudflare tokens. Preview deployment modifies portal-v2-frontend only; canonical portal unchanged pending owner review.
-- Validation: node syntax check and all 16 frontend tests pass (including 4 admin navigation integration tests, payment location submission, old exports and client UI). Guarded stale list responses and mutation completion after navigation/client switch. Browser visual check unavailable locally because Chromium download failed; owner mobile preview check remains required.
+- Implemented owner-requested admin groups with dedicated lists, ICS/XLSX export, add forms, contracts and selected-client access. Sticky selected-client controls include a menu jump link for long histories. Native details/summary supports expandable mobile groups and active submenu. Client UI remains unchanged.
+- Edit opens a dedicated form and synchronizes selected-client context; cancel/save return to list. Guards reject stale list responses and mutation completions after client/navigation changes.
+- All 17 frontend tests passed, including five navigation integration tests and existing export/payment/location/session tests; syntax valid. Browser visual verification unavailable locally (Chromium download failed); owner phone review pending.
+- Preview publication main commit f9d4b36c2de47ab2bee7e34f7860a744d8fc8984. First Pages deployment 37065143093 passed; final correction deployment pending verification. Canonical /portal/ deliberately unchanged until owner accepts preview.
+- No backend, database, token or backup changes required.
