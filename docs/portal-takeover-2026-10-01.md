@@ -67,3 +67,10 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 ### Owner confirmed ZIP saved
 - 2026-10-02: owner explicitly confirmed ZIP saved for successful backup run 36982567244 following download/private-copy and separate-key instructions.
 - Proceed with manual migration 0009 apply using pinned workflow portal-d1-payment-locations-upgrade.yml; exact APPLY PORTAL PAYMENT LOCATIONS UUID and TIME TRAVEL VERIFIED UUID confirmations. Verify resulting run before Worker update; do not publish frontend ahead of backend.
+
+
+### Migration 0009 applied successfully
+- Run https://github.com/petruandines/cleaning-services/actions/runs/36982933465, job 110761360162: success. Backend 70/70 passed at reviewed 064bd76 code; OPERATION=apply and exact confirmation/recovery strings verified.
+- Pre-migration recovery bookmark: 00000057-00000000-000050f8-b777e70bd330bdf6911f8d39a34893b6.
+- Script finished schema-0009 verification, backfill completeness, foreign-key checks and unchanged appointment/job/payment counts and payment total.
+- Worker and frontend have NOT been updated for payment-location selection yet. Next owner action: Portal Worker payment locations update workflow, main, inspect, empty confirmation. Review before deploy, then publish reviewed frontend.
