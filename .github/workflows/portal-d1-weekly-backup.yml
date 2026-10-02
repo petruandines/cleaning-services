@@ -1,20 +1,9 @@
-name: Portal D1 encrypted export and local recovery test (manual)
+name: Portal D1 weekly encrypted backup
 
 on:
+  schedule:
+    - cron: '0 2 * * 0'
   workflow_dispatch:
-    inputs:
-      operation:
-        description: Inspect first; export only after separately saving the key
-        required: true
-        type: choice
-        options:
-          - inspect
-          - export
-        default: inspect
-      confirmation:
-        description: For export, type EXPORT PORTAL BACKUP followed by D1 UUID
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -25,7 +14,7 @@ concurrency:
 
 jobs:
   backup:
-    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -54,30 +43,36 @@ jobs:
         run: |
           npm test
           python -m unittest discover -s test -p backup_test.py
-      - name: Inspect EU D1 with read-only token
-        if: inputs.operation == 'inspect'
-        working-directory: portal-v2-backend
-        env:
-          CI: 'true'
-          CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
-          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_BACKUP_D1_READ_TOKEN }}
-          CONFIRMATION: ${{ inputs.confirmation }}
-        run: node scripts/backup-remote-phone.mjs inspect "$CONFIRMATION"
       - name: Export encrypted D1 archive and test recovery locally
-        if: inputs.operation == 'export'
         working-directory: portal-v2-backend
         env:
           CI: 'true'
           CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
           CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_BACKUP_D1_EXPORT_TOKEN }}
           PORTAL_BACKUP_KEY_HEX: ${{ secrets.PORTAL_BACKUP_KEY_HEX }}
-          CONFIRMATION: ${{ inputs.confirmation }}
+          CONFIRMATION: EXPORT PORTAL BACKUP 6816004b-dc95-48c9-be52-9bd4131d157e
         run: node scripts/backup-remote-phone.mjs export "$CONFIRMATION"
-      - name: Upload only the encrypted result (download and store elsewhere within one day)
-        if: success() && inputs.operation == 'export'
+      - name: Keep only the verified encrypted archive for 30 days
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: portal-d1-encrypted-${{ github.run_id }}
           path: ${{ runner.temp }}/portal-d1-backup.pi-d1
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
+
+      - name: Write backup result summary
+        if: always()
+        env:
+          BACKUP_JOB_STATUS: ${{ job.status }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from datetime import datetime, timezone
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as report:
+              report.write('## Weekly encrypted D1 backup\n')
+              report.write('Result: ' + os.environ['BACKUP_JOB_STATUS'] + '\n\n')
+              report.write('UTC: ' + datetime.now(timezone.utc).isoformat() + '\n\n')
+              report.write('A successful run includes encrypted export, authentication, isolated local recovery, row counts and foreign-key checks.\n\n')
+              report.write('Download the artifact and keep a private copy outside GitHub/Cloudflare; keep the key separately. Artifacts are retained for 30 days.\n')
+          PY
