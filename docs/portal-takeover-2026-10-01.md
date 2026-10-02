@@ -134,3 +134,12 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Remaining owner cleanup: revoke only Cloudflare migration/inspect/Worker deployment tokens associated with PORTAL_D1_CONTRACT_TOKEN and PORTAL_WORKER_CONTRACT_TOKEN, then delete those exact GitHub secrets. PORTAL_BACKUP_D1_READ_TOKEN is not used by the weekly export (optional later cleanup when identity clear).
 - Preserve PORTAL_WORKER_AUTH_SECRET, PORTAL_BACKUP_D1_EXPORT_TOKEN and PORTAL_BACKUP_KEY_HEX. Weekly exports depend on export token and key; preserve the corresponding Cloudflare backup export token. Owner must match token names/permissions before revocation; cannot inspect secrets via GitHub connector.
 - Public launch functional; no Appwrite deletion required. Scheduled weekly run still must be verified after Sunday 2026-10-04; manual pipeline proof succeeded.
+
+## 2026-10-02 11:51 UTC — backup credentials and cleanup completed
+
+- Owner created new Cloudflare token portal-backup-weekly with Account D1 Edit limited to their account; instructed to leave TTL empty. Actual final TTL not independently inspected.
+- Owner updated PORTAL_BACKUP_D1_EXPORT_TOKEN and ran weekly workflow manually: https://github.com/petruandines/cleaning-services/actions/runs/37002494535 . Job 110823151459 success; 71 backend tests and 7 backup tests passed. Exact EU database schema 0009 verified; encrypted export authenticated and restored into isolated local D1; no database writes.
+- Artifact portal-d1-encrypted-37002494535, ID 11224595495, 58592 bytes; expires 2026-11-01T11:43:31Z. Encrypted file SHA-256 c27a66ad1151d580890b763627fd500a8f197cd784abe9792e56c02d293f2044.
+- Owner confirmed completion of instructed cleanup and archive saving: revoke portal-contract-worker-temporary, portal-contract-migrate-temporary, Portal contract inspect, and replaced Token2; delete PORTAL_D1_CONTRACT_TOKEN, PORTAL_WORKER_CONTRACT_TOKEN, and leftover PORTAL_BACKUP_D1_READ_TOKEN if present. This is owner-reported, not independently enumerated.
+- Preserve portal-backup-weekly Cloudflare token and GitHub PORTAL_BACKUP_D1_EXPORT_TOKEN, PORTAL_BACKUP_KEY_HEX, PORTAL_WORKER_AUTH_SECRET; offline archive and key kept separately.
+- Public portal functional and owner-tested. First actual scheduled weekly run remains unobserved; due Sunday 2026-10-04 02:00 UTC (04:00 Europe/Madrid and 05:00 Europe/Bucharest). No automatic monitoring claimed.
