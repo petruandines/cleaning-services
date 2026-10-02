@@ -151,3 +151,10 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - All 17 frontend tests passed, including five navigation integration tests and existing export/payment/location/session tests; syntax valid. Browser visual verification unavailable locally (Chromium download failed); owner phone review pending.
 - Preview publication main commit f9d4b36c2de47ab2bee7e34f7860a744d8fc8984. First Pages deployment 37065143093 passed; final correction deployment pending verification. Canonical /portal/ deliberately unchanged until owner accepts preview.
 - No backend, database, token or backup changes required.
+
+## 2026-10-02 21:14 UTC — owner-approved admin menus live
+
+- Owner confirmed preview is OK and explicitly requested canonical portal update.
+- Copied all nine reviewed frontend assets into /portal/ at main commit 75717f2e79564b53d8ca63840e62bdc2fb3f9a93; versioned canonical entry points as portal-v2-20261002-admin-menu and updated scripts/build-portal-v2.mjs to preserve the cache version on future builds.
+- GitHub Pages deployment 37065706852 / job 111032868577 completed successfully. Live HTTP reads verified all nine canonical assets equal approved preview (index query version normalized). Previously passed 17 frontend tests; owner accepted phone preview.
+- Canonical URL: https://petruandines.github.io/cleaning-services/portal/ . No database, Worker or credential modifications.
