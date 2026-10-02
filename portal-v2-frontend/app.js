@@ -343,9 +343,10 @@ import { visibleContractDetails } from './contract-view.mjs';
   async function beginEdit(row) {
     const editingSection = section;
     const editingGeneration = generation;
-    if (section !== 'clients' && currentClientId !== row.client_id) {
-      currentClientId = row.client_id;
-      currentClientLabel = row.client_name || 'Client selectat';
+    const editClientId = section === 'clients' ? row.id : row.client_id;
+    if (currentClientId !== editClientId) {
+      currentClientId = editClientId;
+      currentClientLabel = row.display_name || row.client_name || 'Client selectat';
       await refreshClientChoices();
       if (editingGeneration !== generation || section !== editingSection) return;
     }
@@ -358,6 +359,7 @@ import { visibleContractDetails } from './contract-view.mjs';
       $('calendar-export').hidden = true;
       $('payments-export').hidden = true;
       $('section-title').textContent = 'Editează · ' + singular[section];
+      $('refresh').hidden = true;
     }
     editingId = row.id;
     formKey = '';
