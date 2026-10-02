@@ -74,3 +74,9 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Pre-migration recovery bookmark: 00000057-00000000-000050f8-b777e70bd330bdf6911f8d39a34893b6.
 - Script finished schema-0009 verification, backfill completeness, foreign-key checks and unchanged appointment/job/payment counts and payment total.
 - Worker and frontend have NOT been updated for payment-location selection yet. Next owner action: Portal Worker payment locations update workflow, main, inspect, empty confirmation. Review before deploy, then publish reviewed frontend.
+
+
+### Worker pre-deployment inspection passed
+- Run https://github.com/petruandines/cleaning-services/actions/runs/36983161938, job 110762090535: success. Backend 70/70 and Worker dry-run passed; schema 0009, all nine migration hashes and existing Worker target verified.
+- OPERATION=inspect, confirmation empty. No Worker deployment occurred.
+- Next owner action: NEW run in portal-worker-payment-locations-update.yml, main, deploy; confirmation UPDATE PORTAL PAYMENT LOCATIONS 6816004b-dc95-48c9-be52-9bd4131d157e. Review success and anonymous API/auth checks before publishing frontend app.js/portal.css from reviewed feature code.
