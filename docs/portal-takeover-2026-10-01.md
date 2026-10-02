@@ -127,3 +127,10 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Next: canonical-route login confirmation on phone, then revoke only temporary migration/Worker tokens and delete corresponding GitHub secrets. Keep permanent Worker auth secret and backup export token/key for weekly workflow. Do not delete Appwrite during launch verification. First actual weekly cron run remains to be checked after 2026-10-04.
 
 - Post-cutover HTTP verification: all nine /portal/ assets match prepared files byte-for-byte. Browser-origin probe: /login HTTP200 and anonymous /api/me HTTP401, Access-Control-Allow-Origin https://petruandines.github.io. Canonical phone login confirmation remains next.
+
+
+### Canonical admin login confirmed
+- 2026-10-02 owner logged in as admin at public /portal/ and confirmed it works perfectly.
+- Remaining owner cleanup: revoke only Cloudflare migration/inspect/Worker deployment tokens associated with PORTAL_D1_CONTRACT_TOKEN and PORTAL_WORKER_CONTRACT_TOKEN, then delete those exact GitHub secrets. PORTAL_BACKUP_D1_READ_TOKEN is not used by the weekly export (optional later cleanup when identity clear).
+- Preserve PORTAL_WORKER_AUTH_SECRET, PORTAL_BACKUP_D1_EXPORT_TOKEN and PORTAL_BACKUP_KEY_HEX. Weekly exports depend on export token and key; preserve the corresponding Cloudflare backup export token. Owner must match token names/permissions before revocation; cannot inspect secrets via GitHub connector.
+- Public launch functional; no Appwrite deletion required. Scheduled weekly run still must be verified after Sunday 2026-10-04; manual pipeline proof succeeded.
