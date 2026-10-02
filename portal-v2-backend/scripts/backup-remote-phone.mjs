@@ -69,6 +69,8 @@ export function safeVaultError(error) {
     'Restored database failed SQLite integrity check',
     'Restored database has broken foreign-key references',
     'Restored database is missing portal tables',
+    'Restored database row counts differ from backup',
+    'Backup schema does not match the expected portal tables',
     'Local D1 import failed foreign-key validation', 'Local D1 import failed SQL validation',
     'Local D1 import failed before completion',
     'ValueError', 'InvalidTag', 'FileExistsError', 'PermissionError', 'FileNotFoundError', 'OSError', 'CalledProcessError',
@@ -82,8 +84,8 @@ export function run(operation, confirmation, env = process.env) {
   assertFiles();
   const details = verifyRemoteD1();
   assertTarget(details);
-  assertVersion(remoteState(details), false);
-  process.stdout.write('Verified exact EU D1 target, version 0008, nine pinned migration files (0009 not applied). No database writes.\n');
+  assertVersion(remoteState(details), true);
+  process.stdout.write('Verified exact EU D1 target, version 0009, all nine pinned migration files applied. No database writes.\n');
   if (operation === 'inspect') return;
 
   // The runner's temporary directory and the output are outside the public

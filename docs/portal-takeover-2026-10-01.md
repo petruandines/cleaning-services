@@ -88,3 +88,13 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - Pages run 36983581313, job 110763431212: deployment success. All 12 frontend tests passed; publicly served app.js and portal.css byte-match tested files.
 - Await owner phone check: admin selects client, Payments allows one/several/all locations, single total; edits and Excel retain one row/payment. Old public Appwrite /portal/ remains unchanged.
 - Next after owner check: update backup schema guard and recovery table counts for schema 0009, then remaining QA/cutover plan and temporary access cleanup. Existing backup workflow deliberately verifies schema 0008 and will refuse schema 0009 until updated.
+
+
+### Schema-0009 backup and weekly automation prepared
+- Owner confirmed multi-location payments work on phone and authorized next phase.
+- Backup script now requires schema 0009 (all nine pinned migrations). Encrypted archive recovery includes payment_locations and compares counts for every expected table. Counts can safely inspect legacy 16-table or current 17-table archives; unknown tables rejected.
+- Schema-first recovery now also creates unique indexes before dependent row inserts, required for the composite payment/location foreign keys in migration 0009. Original encrypted SQL/archive remains unchanged.
+- Local fixture exported/restored through real Wrangler at schema 0009, matching payment sums and one migrated payment_locations link; all 7 backup tests and 71 backend tests passed. Workflow YAML/summary/30-day retention validated.
+- Main weekly workflow: Sunday 02:00 UTC, also manually dispatchable for proof; reviewed code fixed by SHA, temporary export token and saved key reused. 30-day encrypted artifacts; owner still must download a separate private copy. No email/chat messages sent. Confirm actual schedule execution later; GitHub can delay cron jobs.
+- Preserve PORTAL_BACKUP_D1_EXPORT_TOKEN and PORTAL_BACKUP_KEY_HEX while weekly backups are active; retire migration/Worker temporary tokens after final QA. Preserve PORTAL_WORKER_AUTH_SECRET.
+- Next owner action: manual run of Portal D1 weekly encrypted backup on main; verify schema9 artifact, download/save, then follow docs/portal-v2/final-phone-checks.md with two client accounts. Inventory Appwrite real data before cutover; public /portal/ remains old backend.

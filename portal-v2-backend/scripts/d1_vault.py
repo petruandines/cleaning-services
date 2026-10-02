@@ -172,7 +172,7 @@ def schema_first_sql(source, target):
 
     ALTER TABLE rebuilds change sqlite_schema order. D1 exports can therefore
     insert jobs before CREATE TABLE appointments, even with deferred keys.
-    Only table declaration order changes, in a private recovery copy.
+    Only table/index declaration order changes, in a private recovery copy.
     """
     statements, pending = [], []
     for char in Path(source).read_text():
@@ -182,11 +182,23 @@ def schema_first_sql(source, target):
             pending = []
     if ''.join(pending).strip():
         statements.append(''.join(pending))
-    tables, rest = [], []
+    tables, indexes, rest = [], [], []
     for statement in statements:
         # D1 exports contain SQL statements without leading comments.
-        (tables if re.match(r'\s*CREATE\s+TABLE\b', statement, re.I) else rest).append(statement)
-    Path(target).write_text('PRAGMA defer_foreign_keys = ON;\n' + '\n'.join(tables + rest))
+        if re.match(r'\s*CREATE\s+TABLE\b', statement, re.I):
+            tables.append(statement)
+        elif re.match(r'\s*CREATE\s+(?:UNIQUE\s+)?INDEX\b', statement, re.I):
+            indexes.append(statement)
+        else:
+            rest.append(statement)
+    Path(target).write_text('PRAGMA defer_foreign_keys = ON;\n' + '\n'.join(tables + indexes + rest))
+
+
+def expected_tables(names):
+    base = set(PORTAL_TABLES)
+    if names not in (base, base | {"payment_locations"}):
+        raise ValueError("Backup schema does not match the expected portal tables")
+    return sorted(names)
 
 
 def restore_local_test(source, key, expect_client_id=None):
@@ -196,6 +208,7 @@ def restore_local_test(source, key, expect_client_id=None):
         decrypt(source, key, plaintext)
         ordered = temp / "recovery.sql"
         schema_first_sql(plaintext, ordered)
+        expected = sql_counts(plaintext)
         config = temp / "wrangler.jsonc"
         config.write_text(json.dumps({
             "name": "pi-d1-restore-test", "main": str(ROOT / "src" / "index.mjs"),
@@ -222,6 +235,13 @@ def restore_local_test(source, key, expect_client_id=None):
                 "SELECT name FROM sqlite_schema WHERE type = 'table'")}
             if not {"clients", "portal_accounts", "user", "audit_events"}.issubset(tables):
                 raise ValueError("Restored database is missing portal tables")
+            restored_names = {name for name in tables if not name.startswith("sqlite_")
+                              and name not in ("_cf_KV", "_cf_METADATA")}
+            if restored_names != set(expected):
+                raise ValueError("Restored database is missing portal tables")
+            for table, count in expected.items():
+                if restored.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0] != count:
+                    raise ValueError("Restored database row counts differ from backup")
             if expect_client_id is not None:
                 count = restored.execute(
                     "SELECT count(*) FROM clients WHERE id = ?", (expect_client_id,)
@@ -238,14 +258,13 @@ def sql_counts(source):
         names = {name for (name,) in database.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
         ) if name not in ("_cf_KV", "_cf_METADATA")}
-        if names != set(PORTAL_TABLES):
-            raise ValueError("Backup schema does not match the expected portal tables")
+        allowed = expected_tables(names)
         if database.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise ValueError("Backup SQL failed integrity check")
         if database.execute("PRAGMA foreign_key_check").fetchone() is not None:
             raise ValueError("Backup SQL has broken foreign keys")
         return {name: database.execute(f'SELECT count(*) FROM "{name}"').fetchone()[0]
-                for name in PORTAL_TABLES}
+                for name in allowed}
 
 
 def safe_failure(error, action):
@@ -259,6 +278,7 @@ def safe_failure(error, action):
         "Restored database failed SQLite integrity check",
         "Restored database has broken foreign-key references",
         "Restored database is missing portal tables",
+        "Restored database row counts differ from backup",
     )
     if isinstance(error, ValueError) and str(error) in known:
         return str(error)

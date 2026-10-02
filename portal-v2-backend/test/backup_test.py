@@ -26,12 +26,14 @@ class BackupTest(unittest.TestCase):
             source.write_text("""PRAGMA defer_foreign_keys=ON;
 CREATE TABLE child(id TEXT, parent_id TEXT REFERENCES parent(id));
 INSERT INTO child VALUES('quoted;value','parent');
-CREATE TABLE parent(id TEXT PRIMARY KEY);
+CREATE TABLE parent(id TEXT);
 INSERT INTO parent VALUES('parent');
+CREATE UNIQUE INDEX parent_id_unique ON parent(id);
 """)
             vault.schema_first_sql(source, target)
             ordered = target.read_text()
             self.assertLess(ordered.index('CREATE TABLE parent'), ordered.index('INSERT INTO child'))
+            self.assertLess(ordered.index('CREATE UNIQUE INDEX'), ordered.index('INSERT INTO child'))
             with sqlite3.connect(':memory:') as db:
                 db.execute('PRAGMA foreign_keys=ON')
                 db.execute('BEGIN')
@@ -123,10 +125,10 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
             vault.run_wrangler('d1', 'execute', database, '--local', '--cwd',
                                str(source_dir), '--config', str(config),
                                '--file', str(seed), capture=True)
-            # Include the rebuilt appointments table and populated dependent jobs.
+            # Schema 0009 must restore populated payments and location links.
             for name in ('0004_location_contact.sql', '0005_soft_delete.sql',
                          '0006_invoice_client_notes.sql', '0007_client_contract.sql',
-                         '0008_appointment_draft.sql'):
+                         '0008_appointment_draft.sql', '0009_payment_locations.sql'):
                 vault.run_wrangler('d1', 'execute', database, '--local', '--cwd',
                                    str(source_dir), '--config', str(config),
                                    '--file', str(migrations / name), capture=True)
@@ -146,6 +148,7 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
             counts = vault.sql_counts(restored_sql)
             self.assertEqual(counts['clients'], 1)
             self.assertEqual(counts['payments'], 1)
+            self.assertEqual(counts['payment_locations'], 1)
             self.assertEqual(counts['d1_migrations'], 0)
             restored_db = root / 'inspected.sqlite'
             with sqlite3.connect(restored_db) as db:
