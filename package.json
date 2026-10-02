@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Site HTML/CSS/JavaScript pregătit pentru GitHub Pages în repository-ul `cleaning-services`.",
   "scripts": {
-    "build:portal": "esbuild portal/src/entry.mjs --bundle --minify --target=es2020 --outfile=portal/app.js",
-    "test:portal": "node --test portal/tests/*.test.mjs"
+    "build:portal": "node scripts/build-portal-v2.mjs",
+    "test:portal": "node --test portal-v2-frontend/test/*.test.mjs"
   },
   "repository": {
     "type": "git",
