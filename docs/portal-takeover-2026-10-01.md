@@ -111,3 +111,9 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 ### Owner saved schema-0009 backup
 - 2026-10-02 owner confirmed ZIP saved for weekly backup manual proof 36984798940 after private-copy/separate-key instructions.
 - Next client phone QA: existing client login, own locations/appointments/payments only, conditional Contract tab, single-total multi-location payment, client->admin chat and logout. Then second-client isolation and Appwrite data inventory before cutover. No public portal cutover authorized/performed in this checkpoint.
+
+
+### First-client phone QA confirmed
+- 2026-10-02 owner confirmed all instructed client checks work: login as client, own locations/appointments/payments, populated-only Contract fields/tab, single-total multi-location payment and sending a message to admin.
+- Await second-client isolation/logout check; do not assume an existing second test account. Confirm old Appwrite contains real records needing transfer versus tests/empty before deciding cutover.
+- Current new portal features, schema9 backup and manual weekly pipeline proof verified; old public /portal/ remains Appwrite.
