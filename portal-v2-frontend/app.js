@@ -25,7 +25,7 @@ import { visibleContractDetails } from './contract-view.mjs';
   const fields = {
     appointments: { starts_at: 'Începe', ends_at: 'Se termină', client_note: 'Detalii', estimated_cost_bani: 'Estimare' },
     jobs: { description: 'Descriere', price_bani: 'Preț', completed_at: 'Finalizată' },
-    payments: { appointment_starts_at: 'Intervenție', location_name: 'Locație', amount_bani: 'Sumă', recorded_at: 'Înregistrată', note: 'Detalii' },
+    payments: { appointment_starts_at: 'Intervenție', location_name: 'Locații', amount_bani: 'Sumă', recorded_at: 'Înregistrată', note: 'Detalii' },
     locations: { address: 'Adresă', city: 'Oraș', county: 'Județ', contact_name: 'Persoană de contact', contact_phone: 'Telefon contact', contact_email: 'E-mail contact' },
     clients: { kind: 'Tip', email: 'E-mail', phone: 'Telefon', company_name: 'Firmă', cui: 'CUI', internal_note: 'Notițe interne · doar echipa' },
   };
@@ -56,7 +56,7 @@ import { visibleContractDetails } from './contract-view.mjs';
       ['price_bani', 'Preț (lei)', 'money', false],
     ],
     payments: [
-      ['appointment_id', 'Programare', 'related', true, 'appointments'], ['amount_bani', 'Sumă (lei)', 'money', true],
+      ['amount_bani', 'Sumă totală (lei)', 'money', true],
       ['status', 'Stare', 'select', true, [['pending', 'În așteptare'], ['confirmed', 'Confirmată'], ['reversed', 'Anulată']]],
       ['recorded_at', 'Data înregistrării (opțional)', 'datetime-local', false], ['note', 'Notă', 'textarea', false, 1000],
       ['invoice_url', 'Link factură HTTPS (opțional)', 'url', false, 2048],
@@ -344,6 +344,17 @@ import { visibleContractDetails } from './contract-view.mjs';
     await renderStaffForm();
     if (editingGeneration !== generation || section !== editingSection || editingId !== row.id) return;
     const form = $('staff-form');
+    if (section === 'payments') {
+      form.dataset.legacyPayment = row.location_ids?.length ? '' : 'true';
+      const box = $('payment-locations');
+      for (const location of row.location_details || []) {
+        if ([...box.querySelectorAll('input')].some(input => input.value === location.id)) continue;
+        const label = document.createElement('label'); label.className = 'payment-location-option';
+        const input = document.createElement('input'); input.type = 'checkbox'; input.name = 'location_ids'; input.value = location.id;
+        label.append(input, document.createTextNode(location.label + ' · locație arhivată')); box.append(label);
+      }
+      form.querySelectorAll('input[name=location_ids]').forEach(input => { input.checked = row.location_ids?.includes(input.value) || false; });
+    }
     for (const [key, value] of Object.entries(row)) {
       const control = form.elements.namedItem(key);
       if (!control || !('value' in control)) continue;
@@ -425,6 +436,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     const sessionAtStart = generation;
     const fieldsBox = $('staff-fields');
     fieldsBox.replaceChildren();
+    form.dataset.legacyPayment = '';
     $('staff-form-title').textContent = editingId ? 'Editează · ' + singular[section] :
       section === 'messages' ? 'Răspunde clientului' : 'Adaugă · ' + sections[section];
     const needClient = section !== 'clients' && !currentClientId;
@@ -437,12 +449,28 @@ import { visibleContractDetails } from './contract-view.mjs';
     const related = [];
     const definitions = section === 'clients' && editingId ?
       [...forms.clients, ['status', 'Stare', 'select', true, [['active', 'Activ'], ['inactive', 'Inactiv']]]] :
-      section === 'payments' && editingId ? forms.payments.slice(1) : forms[section];
-    if (section === 'payments' && editingId) {
-      const hint = document.createElement('p');
-      hint.className = 'form-hint';
-      hint.textContent = 'Intervenția asociată acestei plăți rămâne aceeași.';
-      fieldsBox.append(hint);
+      forms[section];
+    if (section === 'payments') {
+      const box = document.createElement('fieldset');
+      box.id = 'payment-locations';
+      const title = document.createElement('legend'); title.textContent = 'Locațiile acestei plăți';
+      const hint = document.createElement('p'); hint.className = 'form-hint';
+      hint.textContent = 'Bifează una sau mai multe locații. Suma totală se înregistrează o singură dată.';
+      const all = document.createElement('button'); all.type = 'button'; all.textContent = 'Selectează toate';
+      all.addEventListener('click', () => box.querySelectorAll('input').forEach(input => { input.checked = true; }));
+      const none = document.createElement('button'); none.type = 'button'; none.textContent = 'Debifează toate';
+      none.addEventListener('click', () => box.querySelectorAll('input').forEach(input => { input.checked = false; }));
+      box.append(title, hint, all, none); fieldsBox.append(box);
+      try {
+        const rows = await allRelated('locations', clientAtStart);
+        if (section !== sectionAtStart || currentClientId !== clientAtStart || generation !== sessionAtStart || formKey !== key) return;
+        for (const row of rows.filter(row => row.active !== 0)) {
+          const label = document.createElement('label'); label.className = 'payment-location-option';
+          const input = document.createElement('input'); input.type = 'checkbox'; input.name = 'location_ids'; input.value = row.id;
+          label.append(input, document.createTextNode(row.label + ' · ' + row.address)); box.append(label);
+        }
+        if (!rows.length) { const empty = document.createElement('p'); empty.textContent = 'Adaugă mai întâi o locație pentru acest client.'; box.append(empty); }
+      } catch (error) { if (sessionAtStart === generation) notice(error.message); }
     }
     for (const definition of definitions) {
       const { wrapper, control } = makeInput(definition);
@@ -452,7 +480,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     try {
       for (const { control, name } of related) {
         const rows = await allRelated(name, clientAtStart);
-        if (section !== sectionAtStart || currentClientId !== clientAtStart || generation !== sessionAtStart) return;
+        if (section !== sectionAtStart || currentClientId !== clientAtStart || generation !== sessionAtStart || formKey !== key) return;
         for (const row of rows) {
           const option = document.createElement('option');
           option.value = row.id;
@@ -885,12 +913,21 @@ import { visibleContractDetails } from './contract-view.mjs';
     button.disabled = true;
     try {
       for (const [key, value] of new FormData(form)) {
+        if (key === 'location_ids') continue;
         if (!value) {
           if (editAtStart && key !== 'kind' && key !== 'status') data[key] = null;
           continue;
         }
         data[key] = key.endsWith('_bani') ? leiToBani(value) :
           ['starts_at', 'ends_at', 'recorded_at'].includes(key) ? new Date(value).toISOString() : value;
+      }
+      if (sectionAtStart === 'payments') {
+        data.location_ids = new FormData(form).getAll('location_ids');
+        if (data.location_ids.length > 100) throw new Error('O plată poate include cel mult 100 de locații.');
+        if (!data.location_ids.length) {
+          if (editAtStart && form.dataset.legacyPayment === 'true') delete data.location_ids;
+          else throw new Error('Bifează cel puțin o locație pentru această plată.');
+        }
       }
       if (editAtStart) delete data.client_id;
       const result = await api('/api/' + sectionAtStart + (editAtStart ? '/' + encodeURIComponent(editAtStart) : ''),
