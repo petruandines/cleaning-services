@@ -117,3 +117,11 @@ Next: migration inspect, fresh schema-0008 backup export + owner confirms ZIP sa
 - 2026-10-02 owner confirmed all instructed client checks work: login as client, own locations/appointments/payments, populated-only Contract fields/tab, single-total multi-location payment and sending a message to admin.
 - Await second-client isolation/logout check; do not assume an existing second test account. Confirm old Appwrite contains real records needing transfer versus tests/empty before deciding cutover.
 - Current new portal features, schema9 backup and manual weekly pipeline proof verified; old public /portal/ remains Appwrite.
+
+
+### Canonical portal launched 2026-10-02
+- Owner confirmed second-client isolation works and old Appwrite contains only test data. No data migration required; no Appwrite records deleted.
+- Main production cutover commit 177d1665a114a64879b313af2e65fe311bb6e5a1 copies nine tested v2 frontend assets to /portal/ and updates asset cache version. Public URL remains https://petruandines.github.io/cleaning-services/portal/ . Existing D1 records/accounts retained.
+- npm run build:portal now copies v2 assets using scripts/build-portal-v2.mjs; npm run test:portal targets v2 tests instead of inactive legacy Appwrite tests. Legacy source remains in git; no backend deployment needed for route change (same origin).
+- 12 frontend tests passed. Pages run 36988259945 succeeded. Pre-cutover main reference 3d32a03f81c6b7dbfe2a17aae873c72c2271f9dd; revert production cutover commit to restore old Appwrite public assets if necessary.
+- Next: canonical-route login confirmation on phone, then revoke only temporary migration/Worker tokens and delete corresponding GitHub secrets. Keep permanent Worker auth secret and backup export token/key for weekly workflow. Do not delete Appwrite during launch verification. First actual weekly cron run remains to be checked after 2026-10-04.
