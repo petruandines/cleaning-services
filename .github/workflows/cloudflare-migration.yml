@@ -27,9 +27,25 @@ jobs:
               headers: {Authorization: 'Bearer ' + process.env.CF_TOKEN},
             });
             const data = await response.json();
-            if (!response.ok || !data.success) throw new Error('Inspection failed: ' + path + ' HTTP ' + response.status + ' codes ' + (data.errors || []).map(e => e.code).join(','));
+            if (!response.ok || !data.success) throw new Error('Inspection failed: ' + path + ' HTTP ' + response.status + ' codes ' + (data.errors || []).map(e => e.code + ': ' + e.message).join(','));
             return data.result;
           }
+          const diagnostics = [
+            ['Token validity', '/user/tokens/verify'],
+            ['Pages access', '/accounts/' + account + '/pages/projects'],
+            ['Worker access', '/accounts/' + account + '/workers/scripts/petru-ines-portal-api/settings'],
+          ];
+          for (const [label, path] of diagnostics) {
+            const response = await fetch('https://api.cloudflare.com/client/v4' + path, {
+              headers: {Authorization: 'Bearer ' + process.env.CF_TOKEN},
+            });
+            const data = await response.json();
+            const result = label === 'Token validity' && data.success ? {
+              status:data.result.status,not_before:data.result.not_before,expires_on:data.result.expires_on,
+            } : undefined;
+            console.log(label, 'HTTP', response.status, JSON.stringify({success:data.success,errors:data.errors,result}));
+          }
+          console.log('Runner UTC:',new Date().toISOString());
           const zones = await get('/zones?name=petruandines.com');
           if (zones.length !== 1 || zones[0].account.id !== account) throw new Error('Domain/account mismatch');
           console.log('Domain:', zones[0].name, 'status:', zones[0].status, 'zone:', zones[0].id);
