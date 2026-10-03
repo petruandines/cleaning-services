@@ -1,7 +1,7 @@
 import { commitRecord, createStaffRecord } from './writes.mjs';
 import { changeInitialPassword, createClientUser, mustChangePassword } from './accounts.mjs';
 import { changeStaffRecord } from './mutations.mjs';
-const ORIGIN = 'https://petruandines.github.io';
+import { ORIGIN, isPortalOrigin, corsOrigin } from './origins.mjs';
 const LIMIT = 30;
 
 function json(value, status = 200) {
@@ -19,7 +19,7 @@ function error(status, code) { return json({ error: code }, status); }
 
 function allowedOrigin(request) {
   const origin = request.headers.get('Origin');
-  return !origin || origin === ORIGIN || origin === new URL(request.url).origin;
+  return !origin || isPortalOrigin(origin) || origin === new URL(request.url).origin;
 }
 
 const lists = Object.freeze({
@@ -37,7 +37,15 @@ const order = Object.freeze({
 
 // This module is intentionally independent of the authentication library.
 // Authentication is verified on the Worker before any D1 query is run.
-export async function handleApi(request, { db, auth }) {
+export async function handleApi(request, context) {
+  const response = await dispatchApi(request, context);
+  const headers = new Headers(response.headers);
+  if (allowedOrigin(request)) headers.set('access-control-allow-origin', corsOrigin(request));
+  else headers.delete('access-control-allow-origin');
+  return new Response(response.body, { status: response.status, headers });
+}
+
+async function dispatchApi(request, { db, auth }) {
   if (!allowedOrigin(request)) return error(403, 'origin_forbidden');
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: {

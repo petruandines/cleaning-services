@@ -1,11 +1,13 @@
 (() => {
   'use strict';
-  const portalOrigin = 'https://petruandines.github.io';
+  const portalOrigin = new URL(location.href).searchParams.get('portal_origin') || 'https://petruandines.github.io';
+  const validPortalOrigin = ['https://petruandines.github.io', 'https://petruandines.com',
+    'https://www.petruandines.com', 'https://petruandines-site.pages.dev'].includes(portalOrigin);
   const state = new URL(location.href).searchParams.get('state');
   const $ = id => document.getElementById(id);
   let token = null;
   let clientId = null;
-  const valid = /^[a-f0-9]{32}$/.test(state || '') && !!window.opener;
+  const valid = validPortalOrigin && /^[a-f0-9]{32}$/.test(state || '') && !!window.opener;
   function message(text) { $('error').textContent = text; $('error').hidden = false; }
   if (!valid) { message('Deschide această fereastră din portalul Petru & Inés.'); return; }
   window.addEventListener('message', event => {

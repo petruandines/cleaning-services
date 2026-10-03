@@ -1,6 +1,8 @@
 (() => {
   'use strict';
-  const portalOrigin = 'https://petruandines.github.io';
+  const portalOrigin = new URL(location.href).searchParams.get('portal_origin') || 'https://petruandines.github.io';
+  const validPortalOrigin = ['https://petruandines.github.io', 'https://petruandines.com',
+    'https://www.petruandines.com', 'https://petruandines-site.pages.dev'].includes(portalOrigin);
   const state = new URL(location.href).searchParams.get('state');
   const $ = id => document.getElementById(id);
   const views = ['sign-in', 'totp', 'enroll', 'change-password'];
@@ -37,13 +39,13 @@
     pendingToken = token;
     if (user.twoFactorRequired) { show('enroll'); return; }
     if (user.mustChangePassword) { show('change-password'); return; }
-    if (!window.opener || !/^[a-f0-9]{32}$/.test(state || '')) throw new Error('Portal session unavailable');
+    if (!validPortalOrigin || !window.opener || !/^[a-f0-9]{32}$/.test(state || '')) throw new Error('Portal session unavailable');
     window.opener.postMessage({ type: 'petru-ines-auth', state, token, user }, portalOrigin);
     pendingToken = null;
     window.close();
   }
 
-  if (!window.opener || !/^[a-f0-9]{32}$/.test(state || '')) {
+  if (!validPortalOrigin || !window.opener || !/^[a-f0-9]{32}$/.test(state || '')) {
     for (const id of views) $(id).hidden = true;
     $('error').textContent = 'Deschide autentificarea din portalul Petru & Inés.';
     $('error').hidden = false;
