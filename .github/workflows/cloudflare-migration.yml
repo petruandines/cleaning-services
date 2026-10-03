@@ -1,0 +1,46 @@
+name: Cloudflare domain migration
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/cloudflare-migration.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-domain-migration
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify token, domain and existing portal (read only)
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const account = '47b9f8498a9865c0fbbaca8f0f5cf59d';
+          if (!process.env.CF_TOKEN) throw new Error('CLOUDFLARE_MIGRATION_TOKEN is missing');
+          async function get(path) {
+            const response = await fetch('https://api.cloudflare.com/client/v4' + path, {
+              headers: {Authorization: 'Bearer ' + process.env.CF_TOKEN},
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error('Inspection failed: ' + path + ' HTTP ' + response.status + ' codes ' + (data.errors || []).map(e => e.code).join(','));
+            return data.result;
+          }
+          const zones = await get('/zones?name=petruandines.com');
+          if (zones.length !== 1 || zones[0].account.id !== account) throw new Error('Domain/account mismatch');
+          console.log('Domain:', zones[0].name, 'status:', zones[0].status, 'zone:', zones[0].id);
+          const records = await get('/zones/' + zones[0].id + '/dns_records?per_page=100');
+          console.log('Web DNS records:', JSON.stringify(records.filter(r => ['petruandines.com','www.petruandines.com'].includes(r.name)).map(r => ({type:r.type,name:r.name,content:r.content,proxied:r.proxied}))));
+          const projects = await get('/accounts/' + account + '/pages/projects');
+          console.log('Pages projects:', JSON.stringify(projects.map(p => ({name:p.name,subdomain:p.subdomain,domains:p.domains}))));
+          const settings = await get('/accounts/' + account + '/workers/scripts/petru-ines-portal-api/settings');
+          const db = settings.bindings.find(b => b.name === 'DB');
+          if (!db || db.id !== '6816004b-dc95-48c9-be52-9bd4131d157e') throw new Error('Existing Worker D1 mismatch');
+          console.log('Existing Worker verified. Bindings:', JSON.stringify(settings.bindings.map(b => ({name:b.name,type:b.type,...(b.type === 'd1' ? {id:b.id}: {})}))));
+          console.log('Worker compatibility:',settings.compatibility_date,JSON.stringify(settings.compatibility_flags));
+          console.log('Read-only inspection completed. No Cloudflare resources changed.');
+          NODE
