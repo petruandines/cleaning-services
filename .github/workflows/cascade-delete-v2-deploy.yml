@@ -1,0 +1,60 @@
+name: Deploy verified cascade deletion backend
+
+on:
+  push:
+    branches: ["backend/cascade-delete-v2"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cascade-delete-v2-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
+    steps:
+      - name: Read verified backend source
+        uses: actions/checkout@v4
+        with:
+          ref: e77e70edc1fe0bf2ed6d0edf48dc255b25d73a51
+          path: .backend-source
+          persist-credentials: false
+      - name: Read production routing policy
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .production-policy
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: .backend-source/portal-v2-backend/package-lock.json
+      - name: Install locked dependencies
+        working-directory: .backend-source/portal-v2-backend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run complete backend test suite
+        working-directory: .backend-source/portal-v2-backend
+        run: npm test
+      - name: Enforce production API routing
+        run: node .production-policy/scripts/enforce-portal-worker-production-config.mjs .backend-source/portal-v2-backend/wrangler.jsonc
+      - name: Compile production Worker
+        working-directory: .backend-source/portal-v2-backend
+        run: npx wrangler deploy --dry-run
+      - name: Deploy Worker code only and verify live API
+        working-directory: .backend-source/portal-v2-backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+          PORTAL_WORKER_AUTH_SECRET: ${{ secrets.PORTAL_WORKER_AUTH_SECRET }}
+        run: node scripts/deploy-cascade-delete-code-only.mjs
+      - name: Verify production Worker bindings and routing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+        run: node .production-policy/scripts/cloudflare-migration.mjs inspect
