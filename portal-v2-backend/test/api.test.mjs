@@ -113,7 +113,7 @@ test('optional contract fields remain scoped and hidden until at least one is se
   assert.equal(own[0].manager_email, 'manager@example.test');
   assert.equal(own[0].contract_details, 'Intervenții lunare');
   assert.equal('internal_note' in own[0], false);
-  assert.deepEqual((await (await call('contracts', 'b')).json(), []));
+  assert.deepEqual((await (await call('contracts', 'b')).json()).rows, []);
   assert.deepEqual((await (await call('contracts?client_id=b', 'admin')).json()).rows[0].manager_email, null);
   assert.equal((await patch('a', { billing_type: 'fixed' })).status, 400);
   assert.equal((await patch('a', { billing_type: 'fixed', contract_rate_bani: null })).status, 200);
