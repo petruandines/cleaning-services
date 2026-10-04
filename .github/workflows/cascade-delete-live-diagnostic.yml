@@ -1,0 +1,31 @@
+name: Diagnose cascade delete live API
+
+on:
+  push:
+    branches: ["diagnose/cascade-delete"]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe live API endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe() {
+            local url="$1"
+            echo "=== $url ==="
+            curl -sS -o /tmp/body -D /tmp/headers --max-time 20 -H 'Origin: https://petruandines.com' "$url" || true
+            head -n 1 /tmp/headers || true
+            grep -iE '^(location|access-control-allow-origin|content-type|cache-control):' /tmp/headers || true
+            head -c 160 /tmp/body || true
+            echo
+          }
+          probe 'https://api.petruandines.com/api/me?diagnostic=1'
+          probe 'https://api.petruandines.com/login?diagnostic=1'
+          probe 'https://api.petruandines.com/login.html?diagnostic=1'
+          probe 'https://petru-ines-portal-api.petruandines.workers.dev/api/me?diagnostic=1'
