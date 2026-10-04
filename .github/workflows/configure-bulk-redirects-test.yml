@@ -20,5 +20,8 @@ jobs:
         run: node --check scripts/configure-bulk-redirects.mjs
       - name: Configure and verify Bulk Redirects
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+          # Temporary one-purpose token. Required Cloudflare account permissions:
+          # Account Filter Lists: Edit
+          # Bulk URL Redirects: Edit
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BULK_REDIRECT_TOKEN }}
         run: node scripts/configure-bulk-redirects.mjs apply
