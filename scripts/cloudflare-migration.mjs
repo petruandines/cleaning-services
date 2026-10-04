@@ -31,7 +31,10 @@ async function inspect() {
   assert.deepEqual(settings.compatibility_flags,['nodejs_compat']);
   const workerDomains = await cf(`/accounts/${ACCOUNT}/workers/domains`);
   assert.ok(workerDomains.some(d => d.hostname === 'api.petruandines.com' && d.service === 'petru-ines-portal-api'));
-  console.log('Verified target zone, API custom domain, existing Worker configuration, unchanged D1 binding and authentication secret presence.');
+  const subdomain = await cf(`/accounts/${ACCOUNT}/workers/scripts/petru-ines-portal-api/subdomain`);
+  assert.equal(subdomain.enabled,false,'workers.dev must stay disabled');
+  assert.equal(subdomain.previews_enabled,false,'Worker preview/version URLs must stay disabled');
+  console.log('Verified target zone, API custom domain, disabled workers.dev, existing Worker configuration, unchanged D1 binding and authentication secret presence.');
 }
 
 async function getProject() {
