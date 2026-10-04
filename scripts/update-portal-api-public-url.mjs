@@ -32,14 +32,14 @@ async function cf(path, method = 'GET', body) {
   return data.result;
 }
 
-async function cfPatchSettings(metadata) {
+async function cfPatchSettings(settings) {
   assert.ok(process.env.CLOUDFLARE_API_TOKEN, 'Missing CLOUDFLARE_API_TOKEN');
   const boundary = '----petruines-' + crypto.randomUUID();
   const payload = [
     `--${boundary}\r\n`,
-    'Content-Disposition: form-data; name="metadata"\r\n',
+    'Content-Disposition: form-data; name="settings"\r\n',
     'Content-Type: application/json\r\n\r\n',
-    JSON.stringify(metadata),
+    JSON.stringify(settings),
     `\r\n--${boundary}--\r\n`,
   ].join('');
   const response = await fetch(API + SETTINGS_PATH, {
