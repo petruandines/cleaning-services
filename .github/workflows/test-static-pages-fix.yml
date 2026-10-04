@@ -1,0 +1,33 @@
+name: Test static Pages fix
+
+on:
+  push:
+    branches: ["fix/static-pages-no-worker"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check scripts/build-cloudflare.mjs
+          node --check scripts/cloudflare-migration.mjs
+          node --check assets/js/canonical-host.js
+      - name: Build static Cloudflare output
+        run: node scripts/build-cloudflare.mjs
+      - name: Verify no Pages Worker is deployed
+        run: |
+          test ! -e dist-cloudflare/_worker.js
+          test ! -e dist-cloudflare/_routes.json
+          test -e dist-cloudflare/_redirects
+          test -e dist-cloudflare/_headers
+          grep -q '/assets/js/canonical-host.js' dist-cloudflare/index.html
+          grep -q '/assets/js/canonical-host.js' dist-cloudflare/portal/index.html
