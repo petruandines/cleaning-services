@@ -43,7 +43,7 @@ jobs:
             git fetch --depth=1 origin "$ref"
             git show FETCH_HEAD:portal-v2-backend/wrangler.jsonc > /tmp/wrangler.jsonc
             node scripts/enforce-portal-worker-production-config.mjs /tmp/wrangler.jsonc
-            node -e "const c=require('/tmp/wrangler.jsonc'); if(c.workers_dev!==false||c.preview_urls!==false||c.vars.PUBLIC_API_URL!=='https://api.petruandines.com') process.exit(1)"
+            node --input-type=module -e "import {readFileSync} from 'node:fs'; const c=JSON.parse(readFileSync('/tmp/wrangler.jsonc','utf8')); if(c.workers_dev!==false||c.preview_urls!==false||c.vars.PUBLIC_API_URL!=='https://api.petruandines.com') process.exit(1)"
             echo "Guard verified for $ref"
           done
       - name: Verify current live Cloudflare state
