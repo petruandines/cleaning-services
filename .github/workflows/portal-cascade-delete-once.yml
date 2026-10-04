@@ -24,7 +24,7 @@ jobs:
       - name: Read verified backend source
         uses: actions/checkout@v4
         with:
-          ref: e88f6be593e0172acf7db388a2bacde0edb6154b
+          ref: 7856859230422240fd76f04d9e6fe0418f537cf0
           path: .backend-source
           persist-credentials: false
       - name: Read production policy
