@@ -16,10 +16,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check script syntax
+      - name: Check scripts
         run: |
           node --check scripts/configure-portal-api-domain.mjs
           node --check scripts/update-portal-api-public-url.mjs
+          node --check scripts/build-cloudflare.mjs
+          node --check scripts/cloudflare-migration.mjs
       - name: Attach and verify api.petruandines.com
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
@@ -28,3 +30,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
         run: node scripts/update-portal-api-public-url.mjs apply
+      - name: Build site with custom API domain
+        run: node scripts/build-cloudflare.mjs
+      - name: Verify live Worker settings and custom domain
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+        run: node scripts/cloudflare-migration.mjs inspect
