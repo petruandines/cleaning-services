@@ -39,14 +39,14 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: .backend-source/portal-v2-backend/package-lock.json
-      - name: Enforce production API routing
-        run: node .production-policy/scripts/enforce-portal-worker-production-config.mjs .backend-source/portal-v2-backend/wrangler.jsonc
       - name: Install locked backend dependencies
         working-directory: .backend-source/portal-v2-backend
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Run complete backend test suite
+      - name: Run complete backend test suite on reviewed source
         working-directory: .backend-source/portal-v2-backend
         run: npm test
+      - name: Enforce production API routing
+        run: node .production-policy/scripts/enforce-portal-worker-production-config.mjs .backend-source/portal-v2-backend/wrangler.jsonc
       - name: Compile production Worker
         working-directory: .backend-source/portal-v2-backend
         run: npx wrangler deploy --dry-run
