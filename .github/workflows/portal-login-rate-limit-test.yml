@@ -20,5 +20,7 @@ jobs:
         run: node --check scripts/configure-login-rate-limit.mjs
       - name: Configure and verify login rate limit
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+          # Temporary one-purpose token. Cloudflare permission:
+          # Zone -> Zone WAF -> Edit, scoped to petruandines.com only.
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_RATE_LIMIT_TOKEN }}
         run: node scripts/configure-login-rate-limit.mjs apply
