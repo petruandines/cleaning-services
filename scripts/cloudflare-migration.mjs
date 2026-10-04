@@ -52,8 +52,9 @@ async function publicFetch(url, options={}) {
 async function verifySite(base) {
   for (const [path,marker] of [
     ['/','https://petruandines.com/'], ['/portal/','Portal clienți'],
-    ['/portal/config.js',API], ['/portal/app.js','portal_origin='], ['/catalog/','<html'],
-    ['/oferte/','<html'], ['/sitemap.xml','https://petruandines.com/'],
+    ['/portal/config.js',API], ['/portal/app.js',"/portal/login.html?state="],
+    ['/portal/login.html','Intră în cont'], ['/portal/login.js',API],
+    ['/catalog/','<html'], ['/oferte/','<html'], ['/sitemap.xml','https://petruandines.com/'],
   ]) {
     const response = await publicFetch(base + path);
     assert.equal(response.status,200,base + path);
@@ -65,10 +66,14 @@ async function verifySite(base) {
       assert.ok(text.includes(`connect-src ${API}`),'Portal CSP must use custom API domain');
       assert.ok(!text.includes('petru-ines-portal-api.petruandines.workers.dev'),'Legacy API must not remain in portal HTML');
     }
+    if (path === '/portal/app.js') {
+      assert.ok(text.includes('event.origin !== window.location.origin || !loginWindow'),'Portal must require same-origin login messages');
+      assert.ok(!text.includes("API + '/login.html?state=' + loginState"),'Portal must not reopen the cross-origin login popup');
+    }
   }
   const missing = await publicFetch(base + '/migration-missing-page-check');
   assert.equal(missing.status,404,'Missing routes must not serve a login or home page');
-  console.log('Public site verified:',base,'including portal assets, catalog, offer, sitemap and 404.');
+  console.log('Public site verified:',base,'including same-origin portal login, catalog, offer, sitemap and 404.');
 }
 
 async function verifyPortal() {
@@ -79,8 +84,14 @@ async function verifyPortal() {
     const preflight = await publicFetch(API + '/api/me',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'GET'}});
     assert.equal(preflight.status,204);
     assert.equal(preflight.headers.get('access-control-allow-origin'),origin);
-    const login = await publicFetch(API + '/api/auth/sign-in/email',{method:'OPTIONS',headers:{Origin:origin}});
-    assert.equal(login.status,403,'Credentials must remain in the login popup');
+    const login = await publicFetch(API + '/api/auth/sign-in/email',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'}});
+    if (origin === 'https://petruandines.com') {
+      assert.equal(login.status,204,'Canonical portal must be able to submit authentication securely');
+      assert.equal(login.headers.get('access-control-allow-origin'),origin);
+      assert.equal(login.headers.get('access-control-allow-credentials'),'true');
+    } else {
+      assert.equal(login.status,403,'Only the canonical portal may submit cross-origin credentials');
+    }
   }
   const foreign = await publicFetch(API + '/api/me',{headers:{Origin:'https://attacker.example'}});
   assert.equal(foreign.status,403);
@@ -90,7 +101,7 @@ async function verifyPortal() {
     const text = await response.text();
     assert.ok(text.includes('validPortalOrigin') && text.includes('https://petruandines.com'));
   }
-  console.log('Live portal verified: custom API domain, custom/legacy origin support, popup origin validation and anonymous access denied.');
+  console.log('Live portal verified: canonical same-origin sign-in, narrow API auth CORS, custom API domain, popup origin validation and anonymous access denied.');
 }
 
 async function retry(check, attempts=8) {
