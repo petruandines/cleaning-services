@@ -1,0 +1,29 @@
+name: Cascade delete backend test
+
+on:
+  push:
+    branches: ["backend/cascade-delete"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal-v2-backend/package-lock.json
+      - name: Install locked dependencies
+        working-directory: portal-v2-backend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run full backend tests
+        working-directory: portal-v2-backend
+        run: npm test
+      - name: Compile Worker only
+        working-directory: portal-v2-backend
+        run: npx wrangler deploy --dry-run
