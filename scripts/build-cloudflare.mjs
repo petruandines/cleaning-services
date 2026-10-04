@@ -6,7 +6,6 @@ const root = resolve(import.meta.dirname, '..');
 const out = join(root, 'dist-cloudflare');
 const oldBase = 'https://petruandines.github.io/cleaning-services';
 const newBase = 'https://petruandines.com';
-const canonicalHostScript = '<script src="/assets/js/canonical-host.js"></script>';
 const textTypes = new Set(['.html','.css','.js','.mjs','.json','.txt','.xml','.webmanifest','.svg']);
 const files = execFileSync('git', ['ls-files', '-z'], {cwd:root, encoding:'utf8'}).split('\0').filter(Boolean);
 const included = files.filter(path => {
@@ -24,9 +23,6 @@ for (const path of included) {
   let data = readFileSync(source);
   if (textTypes.has(extname(path))) {
     let text = data.toString('utf8').replaceAll(oldBase, newBase).replaceAll('/cleaning-services/', '/');
-    if (path.endsWith('.html') && text.includes('<head>') && !text.includes(canonicalHostScript)) {
-      text = text.replace('<head>', '<head>\n' + canonicalHostScript);
-    }
     if (path === 'portal/app.js') {
       for (const state of ['loginState','accountState']) {
         const needle = " + " + state + ", 'petru-ines-";
@@ -57,14 +53,12 @@ writeFileSync(join(out, '_headers'), [
 ].join('\n'));
 
 // This deployment is intentionally static-only: do not emit _worker.js or _routes.json.
-// Host aliases are redirected client-side by /assets/js/canonical-host.js until
-// Cloudflare account-level Bulk Redirects are configured.
+// Host aliases are redirected at Cloudflare account level through Bulk Redirects.
 
 // Verify that all local HTML links/assets resolve in the actual upload folder.
 const broken = [];
 for (const path of included.filter(p => p.endsWith('.html'))) {
   const text = readFileSync(join(out, path), 'utf8');
-  if (text.includes('<head>') && !text.includes(canonicalHostScript)) broken.push(path + ' -> canonical host script missing');
   for (const match of text.matchAll(/(?:href|src)\s*=\s*["']([^"']+)["']/g)) {
     const raw = match[1];
     if (/^(?:#|data:|mailto:|tel:|javascript:)/.test(raw)) continue;
