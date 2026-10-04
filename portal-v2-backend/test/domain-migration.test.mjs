@@ -6,8 +6,10 @@ import worker from '../src/index.mjs';
 import { handleApi } from '../src/api.mjs';
 import { PORTAL_ORIGINS } from '../src/origins.mjs';
 
-test('each exact portal origin has CORS, anonymous denial and popup-only login', async () => {
-  const base = 'https://petru-ines-portal-api.petruandines.workers.dev';
+const CANONICAL_PORTAL_ORIGIN = 'https://petruandines.com';
+
+test('each exact portal origin has CORS while canonical portal auth is explicitly allowlisted', async () => {
+  const base = 'https://api.petruandines.com';
   for (const origin of PORTAL_ORIGINS) {
     const request = path => new Request(base + path, {headers:{Origin:origin}});
     const anonymous = await handleApi(request('/api/me'), {auth:{api:{getSession:async () => null}},db:null});
@@ -16,8 +18,14 @@ test('each exact portal origin has CORS, anonymous denial and popup-only login',
     const preflight = await handleApi(new Request(base + '/api/me', {method:'OPTIONS',headers:{Origin:origin}}), {});
     assert.equal(preflight.status, 204);
     assert.equal(preflight.headers.get('access-control-allow-origin'), origin);
-    const login = await worker.fetch(request('/api/auth/sign-in/email'), {});
-    assert.equal(login.status, 403);
+    const login = await worker.fetch(new Request(base + '/api/auth/sign-in/email', {method:'OPTIONS',headers:{Origin:origin}}), {});
+    if (origin === CANONICAL_PORTAL_ORIGIN) {
+      assert.equal(login.status, 204);
+      assert.equal(login.headers.get('access-control-allow-origin'), origin);
+      assert.equal(login.headers.get('access-control-allow-credentials'), 'true');
+    } else {
+      assert.equal(login.status, 403);
+    }
     const logout = await worker.fetch(new Request(base + '/api/auth/sign-out', {method:'OPTIONS',headers:{Origin:origin}}), {});
     assert.equal(logout.status, 204);
     assert.equal(logout.headers.get('access-control-allow-origin'), origin);
@@ -26,7 +34,7 @@ test('each exact portal origin has CORS, anonymous denial and popup-only login',
 
 test('lookalike and unrelated origins are rejected before auth or database access', async () => {
   for (const origin of ['https://petruandines.com.attacker.test','http://petruandines.com','null','https://attacker.test']) {
-    const request = new Request('https://petru-ines-portal-api.petruandines.workers.dev/api/me', {headers:{Origin:origin}});
+    const request = new Request('https://api.petruandines.com/api/me', {headers:{Origin:origin}});
     const response = await handleApi(request, {});
     assert.equal(response.status, 403);
     assert.equal(response.headers.get('access-control-allow-origin'), null);
@@ -50,7 +58,7 @@ function popup(file, origin) {
   return {elements,messages,handlers,state};
 }
 
-test('login sends the session only to the selected allowlisted opener and supports the old frontend', async () => {
+test('legacy API-hosted login sends the session only to the selected allowlisted opener', async () => {
   for (const origin of [undefined,...PORTAL_ORIGINS]) {
     const p = popup('login.js',origin);
     const form = {elements:{trustDevice:{checked:false},email:{value:'fixture@example.test'},password:{value:'fixture-password'}},querySelector:() => ({disabled:false})};
@@ -62,7 +70,7 @@ test('login sends the session only to the selected allowlisted opener and suppor
   }
 });
 
-test('login and account popups reject an untrusted return origin before accepting input', () => {
+test('legacy login and account popups reject an untrusted return origin before accepting input', () => {
   for (const file of ['login.js','account.js']) {
     const p = popup(file,'https://attacker.test');
     assert.equal(p.messages.length,0);
