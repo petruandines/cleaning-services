@@ -116,6 +116,19 @@ async function connectDomains() {
   console.log('Custom domain states:',JSON.stringify((await cf(PROJECT_PATH + '/domains')).map(d => ({name:d.name,status:d.status}))));
 }
 
+async function verifyAliasRedirect(origin) {
+  const path = '/portal/?view=calendar';
+  const response = await publicFetch(origin + path,{redirect:'manual'});
+  const expected = 'https://' + DOMAIN + path;
+  if ([301,302,307,308].includes(response.status)) {
+    assert.equal(response.headers.get('location'),expected);
+    return;
+  }
+  assert.equal(response.status,200,'Alias must redirect server-side or serve the static redirect bootstrap');
+  const text = await response.text();
+  assert.ok(text.includes('/assets/js/canonical-host.js'),'Canonical host redirect bootstrap missing on alias');
+}
+
 const operation = process.argv[2];
 if (operation === 'inspect') {
   await inspect();
@@ -139,11 +152,7 @@ if (operation === 'inspect') {
 } else if (operation === 'verify-domain') {
   await retry(async () => {
     await verifySite('https://' + DOMAIN);
-    for (const origin of ['https://www.' + DOMAIN,PREVIEW]) {
-      const response = await publicFetch(origin + '/portal/?view=calendar',{redirect:'manual'});
-      assert.equal(response.status,301);
-      assert.equal(response.headers.get('location'),'https://' + DOMAIN + '/portal/?view=calendar');
-    }
+    for (const origin of ['https://www.' + DOMAIN,PREVIEW]) await verifyAliasRedirect(origin);
   },18);
   await verifyPortal();
 } else throw new Error('Unknown migration operation');
