@@ -29,11 +29,25 @@ for (const path of included) {
       .replaceAll('/cleaning-services/', '/')
       .replaceAll(oldApi, newApi);
     if (path === 'portal/app.js') {
-      for (const state of ['loginState','accountState']) {
-        const needle = " + " + state + ", 'petru-ines-";
-        if (!text.includes(needle)) throw new Error('Portal popup source changed: ' + state);
-        text = text.replace(needle, " + " + state + " + '&portal_origin=' + encodeURIComponent(window.location.origin), 'petru-ines-");
-      }
+      // Keep the authentication popup on the canonical portal origin. Safari/iPadOS
+      // may sever window.opener for a cross-origin popup; the local page talks to
+      // api.petruandines.com over the narrowly allowlisted CORS auth surface.
+      const loginOpen = "window.open(API + '/login.html?state=' + loginState, 'petru-ines-login'";
+      const localLoginOpen = "window.open('/portal/login.html?state=' + loginState, 'petru-ines-login'";
+      if (!text.includes(loginOpen)) throw new Error('Portal login popup source changed');
+      text = text.replace(loginOpen, localLoginOpen);
+
+      const loginOriginCheck = "if (!ready() || event.origin !== API || !loginWindow || event.source !== loginWindow ||";
+      const localLoginOriginCheck = "if (!ready() || event.origin !== window.location.origin || !loginWindow || event.source !== loginWindow ||";
+      if (!text.includes(loginOriginCheck)) throw new Error('Portal login origin guard changed');
+      text = text.replace(loginOriginCheck, localLoginOriginCheck);
+
+      // Account creation remains on the API host for now and keeps its explicit
+      // return-origin parameter and exact postMessage origin checks.
+      const accountNeedle = " + accountState, 'petru-ines-account";
+      if (!text.includes(accountNeedle)) throw new Error('Portal account popup source changed');
+      text = text.replace(accountNeedle,
+        " + accountState + '&portal_origin=' + encodeURIComponent(window.location.origin), 'petru-ines-account");
     }
     data = Buffer.from(text);
   }
@@ -78,8 +92,14 @@ if (existsSync(join(out, '_worker.js')) || existsSync(join(out, '_routes.json'))
 }
 const portalIndex = readFileSync(join(out, 'portal/index.html'), 'utf8');
 const portalConfig = readFileSync(join(out, 'portal/config.js'), 'utf8');
+const portalApp = readFileSync(join(out, 'portal/app.js'), 'utf8');
+const portalLogin = readFileSync(join(out, 'portal/login.html'), 'utf8');
 if (!portalIndex.includes(`connect-src ${newApi}`)) throw new Error('Portal CSP does not use custom API domain');
 if (!portalConfig.includes(newApi)) throw new Error('Portal config does not use custom API domain');
 if (portalIndex.includes(oldApi) || portalConfig.includes(oldApi)) throw new Error('Legacy workers.dev API leaked into portal build');
+if (!portalApp.includes("window.open('/portal/login.html?state=' + loginState")) throw new Error('Portal does not use same-origin login');
+if (portalApp.includes("API + '/login.html?state=' + loginState")) throw new Error('Cross-origin login popup leaked into build');
+if (!portalApp.includes('event.origin !== window.location.origin || !loginWindow')) throw new Error('Same-origin login message guard missing');
+if (!portalLogin.includes('login.js') || !portalLogin.includes('login.css')) throw new Error('Portal login assets missing');
 if (broken.length) throw new Error('Broken local links:\n' + broken.join('\n'));
-console.log('Cloudflare build:', included.length, 'public files; static-only deployment; all local HTML links verified.');
+console.log('Cloudflare build:', included.length, 'public files; static-only deployment; same-origin portal login verified.');
