@@ -384,27 +384,24 @@ test('staff edits scoped records; a client cannot edit or archive anything', asy
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action = 'update'").get().n, 1);
 });
 
-test('archive preserves history, prevents linked deletion and revokes client access', async () => {
+test('archive cascades linked records, preserves history and revokes client access', async () => {
   const { call, sqlite } = setup();
   const archive = path => call(path, 'admin', { method: 'DELETE' });
-  assert.equal((await archive('clients/a')).status, 409);
-  assert.equal((await archive('locations/loc_a')).status, 409);
-  assert.equal((await archive('appointments/ap_a')).status, 200);
-  assert.equal((await (await call('appointments', 'a')).json()).rows.length, 0);
-  assert.equal(sqlite.prepare('SELECT id FROM appointments WHERE id = ?').get('ap_a').id, 'ap_a');
-  assert.equal((await archive('appointments/ap_a')).status, 404);
-  assert.equal((await archive('locations/loc_a')).status, 200);
   assert.equal((await archive('clients/a')).status, 200);
+  assert.ok(sqlite.prepare('SELECT deleted_at FROM clients WHERE id = ?').get('a').deleted_at);
+  assert.ok(sqlite.prepare('SELECT deleted_at FROM locations WHERE id = ?').get('loc_a').deleted_at);
+  assert.ok(sqlite.prepare('SELECT deleted_at FROM appointments WHERE id = ?').get('ap_a').deleted_at);
+  assert.equal((await archive('clients/a')).status, 404);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM client_users WHERE client_id = ?').get('a').n, 0);
   assert.equal((await (await call('clients', 'admin')).json()).rows.some(row => row.id === 'a'), false);
   assert.equal((await call('locations', 'a')).status, 401);
   assert.equal((await call('me', 'a')).status, 401);
   assert.equal((await call('messages', 'a', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ body: 'Acum?' }) })).status, 401);
-  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action = 'delete'").get().n, 3);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action = 'delete'").get().n, 1);
 });
 
-test('financial records and messages can be changed and archived with audit', async () => {
+test('financial records and messages can be changed and cascade-archived with audit', async () => {
   const { call, sqlite } = setup();
   const post = (name, data) => call(name, 'admin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data) });
@@ -412,17 +409,18 @@ test('financial records and messages can be changed and archived with audit', as
   const job = (await (await post('jobs', { client_id: 'a', service_name: 'Curățenie' })).json()).id;
   const payment = (await (await post('payments', { client_id: 'a', job_id: job, amount_bani: 10000 })).json()).id;
   const message = (await (await post('messages', { client_id: 'a', body: 'Salut' })).json()).id;
-  assert.equal((await call('jobs/' + job, 'admin', { method: 'DELETE' })).status, 409);
   assert.equal((await patch('payments/' + payment, { amount_bani: 25000, note: 'Transfer bancar' })).status, 200);
   assert.equal((await patch('payments/' + payment, { job_id: 'job_b' })).status, 400);
   assert.equal((await patch('messages/' + message, { body: 'Bună ziua!' })).status, 200);
-  assert.equal((await call('payments/' + payment, 'admin', { method: 'DELETE' })).status, 200);
   assert.equal((await call('jobs/' + job, 'admin', { method: 'DELETE' })).status, 200);
+  assert.equal((await call('payments/' + payment, 'admin', { method: 'DELETE' })).status, 404);
+  assert.equal((await call('jobs/' + job, 'admin', { method: 'DELETE' })).status, 404);
   assert.equal((await call('messages/' + message, 'admin', { method: 'DELETE' })).status, 200);
   assert.equal((await (await call('payments', 'a')).json()).rows.length, 0);
   assert.equal((await (await call('messages', 'a')).json()).rows.length, 0);
   assert.equal(sqlite.prepare('SELECT amount_bani FROM payments WHERE id = ?').get(payment).amount_bani, 25000);
-  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action IN ('update','delete')").get().n, 5);
+  assert.ok(sqlite.prepare('SELECT deleted_at FROM payments WHERE id = ?').get(payment).deleted_at);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE action IN ('update','delete')").get().n, 4);
 });
 
 test('a failed audit rolls back an archive; inactive clients lose access', async () => {
@@ -485,7 +483,7 @@ test('multi-location payment has one total, scoped links, editable selection and
  assert.throws(()=>sqlite.exec(`INSERT INTO payment_locations VALUES('${id}','b','loc_b')`),/FOREIGN KEY/);
  assert.equal((await call('payments/'+id,'admin',{method:'DELETE'})).status,200);
  assert.equal((await (await call('payments','a')).json()).rows.length,0);
- assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payment_locations WHERE payment_id=?').get(id).n,1);
+ assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM payment_locations WHERE payment_id=?').get(id).n,0);
  assert.deepEqual(sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
 });
 
