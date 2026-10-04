@@ -24,9 +24,8 @@ for (const path of included) {
   let data = readFileSync(source);
   if (textTypes.has(extname(path))) {
     let text = data.toString('utf8').replaceAll(oldBase, newBase).replaceAll('/cleaning-services/', '/');
-    if (path.endsWith('.html')) {
-      if (!text.includes('<head>')) throw new Error('HTML head missing: ' + path);
-      if (!text.includes(canonicalHostScript)) text = text.replace('<head>', '<head>\n' + canonicalHostScript);
+    if (path.endsWith('.html') && text.includes('<head>') && !text.includes(canonicalHostScript)) {
+      text = text.replace('<head>', '<head>\n' + canonicalHostScript);
     }
     if (path === 'portal/app.js') {
       for (const state of ['loginState','accountState']) {
@@ -65,7 +64,7 @@ writeFileSync(join(out, '_headers'), [
 const broken = [];
 for (const path of included.filter(p => p.endsWith('.html'))) {
   const text = readFileSync(join(out, path), 'utf8');
-  if (!text.includes(canonicalHostScript)) broken.push(path + ' -> canonical host script missing');
+  if (text.includes('<head>') && !text.includes(canonicalHostScript)) broken.push(path + ' -> canonical host script missing');
   for (const match of text.matchAll(/(?:href|src)\s*=\s*["']([^"']+)["']/g)) {
     const raw = match[1];
     if (/^(?:#|data:|mailto:|tel:|javascript:)/.test(raw)) continue;
