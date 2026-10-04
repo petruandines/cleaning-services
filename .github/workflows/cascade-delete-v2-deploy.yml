@@ -23,7 +23,7 @@ jobs:
       - name: Read verified backend source
         uses: actions/checkout@v4
         with:
-          ref: e77e70edc1fe0bf2ed6d0edf48dc255b25d73a51
+          ref: backend/cascade-delete-v2
           path: .backend-source
           persist-credentials: false
       - name: Read production routing policy
