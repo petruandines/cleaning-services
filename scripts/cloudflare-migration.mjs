@@ -5,7 +5,7 @@ const ZONE = '556df3da801c06b34a4dcd7ea25c0d06';
 const DOMAIN = 'petruandines.com';
 const PROJECT = 'petruandines-site';
 const PREVIEW = 'https://petruandines-site.pages.dev';
-const API = 'https://petru-ines-portal-api.petruandines.workers.dev';
+const API = 'https://api.petruandines.com';
 const PROJECT_PATH = `/accounts/${ACCOUNT}/pages/projects/${PROJECT}`;
 
 async function cf(path, method='GET', body) {
@@ -29,7 +29,9 @@ async function inspect() {
   assert.deepEqual(settings.bindings.map(b => b.name).sort(),['BETTER_AUTH_SECRET','DB','PUBLIC_API_URL']);
   assert.equal(settings.compatibility_date,'2026-09-24');
   assert.deepEqual(settings.compatibility_flags,['nodejs_compat']);
-  console.log('Verified target zone, existing Worker configuration, unchanged D1 binding and authentication secret presence.');
+  const workerDomains = await cf(`/accounts/${ACCOUNT}/workers/domains`);
+  assert.ok(workerDomains.some(d => d.hostname === 'api.petruandines.com' && d.service === 'petru-ines-portal-api'));
+  console.log('Verified target zone, API custom domain, existing Worker configuration, unchanged D1 binding and authentication secret presence.');
 }
 
 async function getProject() {
@@ -47,7 +49,7 @@ async function publicFetch(url, options={}) {
 async function verifySite(base) {
   for (const [path,marker] of [
     ['/','https://petruandines.com/'], ['/portal/','Portal clienți'],
-    ['/portal/app.js','portal_origin='], ['/catalog/','<html'],
+    ['/portal/config.js',API], ['/portal/app.js','portal_origin='], ['/catalog/','<html'],
     ['/oferte/','<html'], ['/sitemap.xml','https://petruandines.com/'],
   ]) {
     const response = await publicFetch(base + path);
@@ -55,7 +57,11 @@ async function verifySite(base) {
     const text = await response.text();
     assert.ok(text.includes(marker),'Content marker missing: ' + path);
     if (path === '/' || path === '/sitemap.xml') assert.ok(!text.includes('petruandines.github.io/cleaning-services'));
-    if (path === '/portal/') assert.match(response.headers.get('cache-control') || '',/no-store/);
+    if (path === '/portal/') {
+      assert.match(response.headers.get('cache-control') || '',/no-store/);
+      assert.ok(text.includes(`connect-src ${API}`),'Portal CSP must use custom API domain');
+      assert.ok(!text.includes('petru-ines-portal-api.petruandines.workers.dev'),'Legacy API must not remain in portal HTML');
+    }
   }
   const missing = await publicFetch(base + '/migration-missing-page-check');
   assert.equal(missing.status,404,'Missing routes must not serve a login or home page');
@@ -81,7 +87,7 @@ async function verifyPortal() {
     const text = await response.text();
     assert.ok(text.includes('validPortalOrigin') && text.includes('https://petruandines.com'));
   }
-  console.log('Live portal verified: custom/legacy origin support, popup origin validation and anonymous access denied.');
+  console.log('Live portal verified: custom API domain, custom/legacy origin support, popup origin validation and anonymous access denied.');
 }
 
 async function retry(check, attempts=8) {
