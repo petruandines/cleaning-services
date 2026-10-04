@@ -1,28 +1,20 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: Redirect legacy GitHub Pages to petruandines.com
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
     environment:
       name: github-pages
@@ -31,13 +23,65 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Prepare redirect-only Pages site
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf redirect-site
+          mkdir -p redirect-site
+
+          cat > /tmp/redirect.html <<'HTML'
+          <!doctype html>
+          <html lang="ro">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <meta name="robots" content="noindex, nofollow">
+            <title>Petru & Inés — site mutat</title>
+            <script>
+              (function () {
+                var legacyBase = '/cleaning-services';
+                var path = window.location.pathname;
+                if (path === legacyBase || path === legacyBase + '/') {
+                  path = '/';
+                } else if (path.indexOf(legacyBase + '/') === 0) {
+                  path = path.slice(legacyBase.length);
+                }
+                var target = 'https://petruandines.com' + path + window.location.search + window.location.hash;
+                window.location.replace(target);
+              }());
+            </script>
+          </head>
+          <body>
+            <p>Site-ul Petru & Inés s-a mutat la <a href="https://petruandines.com/">petruandines.com</a>.</p>
+          </body>
+          </html>
+          HTML
+
+          cp /tmp/redirect.html redirect-site/index.html
+          cp /tmp/redirect.html redirect-site/404.html
+
+          while IFS= read -r file; do
+            case "$file" in
+              *.html)
+                case "$file" in
+                  .github/*|.deployment/*|docs/*|scripts/*|node_modules/*|portal-v2-backend/*) continue ;;
+                esac
+                mkdir -p "redirect-site/$(dirname "$file")"
+                cp /tmp/redirect.html "redirect-site/$file"
+                ;;
+            esac
+          done < <(git ls-files)
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Upload artifact
+
+      - name: Upload redirect site
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
-      - name: Deploy to GitHub Pages
+          path: redirect-site
+
+      - name: Deploy redirect site to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
