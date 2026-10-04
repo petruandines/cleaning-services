@@ -1,0 +1,24 @@
+name: Configure portal API custom domain test
+
+on:
+  push:
+    branches: ["fix/api-custom-domain"]
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check script syntax
+        run: node --check scripts/configure-portal-api-domain.mjs
+      - name: Attach and verify api.petruandines.com
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_WORKER_UPDATE_TOKEN }}
+        run: node scripts/configure-portal-api-domain.mjs apply
