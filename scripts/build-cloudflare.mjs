@@ -6,6 +6,8 @@ const root = resolve(import.meta.dirname, '..');
 const out = join(root, 'dist-cloudflare');
 const oldBase = 'https://petruandines.github.io/cleaning-services';
 const newBase = 'https://petruandines.com';
+const oldApi = 'https://petru-ines-portal-api.petruandines.workers.dev';
+const newApi = 'https://api.petruandines.com';
 const textTypes = new Set(['.html','.css','.js','.mjs','.json','.txt','.xml','.webmanifest','.svg']);
 const files = execFileSync('git', ['ls-files', '-z'], {cwd:root, encoding:'utf8'}).split('\0').filter(Boolean);
 const included = files.filter(path => {
@@ -22,7 +24,10 @@ for (const path of included) {
   mkdirSync(dirname(dest), {recursive:true});
   let data = readFileSync(source);
   if (textTypes.has(extname(path))) {
-    let text = data.toString('utf8').replaceAll(oldBase, newBase).replaceAll('/cleaning-services/', '/');
+    let text = data.toString('utf8')
+      .replaceAll(oldBase, newBase)
+      .replaceAll('/cleaning-services/', '/')
+      .replaceAll(oldApi, newApi);
     if (path === 'portal/app.js') {
       for (const state of ['loginState','accountState']) {
         const needle = " + " + state + ", 'petru-ines-";
@@ -71,5 +76,10 @@ for (const path of included.filter(p => p.endsWith('.html'))) {
 if (existsSync(join(out, '_worker.js')) || existsSync(join(out, '_routes.json'))) {
   throw new Error('Static Pages build must not contain _worker.js or _routes.json');
 }
+const portalIndex = readFileSync(join(out, 'portal/index.html'), 'utf8');
+const portalConfig = readFileSync(join(out, 'portal/config.js'), 'utf8');
+if (!portalIndex.includes(`connect-src ${newApi}`)) throw new Error('Portal CSP does not use custom API domain');
+if (!portalConfig.includes(newApi)) throw new Error('Portal config does not use custom API domain');
+if (portalIndex.includes(oldApi) || portalConfig.includes(oldApi)) throw new Error('Legacy workers.dev API leaked into portal build');
 if (broken.length) throw new Error('Broken local links:\n' + broken.join('\n'));
 console.log('Cloudflare build:', included.length, 'public files; static-only deployment; all local HTML links verified.');
