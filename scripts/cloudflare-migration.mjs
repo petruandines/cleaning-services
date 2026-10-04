@@ -120,13 +120,8 @@ async function verifyAliasRedirect(origin) {
   const path = '/portal/?view=calendar';
   const response = await publicFetch(origin + path,{redirect:'manual'});
   const expected = 'https://' + DOMAIN + path;
-  if ([301,302,307,308].includes(response.status)) {
-    assert.equal(response.headers.get('location'),expected);
-    return;
-  }
-  assert.equal(response.status,200,'Alias must redirect server-side or serve the static redirect bootstrap');
-  const text = await response.text();
-  assert.ok(text.includes('/assets/js/canonical-host.js'),'Canonical host redirect bootstrap missing on alias');
+  assert.equal(response.status,301,'Alias must redirect with permanent 301');
+  assert.equal(response.headers.get('location'),expected);
 }
 
 const operation = process.argv[2];
