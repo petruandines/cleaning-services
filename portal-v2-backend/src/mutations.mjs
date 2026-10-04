@@ -12,13 +12,6 @@ const definitions = Object.freeze({
   payments: ['location_ids', 'job_id', 'amount_bani', 'status', 'recorded_at', 'note', 'invoice_url'],
   messages: ['body'],
 });
-const dependencies = Object.freeze({
-  clients: [['locations', 'client_id'], ['appointments', 'client_id'], ['jobs', 'client_id'],
-    ['payments', 'client_id'], ['messages', 'client_id']],
-  locations: [['appointments', 'location_id']],
-  appointments: [['jobs', 'appointment_id']],
-  jobs: [['payments', 'job_id']], payments: [], messages: [],
-});
 const fail = (status, error) => ({ status, error });
 const txt = (v, max, required = false) => {
   if (v === undefined || v === null || v === '') return required ? undefined : null;
@@ -36,6 +29,74 @@ async function exists(db, table, id, clientId) {
     .bind(id, clientId).all()).results.length;
 }
 
+function cascadeArchiveOperations(db, name, id, clientId, now) {
+  if (name === 'clients') return [
+    db.prepare('DELETE FROM payment_locations WHERE client_id = ?').bind(id),
+    db.prepare('UPDATE payments SET deleted_at = ? WHERE client_id = ? AND deleted_at IS NULL').bind(now, id),
+    db.prepare('UPDATE jobs SET deleted_at = ?, updated_at = ? WHERE client_id = ? AND deleted_at IS NULL').bind(now, now, id),
+    db.prepare('UPDATE appointments SET deleted_at = ?, updated_at = ? WHERE client_id = ? AND deleted_at IS NULL').bind(now, now, id),
+    db.prepare('UPDATE locations SET deleted_at = ?, updated_at = ?, active = 0 WHERE client_id = ? AND deleted_at IS NULL').bind(now, now, id),
+    db.prepare('UPDATE messages SET deleted_at = ? WHERE client_id = ? AND deleted_at IS NULL').bind(now, id),
+    db.prepare('DELETE FROM client_users WHERE client_id = ?').bind(id),
+    db.prepare("UPDATE clients SET deleted_at = ?, updated_at = ?, status = 'inactive' WHERE id = ? AND deleted_at IS NULL").bind(now, now, id),
+  ];
+
+  if (name === 'locations') return [
+    db.prepare(`DELETE FROM payment_locations WHERE payment_id IN (
+      SELECT p.id FROM payments p
+      JOIN jobs j ON j.id = p.job_id AND j.client_id = p.client_id
+      JOIN appointments a ON a.id = j.appointment_id AND a.client_id = p.client_id
+      WHERE a.location_id = ? AND a.client_id = ? AND a.deleted_at IS NULL
+        AND j.deleted_at IS NULL AND p.deleted_at IS NULL
+    )`).bind(id, clientId),
+    db.prepare('DELETE FROM payment_locations WHERE location_id = ? AND client_id = ?').bind(id, clientId),
+    db.prepare(`UPDATE payments SET deleted_at = ? WHERE client_id = ? AND deleted_at IS NULL AND job_id IN (
+      SELECT j.id FROM jobs j JOIN appointments a ON a.id = j.appointment_id AND a.client_id = j.client_id
+      WHERE a.location_id = ? AND a.client_id = ? AND a.deleted_at IS NULL AND j.deleted_at IS NULL
+    )`).bind(now, clientId, id, clientId),
+    db.prepare(`UPDATE jobs SET deleted_at = ?, updated_at = ? WHERE client_id = ? AND deleted_at IS NULL AND appointment_id IN (
+      SELECT a.id FROM appointments a WHERE a.location_id = ? AND a.client_id = ? AND a.deleted_at IS NULL
+    )`).bind(now, now, clientId, id, clientId),
+    db.prepare('UPDATE appointments SET deleted_at = ?, updated_at = ? WHERE location_id = ? AND client_id = ? AND deleted_at IS NULL')
+      .bind(now, now, id, clientId),
+    db.prepare('UPDATE locations SET deleted_at = ?, updated_at = ?, active = 0 WHERE id = ? AND client_id = ? AND deleted_at IS NULL')
+      .bind(now, now, id, clientId),
+  ];
+
+  if (name === 'appointments') return [
+    db.prepare(`DELETE FROM payment_locations WHERE payment_id IN (
+      SELECT p.id FROM payments p JOIN jobs j ON j.id = p.job_id AND j.client_id = p.client_id
+      WHERE j.appointment_id = ? AND j.client_id = ? AND j.deleted_at IS NULL AND p.deleted_at IS NULL
+    )`).bind(id, clientId),
+    db.prepare(`UPDATE payments SET deleted_at = ? WHERE client_id = ? AND deleted_at IS NULL AND job_id IN (
+      SELECT id FROM jobs WHERE appointment_id = ? AND client_id = ? AND deleted_at IS NULL
+    )`).bind(now, clientId, id, clientId),
+    db.prepare('UPDATE jobs SET deleted_at = ?, updated_at = ? WHERE appointment_id = ? AND client_id = ? AND deleted_at IS NULL')
+      .bind(now, now, id, clientId),
+    db.prepare('UPDATE appointments SET deleted_at = ?, updated_at = ? WHERE id = ? AND client_id = ? AND deleted_at IS NULL')
+      .bind(now, now, id, clientId),
+  ];
+
+  if (name === 'jobs') return [
+    db.prepare('DELETE FROM payment_locations WHERE payment_id IN (SELECT id FROM payments WHERE job_id = ? AND client_id = ? AND deleted_at IS NULL)')
+      .bind(id, clientId),
+    db.prepare('UPDATE payments SET deleted_at = ? WHERE job_id = ? AND client_id = ? AND deleted_at IS NULL')
+      .bind(now, id, clientId),
+    db.prepare('UPDATE jobs SET deleted_at = ?, updated_at = ? WHERE id = ? AND client_id = ? AND deleted_at IS NULL')
+      .bind(now, now, id, clientId),
+  ];
+
+  if (name === 'payments') return [
+    db.prepare('DELETE FROM payment_locations WHERE payment_id = ? AND client_id = ?').bind(id, clientId),
+    db.prepare('UPDATE payments SET deleted_at = ? WHERE id = ? AND client_id = ? AND deleted_at IS NULL').bind(now, id, clientId),
+  ];
+
+  if (name === 'messages') return [
+    db.prepare('UPDATE messages SET deleted_at = ? WHERE id = ? AND client_id = ? AND deleted_at IS NULL').bind(now, id, clientId),
+  ];
+  throw new Error('Unsupported archive target');
+}
+
 export async function changeStaffRecord(db, name, id, data, actor) {
   if (!Object.hasOwn(definitions, name) || !/^[\w-]{1,100}$/.test(id)) return fail(404, 'not_found');
   const rows = await db.prepare(`SELECT id, ${name === 'clients' ? 'id' : 'client_id'} AS client_id${name === 'payments' ? ', job_id' : ''} FROM ${name} WHERE id = ? AND deleted_at IS NULL LIMIT 1`)
@@ -46,15 +107,7 @@ export async function changeStaffRecord(db, name, id, data, actor) {
   const now = new Date().toISOString();
 
   if (data === null) {
-    for (const [dependent, column] of dependencies[name]) {
-      const found = await db.prepare(`SELECT id FROM ${dependent} WHERE ${column} = ? AND deleted_at IS NULL LIMIT 1`).bind(id).all();
-      if (found.results.length) return fail(409, 'has_related_records');
-    }
-    const stamp = ['clients', 'locations', 'appointments', 'jobs'].includes(name) ? ', updated_at = ?' : '';
-    const operations = [db.prepare(`UPDATE ${name} SET deleted_at = ?${stamp}${name === 'clients' ? ', status = ?' :
-      name === 'locations' ? ', active = 0' : ''} WHERE id = ? AND deleted_at IS NULL`)
-      .bind(...(name === 'clients' ? [now, now, 'inactive', id] : stamp ? [now, now, id] : [now, id]))];
-    if (name === 'clients') operations.push(db.prepare('DELETE FROM client_users WHERE client_id = ?').bind(id));
+    const operations = cascadeArchiveOperations(db, name, id, clientId, now);
     if (name === 'payments' && record.job_id?.startsWith('auto-payment-')) {
       // This job was created solely as the payment's required internal link.
       // Keep it if another active payment was attached through the legacy API.
