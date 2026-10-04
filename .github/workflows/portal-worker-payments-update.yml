@@ -34,6 +34,14 @@ jobs:
         with:
           ref: 97e4aa49168b174800ae5507f3f5e7b28fa0d813
           persist-credentials: false
+      - name: Read current production routing policy
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .production-policy
+          persist-credentials: false
+      - name: Enforce production Worker routing
+        run: node .production-policy/scripts/enforce-portal-worker-production-config.mjs portal-v2-backend/wrangler.jsonc
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
