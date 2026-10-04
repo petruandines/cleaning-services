@@ -9,24 +9,50 @@ const API = 'https://api.cloudflare.com/client/v4';
 const ORIGIN = 'https://petruandines.com';
 const SETTINGS_PATH = `/accounts/${ACCOUNT}/workers/scripts/${SCRIPT}/settings`;
 
+function cloudflareError(method, path, response, data) {
+  const details = Array.isArray(data.errors)
+    ? data.errors.map(error => `${error.code ?? ''} ${error.message ?? ''}`.trim()).join('; ')
+    : '';
+  return new Error(`Cloudflare ${method} ${path}: HTTP ${response.status}${details ? '; ' + details : ''}`);
+}
+
 async function cf(path, method = 'GET', body) {
   assert.ok(process.env.CLOUDFLARE_API_TOKEN, 'Missing CLOUDFLARE_API_TOKEN');
   const response = await fetch(API + path, {
     method,
     headers: {
       Authorization: 'Bearer ' + process.env.CLOUDFLARE_API_TOKEN,
-      'Content-Type': 'application/json',
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(30000),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.success !== true) {
-    const details = Array.isArray(data.errors)
-      ? data.errors.map(error => `${error.code ?? ''} ${error.message ?? ''}`.trim()).join('; ')
-      : '';
-    throw new Error(`Cloudflare ${method} ${path}: HTTP ${response.status}${details ? '; ' + details : ''}`);
-  }
+  if (!response.ok || data.success !== true) throw cloudflareError(method, path, response, data);
+  return data.result;
+}
+
+async function cfPatchSettings(metadata) {
+  assert.ok(process.env.CLOUDFLARE_API_TOKEN, 'Missing CLOUDFLARE_API_TOKEN');
+  const boundary = '----petruines-' + crypto.randomUUID();
+  const payload = [
+    `--${boundary}\r\n`,
+    'Content-Disposition: form-data; name="metadata"\r\n',
+    'Content-Type: application/json\r\n\r\n',
+    JSON.stringify(metadata),
+    `\r\n--${boundary}--\r\n`,
+  ].join('');
+  const response = await fetch(API + SETTINGS_PATH, {
+    method: 'PATCH',
+    headers: {
+      Authorization: 'Bearer ' + process.env.CLOUDFLARE_API_TOKEN,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    },
+    body: payload,
+    signal: AbortSignal.timeout(30000),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success !== true) throw cloudflareError('PATCH', SETTINGS_PATH, response, data);
   return data.result;
 }
 
@@ -67,7 +93,7 @@ async function apply() {
       }
       return { name: binding.name, type: 'inherit', version_id: 'latest' };
     });
-    await cf(SETTINGS_PATH, 'PATCH', { bindings });
+    await cfPatchSettings({ bindings });
     console.log('Updated PUBLIC_API_URL while inheriting DB and auth-secret bindings.');
   } else {
     console.log('PUBLIC_API_URL already uses the custom API domain.');
