@@ -1,0 +1,62 @@
+name: Deploy portal cascade deletion
+
+on:
+  push:
+    branches: ["deploy/cascade-delete"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-cascade-delete-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/deploy/cascade-delete'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
+    steps:
+      - name: Read verified cascade-delete backend at fixed commit
+        uses: actions/checkout@v4
+        with:
+          ref: 3515cb87b0204d717483db271b77cb62557b88ed
+          path: .backend-source
+          persist-credentials: false
+      - name: Read current production routing policy
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: .production-policy
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: .backend-source/portal-v2-backend/package-lock.json
+      - name: Enforce production API routing
+        run: node .production-policy/scripts/enforce-portal-worker-production-config.mjs .backend-source/portal-v2-backend/wrangler.jsonc
+      - name: Install locked backend dependencies
+        working-directory: .backend-source/portal-v2-backend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run complete backend test suite
+        working-directory: .backend-source/portal-v2-backend
+        run: npm test
+      - name: Compile production Worker
+        working-directory: .backend-source/portal-v2-backend
+        run: npx wrangler deploy --dry-run
+      - name: Deploy cascade-delete Worker after guarded inspection
+        working-directory: .backend-source/portal-v2-backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_WORKER_CONTRACT_TOKEN }}
+          PORTAL_WORKER_AUTH_SECRET: ${{ secrets.PORTAL_WORKER_AUTH_SECRET }}
+        run: node scripts/deploy-cascade-delete-worker.mjs deploy "UPDATE PORTAL CASCADE DELETE 6816004b-dc95-48c9-be52-9bd4131d157e"
+      - name: Verify hardened production Worker state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+        run: node .production-policy/scripts/cloudflare-migration.mjs inspect
