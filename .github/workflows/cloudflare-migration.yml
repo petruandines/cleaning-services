@@ -1,4 +1,4 @@
-name: Cloudflare domain migration
+name: Cloudflare site publication and verification
 on:
   push:
     branches: [main]
@@ -33,33 +33,17 @@ jobs:
       - name: Install pinned deployment dependencies without credentials
         working-directory: .migration/backend-source/portal-v2-backend
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Test portal and compile without credentials
-        working-directory: .migration/backend-source/portal-v2-backend
-        run: |
-          npm test
-          npx wrangler deploy --dry-run
+      - name: Test canonical routing
+        run: node --test .deployment/site-router.test.mjs
       - name: Build public site and verify local links
         run: node scripts/build-cloudflare.mjs
-      - name: Verify existing resources and prepare Pages project
+      - name: Verify existing target resources (read only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
-        run: node scripts/cloudflare-migration.mjs prepare
+        run: node scripts/cloudflare-migration.mjs inspect
       - name: Publish site and portal frontend to Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
         run: node .migration/backend-source/portal-v2-backend/node_modules/wrangler/bin/wrangler.js pages deploy dist-cloudflare --project-name petruandines-site --branch main --commit-dirty=true
-      - name: Update portal origins and popup destinations, preserving secrets and database
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
-        working-directory: .migration/backend-source/portal-v2-backend
-        run: npx wrangler deploy --keep-vars
-      - name: Verify deployed preview and protected portal API
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
-        run: node scripts/cloudflare-migration.mjs verify-preview
-      - name: Connect petruandines.com and www DNS
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
-        run: node scripts/cloudflare-migration.mjs connect
       - name: Verify HTTPS on custom domains
         run: node scripts/cloudflare-migration.mjs verify-domain

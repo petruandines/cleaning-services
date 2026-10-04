@@ -117,7 +117,10 @@ async function connectDomains() {
 }
 
 const operation = process.argv[2];
-if (operation === 'prepare') {
+if (operation === 'inspect') {
+  await inspect();
+  await getProject();
+} else if (operation === 'prepare') {
   await inspect();
   const projects = await cf(`/accounts/${ACCOUNT}/pages/projects`);
   if (!projects.some(p => p.name === PROJECT)) {
@@ -136,9 +139,11 @@ if (operation === 'prepare') {
 } else if (operation === 'verify-domain') {
   await retry(async () => {
     await verifySite('https://' + DOMAIN);
-    const www = await publicFetch('https://www.' + DOMAIN + '/portal/',{redirect:'manual'});
-    assert.equal(www.status,301);
-    assert.equal(www.headers.get('location'),'https://' + DOMAIN + '/portal/');
+    for (const origin of ['https://www.' + DOMAIN,PREVIEW]) {
+      const response = await publicFetch(origin + '/portal/?view=calendar',{redirect:'manual'});
+      assert.equal(response.status,301);
+      assert.equal(response.headers.get('location'),'https://' + DOMAIN + '/portal/?view=calendar');
+    }
   },18);
   await verifyPortal();
 } else throw new Error('Unknown migration operation');

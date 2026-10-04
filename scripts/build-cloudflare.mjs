@@ -35,13 +35,14 @@ for (const path of included) {
   writeFileSync(dest, data);
 }
 writeFileSync(join(out, '_redirects'), [
-  'https://www.petruandines.com/* https://petruandines.com/:splat 301',
   '/cleaning-services / 301',
   '/cleaning-services/* /:splat 301',
   '/portal-v2-frontend /portal/ 301',
   '/portal-v2-frontend/* /portal/:splat 301',
   '',
 ].join('\n'));
+writeFileSync(join(out, '_worker.js'), readFileSync(join(root,'.deployment/site-router.mjs')));
+writeFileSync(join(out, '_routes.json'), JSON.stringify({version:1,include:['/*'],exclude:[]}));
 writeFileSync(join(out, '_headers'), [
   '/*',
   '  X-Content-Type-Options: nosniff',
