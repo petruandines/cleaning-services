@@ -2,22 +2,27 @@
 
 ## Stare și activare
 
-Cod implementat și testat local/CI. Frontend publicat; modulul nu este încă activ
-în producție deoarece nu există un credential D1 utilizabil în GitHub Actions.
-Migrarea s-a oprit înainte de orice scriere, iar Worker-ul existent a rămas la
-`2060d84af71fa271c7c69031dfd8b4ced2134e48`.
+Modul activ în producție din 6 octombrie 2026. Schema dedicată a fost creată
+additiv, API-ul a fost publicat din sursa verificată
+`927dc5e65f1aba5de2f674d916311214f9e78775`, iar testul HTTP live a trecut.
 
-Pentru activare, creează în Cloudflare un token **Account → D1 → Edit**, limitat
-la contul în care se află `petru-ines-portal-eu`. Salvează-l în GitHub, repository
-`petruandines/cleaning-services`, Settings → Secrets and variables → Actions,
-cu numele exact **PORTAL_ONE_TIME_D1_TOKEN**. Nu trimite tokenul în conversație.
-Rulează manual workflow-ul **Portal isolated one-time projects production deploy**
-pe `main`. Acesta aplică schema dedicată, publică API-ul, apoi rulează smoke live.
+Verificare: [GitHub Actions, run 37487873307, attempt 2](https://github.com/petruandines/cleaning-services/actions/runs/37487873307/attempts/2).
+92 teste backend și 10 teste frontend au trecut, fără erori. Verificarea live
+confirmă login-ul cu parolă, cookie-ul persistent securizat, izolarea payload-ului,
+progresul, review-ul după finalizare, factura, revocarea/reactivarea, logout-ul și
+expirarea. Datele fictive au fost eliminate exclusiv din tabelele noi.
+
+Secretul GitHub **PORTAL_ONE_TIME_D1_TOKEN** folosește permisiunea Cloudflare
+**Account → D1 → Edit** pentru contul bazei `petru-ines-portal-eu`.
+Pentru republicare, rulează workflow-ul **Portal isolated one-time projects production deploy**
+pe `main`. Acesta verifică schema dedicată, publică API-ul, apoi rulează smoke live.
 
 Fără secret, workflow-ul păstrează și verifică backend-ul original. Linkul nou din
 meniu apare numai când API-ul nou răspunde corect pentru adminul autentificat.
-Nu declara activarea completă înainte de succesul smoke-ului live. Conturile reale
-nu au fost utilizate pentru autentificări de test în producție.
+Conturile reale nu au fost utilizate pentru autentificări de test în producție;
+fluxurile lor sunt acoperite de testele existente. Pagina publică și login-ul
+portalului au fost verificate în browser, iar rutarea și binding-urile au fost
+verificate după deployment.
 
 ## Utilizare
 
