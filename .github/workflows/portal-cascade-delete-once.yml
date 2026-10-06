@@ -60,7 +60,7 @@ jobs:
       - name: Apply isolated additive one-time schema
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_D1_CONTRACT_TOKEN }}
         run: node scripts/one-time-schema.mjs
       - name: Deploy verified Worker code
         working-directory: .backend-source/portal-v2-backend
@@ -75,5 +75,5 @@ jobs:
       - name: Verify live temporary access with isolated disposable fixtures
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_D1_CONTRACT_TOKEN }}
         run: node scripts/one-time-live-smoke.mjs
