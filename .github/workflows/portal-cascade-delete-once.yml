@@ -1,6 +1,7 @@
 name: Portal isolated one-time projects production deploy
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -60,7 +61,7 @@ jobs:
       - name: Apply isolated additive one-time schema
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_D1_CONTRACT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN || secrets.PORTAL_D1_CONTRACT_TOKEN || secrets.PORTAL_D1_FIELDS_TOKEN || secrets.PORTAL_D1_UPGRADE_TOKEN || secrets.PORTAL_D1_MIGRATE_TOKEN || secrets.PORTAL_D1_ADMIN_TOKEN || secrets.PORTAL_RESTORE_D1_EDIT_TOKEN }}
         run: node scripts/one-time-schema.mjs
       - name: Deploy verified Worker code
         working-directory: .backend-source/portal-v2-backend
@@ -75,5 +76,5 @@ jobs:
       - name: Verify live temporary access with isolated disposable fixtures
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_D1_CONTRACT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN || secrets.PORTAL_D1_CONTRACT_TOKEN || secrets.PORTAL_D1_FIELDS_TOKEN || secrets.PORTAL_D1_UPGRADE_TOKEN || secrets.PORTAL_D1_MIGRATE_TOKEN || secrets.PORTAL_D1_ADMIN_TOKEN || secrets.PORTAL_RESTORE_D1_EDIT_TOKEN }}
         run: node scripts/one-time-live-smoke.mjs
