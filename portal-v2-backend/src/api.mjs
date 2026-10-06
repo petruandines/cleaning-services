@@ -236,7 +236,9 @@ async function dispatchApi(request, { db, auth }) {
   if (request.method === 'POST') {
     if (name === 'users' && !staff) return error(403, 'forbidden');
     if (!staff && !['messages', 'password'].includes(name)) return error(403, 'forbidden');
-    if (name === 'password' && (staff || request.headers.get('Origin') !== url.origin)) return error(403, 'forbidden');
+    if (name === 'password' && (staff ||
+        ![url.origin, 'https://petruandines.com'].includes(request.headers.get('Origin'))))
+      return error(403, 'forbidden');
     if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return error(415, 'json_required');
     const raw = await request.text();
     if (raw.length > 6000) return error(413, 'payload_too_large');

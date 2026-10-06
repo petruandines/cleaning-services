@@ -7,7 +7,8 @@ import { authOptions } from '../src/auth-options.mjs';
 import { handleApi, ORIGIN } from '../src/api.mjs';
 import worker from '../src/index.mjs';
 
-test('admin links a client account; temporary password gate and session rotation', async () => {
+for (const passwordOrigin of ['https://portal.example.workers.dev', 'https://petruandines.com']) {
+test('admin links a client account; temporary password gate and session rotation from ' + passwordOrigin, async () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys = ON');
   for (const path of ['0001_app_schema.sql', '0002_auth.sql', '0003_portal_accounts.sql',
@@ -78,14 +79,20 @@ test('admin links a client account; temporary password gate and session rotation
   assert.equal(client.status, 200);
   assert.equal((await (await call('me', client.token)).json()).mustChangePassword, true);
   assert.equal((await call('appointments', client.token)).status, 403);
+  assert.equal((await call('password', admin.token, { currentPassword: adminPassword, newPassword }, passwordOrigin)).status, 403);
+  assert.equal((await call('password', client.token, { currentPassword: tempPassword, newPassword }, 'https://untrusted.example')).status, 403);
+  assert.equal((await call('password', client.token, { currentPassword: tempPassword, newPassword }, '')).status, 403);
+  assert.equal((await call('password', client.token, { currentPassword: 'wrong-password', newPassword }, passwordOrigin)).status, 400);
   assert.equal((await call('password', client.token, { currentPassword: 'wrong-password', newPassword }, base)).status, 400);
   assert.equal((await call('password', client.token, { currentPassword: tempPassword, newPassword }, ORIGIN)).status, 403);
-  const changed = await call('password', client.token, { currentPassword: tempPassword, newPassword }, base);
+  const changed = await call('password', client.token, { currentPassword: tempPassword, newPassword }, passwordOrigin);
   assert.equal(changed.status, 200, await changed.clone().text());
+  if (passwordOrigin === 'https://petruandines.com') assert.equal(changed.headers.get('access-control-allow-origin'), passwordOrigin);
   const freshToken = (await changed.json()).token;
   assert.ok(freshToken);
   assert.equal(await auth.api.getSession({ headers: new Headers({ Authorization: 'Bearer ' + client.token }) }), null);
   assert.equal((await (await call('me', freshToken)).json()).mustChangePassword, false);
+  assert.equal((await call('password', freshToken, { currentPassword: newPassword, newPassword: 'another-new-password-1234' }, passwordOrigin)).status, 409);
   assert.deepEqual((await (await call('appointments', freshToken)).json()).rows.map(row => row.id), ['ap_a']);
   assert.equal((await signIn(payload.email, tempPassword)).status, 401);
   assert.equal((await signIn(payload.email, newPassword)).status, 200);
@@ -127,3 +134,4 @@ test('admin links a client account; temporary password gate and session rotation
   assert.equal((await worker.fetch(new Request(base + '/api/auth/admin/create-user', { method: 'POST' }), {})).status, 404);
   sqlite.close();
 });
+}
