@@ -4,10 +4,10 @@
 
 Modul activ în producție din 6 octombrie 2026. Schema dedicată a fost creată
 additiv, API-ul a fost publicat din sursa verificată
-`927dc5e65f1aba5de2f674d916311214f9e78775`, iar testul HTTP live a trecut.
+`78c3ccee008f03813d79e8684d382afb9a0ca0e8`, iar testul HTTP live a trecut.
 
 Verificare: [GitHub Actions, run 37487873307, attempt 2](https://github.com/petruandines/cleaning-services/actions/runs/37487873307/attempts/2).
-92 teste backend și 10 teste frontend au trecut, fără erori. Verificarea live
+94 teste backend și 10 teste frontend au trecut, fără erori. Verificarea live
 confirmă login-ul cu parolă, cookie-ul persistent securizat, izolarea payload-ului,
 progresul, review-ul după finalizare, factura, revocarea/reactivarea, logout-ul și
 expirarea. Datele fictive au fost eliminate exclusiv din tabelele noi.
@@ -36,7 +36,7 @@ din filă și verifică autorizarea pe server pentru fiecare cerere.
 2. Alege durata accesului de la finalizare (implicit 7 zile; personalizat 1–3650,
    sau niciodată). Locația poate fi ascunsă clientului.
 3. Generează accesul și setează o parolă de minimum 12 caractere. Parola se poate
-   genera și copia înainte de salvare. După salvare nu se mai poate recupera.
+   genera și copia înainte de salvare. După salvare adminul o poate copia folosind „Copiază parolă”.
 4. Copiază linkul `/portal/project/?token=<64 caractere hex>`; trimite parola separat.
 5. Începe intervenția, bifează sarcinile, apoi confirmă finalizarea.
 6. Finalizarea afișează review-ul Google și fixează `completed_at`.
@@ -56,7 +56,7 @@ linkul de navigare vizibil adminului. Nicio pagină publică existentă nu este 
 
 Backend-ul este păstrat în branch-ul `feat/one-time-projects`, pornit exact din
 versiunea funcțională `2060d84af71fa271c7c69031dfd8b4ced2134e48`.
-Sursa publicată este fixată la `927dc5e65f1aba5de2f674d916311214f9e78775`.
+Sursa publicată este fixată la `78c3ccee008f03813d79e8684d382afb9a0ca0e8`.
 Modificarea în `src/index.mjs` adaugă numai dispatch-ul prefixului nou;
 autentificarea existentă, API-ul recurent și configurarea Worker nu sunt rescrise.
 
@@ -74,6 +74,7 @@ Tabele noi, fără foreign keys spre clienții sau userii existenți:
 - `one_time_project_access`: token, hash parolă, activare, generație și expirare.
 - `one_time_project_sessions`: numai hash-ul tokenului de sesiune, termen și generație.
 - `one_time_project_activity`: tip, actor, timestamp și detaliu; fără secrete.
+- `one_time_project_passwords`: copie AES-256-GCM recuperabilă numai de admin.
 - `one_time_project_rate_limits`: contoare temporare pentru limitarea login-urilor.
 
 Trei indexuri noi pentru taskuri, sesiuni și jurnal.
@@ -88,6 +89,8 @@ Scriptul de deployment verifică identitatea D1 și definițiile schemei existen
 | `/api/one-time/admin/:id/preview` | GET exact payload-ul clientului; numai admin |
 | `/api/one-time/admin/:id/activity` | GET jurnal paginat |
 | `/api/one-time/admin/:id/access` | POST generate/reset/revoke/reactivate |
+| `/api/one-time/admin/:id/password` | POST copiere parolă; numai admin, fără cache |
+| `/api/one-time/admin/:id/delete` | POST ștergere definitivă cu confirmare |
 | `/api/one-time/admin/:id/start` | POST începe intervenția |
 | `/api/one-time/admin/:id/complete` | POST finalizează cu confirmare explicită |
 | `/api/one-time/client/:token/login` | POST parolă și opțiune remember |
@@ -99,6 +102,20 @@ Scriptul de deployment verifică identitatea D1 și definițiile schemei existen
 Tokenurile linkului și sesiunii folosesc 32 bytes aleatorii criptografic.
 Parolele folosesc `hashPassword`/`verifyPassword` din Better Auth, compatibil cu
 backend-ul existent. Parola nu apare în URL, storage sau loguri.
+
+O copie separată AES-256-GCM permite butonul „Copiază parolă”. Cheia dedicată
+este derivată HKDF-SHA-256 din secretul existent al Worker-ului, păstrat separat de
+D1. Fiecare copie are nonce aleatoriu și este legată criptografic de proiect și
+hash-ul parolei. Hash-ul rămâne singurul mecanism de autentificare. Copia este
+returnată numai prin POST explicit, cu admin și TOTP, Origin verificat și no-store;
+nu apare în liste, preview sau payload-ul clientului. Jurnalul păstrează numai
+evenimentul „Parolă copiată”, actorul și timestamp-ul. Copierea nu invalidează sesiuni.
+Resetarea/regenerarea actualizează atomic hash-ul și copia; ștergerea elimină copia.
+Accesurile vechi fără copie cer o singură resetare de către admin. Rotirea secretului
+Worker fără recriptare face copiile existente nerecuperabile, dar login-ul clientului
+prin hash continuă să funcționeze; adminul poate seta din nou parola.
+Rollback al acestei funcții: restaurarea codului anterior și păstrarea tabelului
+aditiv; scriptul de verificare a schemei trebuie să accepte și tabelul nou.
 Cookie host-only pe API: `__Secure-pi-project`, Secure, HttpOnly, SameSite=Lax,
 cu Path separat pentru tokenul proiectului. Originea portalului și API-ul sunt
 same-site; noul endpoint folosește CORS cu credentials pentru originile existente
@@ -128,7 +145,7 @@ Se livrează numai după finalizarea confirmată, în status Finalizată/Închis
 
 ## Verificare
 
-92 teste backend (87 existente + 5 noi), 10 teste frontend (8 existente + 2 noi),
+94 teste backend (87 existente + 7 noi), 10 teste frontend (8 existente + 2 noi),
 3 teste rutare. Testul UI folosește DOM-ul real, API-ul nou și SQLite cu schema D1;
 autentificarea adminului este simulată numai în acest test. Testele existente ale
 autentificării folosesc Better Auth real și verifică inclusiv TOTP și prima parolă.

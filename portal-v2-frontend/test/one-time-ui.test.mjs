@@ -35,6 +35,9 @@ test('admin and client DOM execute the complete lifecycle against actual isolate
   d.querySelector('form').dispatchEvent(new admin.window.Event('submit',{bubbles:true,cancelable:true}));await wait(()=>b('Generează acces'));
   b('Generează acces').click();await wait(()=>d.querySelector('#password-panel input'));d.querySelector('#password-panel input').value='parola-securizata-123';d.querySelector('#password-panel form').dispatchEvent(new admin.window.Event('submit',{bubbles:true,cancelable:true}));await wait(()=>b('Copiază URL client'));
   const p=s.sqlite.prepare('SELECT id FROM one_time_projects').get(),access=s.sqlite.prepare('SELECT token FROM one_time_project_access').get();
+  let copied='';Object.defineProperty(admin.window.navigator,'clipboard',{value:{writeText:async value=>{copied=value;}}});
+  b('Copiază parolă').click();await wait(()=>copied==='parola-securizata-123');assert.equal(d.querySelector('input[type=password]'),null);assert.equal(admin.window.localStorage.length,0);
+
   client=await page('project',access.token);const c=client.window.document;await wait(()=>!c.getElementById('login-panel').hidden);c.getElementById('password').value='parola-securizata-123';c.getElementById('login-form').dispatchEvent(new client.window.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:c.querySelector('button[type=submit]')}));await wait(()=>c.querySelector('.project-card'));
   assert.match(c.body.textContent,/Test UI Petru & Inés/);assert.match(c.body.textContent,/499/);assert.equal(c.querySelector('.project-review'),null);assert.equal(c.getElementById('password').value,'');
   b('Începe intervenția').click();await wait(()=>d.querySelector('article').textContent.includes('În desfășurare'));for(const t of tickers)await t();assert.match(c.body.textContent,/În desfășurare/);
