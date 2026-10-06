@@ -36,6 +36,6 @@ try{
  await query('UPDATE one_time_project_access SET expires_at=? WHERE project_id=?',[new Date(Date.now()-1000).toISOString(),id]);r=await call('view',null,cookie);assert.equal(r.status,410);assert.deepEqual(await r.json(),{error:'access_expired'});
  console.log('Live one-time HTTP smoke passed: password login, secure persistent cookie, scoped payload, progress, finalization/review, invoice, revoke/reactivate, logout, expiry. Admin auth gate remains closed to anonymous requests.');
 }finally{
- if(created)for(const table of ['one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access','one_time_projects'])await query(`DELETE FROM ${table} WHERE ${table==='one_time_projects'?'id':'project_id'}=?`,[id]);
+ if(created)for(const table of ['one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access','one_time_projects'])await query(`DELETE FROM ${table} WHERE ${table==='one_time_projects'?'id':'project_id'}=?`,[id]);
  console.log('Only disposable one-time smoke fixtures removed. Existing customers/users/data were not touched.');
 }

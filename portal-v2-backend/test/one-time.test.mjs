@@ -97,7 +97,7 @@ test('confirmed admin deletion removes only the selected project and invalidates
   assert.equal((await s.call(path,{data:{...data,version:0}})).status,409);
   assert.equal((await s.call('client/'+a.access.token+'/view',{admin:false,cookie})).status,200);
   assert.equal((await s.call(path,{data})).status,200);
-  for(const table of ['one_time_projects','one_time_project_tasks','one_time_project_access','one_time_project_sessions','one_time_project_activity']){
+  for(const table of ['one_time_projects','one_time_project_tasks','one_time_project_access','one_time_project_sessions','one_time_project_activity','one_time_project_passwords']){
    const column=table==='one_time_projects'?'id':'project_id';
    assert.equal(s.sqlite.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${column}=?`).get(p.id).n,0);
    assert.ok(s.sqlite.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${column}=?`).get(other.id).n>0);
@@ -108,4 +108,36 @@ test('confirmed admin deletion removes only the selected project and invalidates
   assert.equal((await s.call('client/'+oa.access.token+'/view',{admin:false,cookie:oc.cookie})).status,200);
   assert.equal((await s.call('admin/'+p.id)).status,404);
  } finally {s.sqlite.close();}
+});
+
+
+test('admin password copy is encrypted, scoped, audited, and never resets client sessions',async()=>{
+ const s=setup();
+ try{
+  const p=await s.create(),a=await s.generate(p.id),token=a.access.token,{cookie}=await s.login(token),path='admin/'+p.id+'/password';
+  const before=s.sqlite.prepare('SELECT * FROM one_time_project_access WHERE project_id=?').get(p.id);
+  const saved=s.sqlite.prepare('SELECT ciphertext FROM one_time_project_passwords WHERE project_id=?').get(p.id).ciphertext;
+  assert.match(saved,/^v1:[a-f0-9]{24}:[a-f0-9]+$/);assert.equal(saved.includes('parola-securizata-123'),false);
+  assert.equal((await s.call(path,{data:{},admin:false,cookie})).status,401);
+  for(const authorization of ['Bearer recurrent','Bearer pending'])assert.equal((await s.call(path,{data:{},authorization})).status,403);
+  assert.equal((await s.call(path,{data:{},origin:'https://evil.example'})).status,403);
+  assert.equal((await s.call(path)).status,405);
+  for(let i=0;i<2;i++){
+   const response=await s.call(path,{data:{}});assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.deepEqual(await response.json(),{password:'parola-securizata-123'});
+  }
+  assert.deepEqual(s.sqlite.prepare('SELECT * FROM one_time_project_access WHERE project_id=?').get(p.id),before);
+  assert.equal((await s.call('client/'+token+'/view',{admin:false,cookie})).status,200);
+  assert.equal(s.sqlite.prepare("SELECT COUNT(*) n FROM one_time_project_activity WHERE type='password_copied'").get().n,2);
+  for(const response of [await s.call('admin'),await s.call('admin/'+p.id),await s.call('admin/'+p.id+'/preview'),await s.call('admin/'+p.id+'/activity'),await s.call('client/'+token+'/view',{admin:false,cookie})])assert.doesNotMatch(await response.text(),/parola-securizata-123|ciphertext|password_hash/);
+  const other=await s.create();await s.generate(other.id);const own=s.sqlite.prepare('SELECT ciphertext FROM one_time_project_passwords WHERE project_id=?').get(other.id).ciphertext;
+  assert.notEqual(own,saved);s.sqlite.prepare('UPDATE one_time_project_passwords SET ciphertext=? WHERE project_id=?').run(saved,other.id);
+  assert.equal((await s.call('admin/'+other.id+'/password',{data:{}})).status,503,'ciphertext cannot move between projects');
+  s.sqlite.prepare('UPDATE one_time_project_passwords SET ciphertext=? WHERE project_id=?').run(saved.slice(0,-2)+(parseInt(saved.slice(-2),16)^1).toString(16).padStart(2,'0'),p.id);
+  assert.equal((await s.call(path,{data:{}})).status,503,'tampering fails closed');
+  assert.equal((await s.call('admin/'+p.id+'/access',{data:{operation:'reset',password:'new-copy-password-123'}})).status,200);
+  assert.deepEqual(await(await s.call(path,{data:{}})).json(),{password:'new-copy-password-123'});
+  assert.equal((await s.call('client/'+token+'/view',{admin:false,cookie})).status,401);
+  s.sqlite.prepare('DELETE FROM one_time_project_passwords WHERE project_id=?').run(p.id);
+  const missing=await s.call(path,{data:{}});assert.equal(missing.status,409);assert.equal((await missing.json()).error,'password_copy_requires_reset');
+ }finally{s.sqlite.close();}
 });

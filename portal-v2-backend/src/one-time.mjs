@@ -1,4 +1,5 @@
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
+import { sealPassword, openPassword } from './one-time-password.mjs';
 import { isPortalOrigin } from './origins.mjs';
 
 export const REVIEW_URL = 'https://g.page/r/CYhmtVqu_TcCEBE/review';
@@ -90,7 +91,7 @@ async function rate(db,key,limit,now) {
  await q(db,'DELETE FROM one_time_project_rate_limits WHERE resets_at<?',ms-60000).run();
  if (r[0].hits > limit) fail(429,'try_again_in_one_minute');
 }
-async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
+async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOString()}) {
  const u = new URL(request.url), path = u.pathname;
  const origin = request.headers.get('origin');
  if (origin && !isPortalOrigin(origin) && origin !== u.origin) fail(403,'origin_forbidden');
@@ -132,7 +133,7 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    if (!s) fail(401,'login_required');
    return json(await publicView(db,await project(db,a.project_id)));
  }
- const admin = /^\/api\/one-time\/admin(?:\/([\w-]{1,100}))?(?:\/(preview|activity|access|start|complete|delete))?$/.exec(path);
+ const admin = /^\/api\/one-time\/admin(?:\/([\w-]{1,100}))?(?:\/(preview|activity|access|start|complete|delete|password))?$/.exec(path);
  if (!admin) fail(404,'not_found');
  const session = await auth.api.getSession({headers:request.headers});
  if (!session?.user?.id) fail(401,'unauthorized');
@@ -166,6 +167,14 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    if (action) fail(405,'method_not_allowed'); return json(await adminView(db,p,now));
  }
  const data=await body(request);
+ if (action==='password' && request.method==='POST') {
+   const saved=await first(db,`SELECT v.ciphertext,a.password_hash FROM one_time_project_passwords v
+     JOIN one_time_project_access a ON a.project_id=v.project_id WHERE v.project_id=?`,id);
+   if (!saved) fail(409,'password_copy_requires_reset');
+   let value;try {value=await openPassword(saved.ciphertext,passwordSecret,id,saved.password_hash);} catch {fail(503,'password_copy_unavailable');}
+   await log(db,id,'password_copied',actor,now).run();
+   return json({password:value});
+ }
  if (action==='delete' && request.method==='POST') {
    if (data.confirm!==true) fail(400,'confirmation_required');
    if (data.version!==p.version) fail(409,'project_changed_reload');
@@ -173,7 +182,7 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    await db.batch([
      q(db,'UPDATE one_time_projects SET version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',p.version,id),
      q(db,"DELETE FROM one_time_project_rate_limits WHERE key IN (SELECT 'token:'||token FROM one_time_project_access WHERE project_id=?)",id),
-     ...['one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'].map(table=>q(db,`DELETE FROM ${table} WHERE project_id=?`,id)),
+     ...['one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'].map(table=>q(db,`DELETE FROM ${table} WHERE project_id=?`,id)),
      q(db,'DELETE FROM one_time_projects WHERE id=?',id),
    ]);
    return json({ok:true});
@@ -182,18 +191,24 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    if (!['generate','reset','revoke','reactivate'].includes(data.operation)) fail(400,'invalid_operation');
    const a=await first(db,'SELECT * FROM one_time_project_access WHERE project_id=?',id);
    if (!a && data.operation!=='generate') fail(409,'access_not_created');
-   const statements=[];
+   const statements=[]; let encrypted;
    if (data.operation==='generate') {
      const hashed=await hashPassword(password(data.password)), token=random();
+     encrypted=await sealPassword(data.password,passwordSecret,id,hashed);
      statements.push(q(db,`INSERT INTO one_time_project_access(project_id,token,password_hash,created_at,expires_at)
       SELECT id,?,?,?,CASE WHEN completed_at IS NOT NULL AND expiry_days IS NOT NULL THEN strftime('%Y-%m-%dT%H:%M:%fZ',completed_at,'+'||expiry_days||' days') ELSE NULL END FROM one_time_projects WHERE id=?
       ON CONFLICT(project_id) DO UPDATE SET token=excluded.token,password_hash=excluded.password_hash,active=1,generation=generation+1,expires_at=excluded.expires_at,expired_logged_at=NULL`,token,hashed,now,id));
-   } else if (data.operation==='reset') statements.push(q(db,'UPDATE one_time_project_access SET password_hash=?,generation=generation+1 WHERE project_id=?',await hashPassword(password(data.password)),id));
+   } else if (data.operation==='reset') {
+     const hashed=await hashPassword(password(data.password));
+     encrypted=await sealPassword(data.password,passwordSecret,id,hashed);
+     statements.push(q(db,'UPDATE one_time_project_access SET password_hash=?,generation=generation+1 WHERE project_id=?',hashed,id));
+   }
    else if (data.operation==='revoke') statements.push(q(db,'UPDATE one_time_project_access SET active=0,generation=generation+1 WHERE project_id=?',id));
    else {
      if (expiry(p) && expiry(p)<=now) fail(409,'change_expiry_before_reactivation');
      statements.push(q(db,'UPDATE one_time_project_access SET active=1,generation=generation+1,expired_logged_at=NULL WHERE project_id=?',id));
    }
+   if(encrypted) statements.push(q(db,'INSERT INTO one_time_project_passwords(project_id,ciphertext) VALUES(?,?) ON CONFLICT(project_id) DO UPDATE SET ciphertext=excluded.ciphertext',id,encrypted));
    await db.batch([...statements,q(db,'DELETE FROM one_time_project_sessions WHERE project_id=?',id),log(db,id,'access_'+data.operation,actor,now)]);
    return json(await adminView(db,await project(db,id),now));
  }
