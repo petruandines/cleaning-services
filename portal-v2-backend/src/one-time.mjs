@@ -114,14 +114,15 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    if (action==='login') {
      const data = await body(request);
      if (typeof data.password !== 'string' || data.password.length > 128 || !await verifyPassword({password:data.password,hash:a.password_hash})) fail(401,'invalid_password');
-     const raw = random(), until = new Date(Math.min(Date.parse(now)+SESSION_DAYS*day, a.expires_at ? Date.parse(a.expires_at) : Infinity)).toISOString();
+     const raw = random(), sessionHash = await digest(raw), until = new Date(Math.min(Date.parse(now)+SESSION_DAYS*day, a.expires_at ? Date.parse(a.expires_at) : Infinity)).toISOString();
      // Recheck generation/activity after the expensive hash so a concurrent revoke cannot issue valid access.
      await db.batch([
        q(db,`INSERT INTO one_time_project_sessions(hash,project_id,generation,created_at,expires_at)
-         SELECT ?,project_id,generation,?,? FROM one_time_project_access WHERE project_id=? AND generation=? AND active=1 AND (expires_at IS NULL OR expires_at>?)`,await digest(raw),now,until,a.project_id,a.generation,now),
-       q(db,'UPDATE one_time_project_access SET last_login_at=? WHERE project_id=? AND generation=? AND active=1',now,a.project_id,a.generation),
-       log(db,a.project_id,'client_login','client',now),
+         SELECT ?,project_id,generation,?,? FROM one_time_project_access WHERE project_id=? AND generation=? AND active=1 AND (expires_at IS NULL OR expires_at>?)`,sessionHash,now,until,a.project_id,a.generation,now),
+       q(db,'UPDATE one_time_project_access SET last_login_at=? WHERE project_id=? AND EXISTS (SELECT 1 FROM one_time_project_sessions WHERE hash=?)',now,a.project_id,sessionHash),
+       q(db,`INSERT INTO one_time_project_activity(id,project_id,type,actor,detail,created_at) SELECT ?,project_id,'client_login','client','',? FROM one_time_project_sessions WHERE hash=?`,crypto.randomUUID(),now,sessionHash),
      ]);
+     if (!await first(db,'SELECT hash FROM one_time_project_sessions WHERE hash=?',sessionHash)) fail(403,'access_unavailable');
      return json({ok:true},200,{'set-cookie':cookie(token,raw,data.remember===true ? Math.floor((Date.parse(until)-Date.parse(now))/1000) : null)});
    }
    const raw = request.headers.get('cookie')?.match(/(?:^|;\s*)__Secure-pi-project=([a-f0-9]{64})(?:;|$)/)?.[1];
@@ -172,8 +173,9 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    const statements=[];
    if (data.operation==='generate') {
      const hashed=await hashPassword(password(data.password)), token=random();
-     statements.push(q(db,`INSERT INTO one_time_project_access(project_id,token,password_hash,created_at,expires_at) VALUES(?,?,?,?,?)
-      ON CONFLICT(project_id) DO UPDATE SET token=excluded.token,password_hash=excluded.password_hash,active=1,generation=generation+1,expires_at=excluded.expires_at,expired_logged_at=NULL`,id,token,hashed,now,expiry(p)));
+     statements.push(q(db,`INSERT INTO one_time_project_access(project_id,token,password_hash,created_at,expires_at)
+      SELECT id,?,?,?,CASE WHEN completed_at IS NOT NULL AND expiry_days IS NOT NULL THEN strftime('%Y-%m-%dT%H:%M:%fZ',completed_at,'+'||expiry_days||' days') ELSE NULL END FROM one_time_projects WHERE id=?
+      ON CONFLICT(project_id) DO UPDATE SET token=excluded.token,password_hash=excluded.password_hash,active=1,generation=generation+1,expires_at=excluded.expires_at,expired_logged_at=NULL`,token,hashed,now,id));
    } else if (data.operation==='reset') statements.push(q(db,'UPDATE one_time_project_access SET password_hash=?,generation=generation+1 WHERE project_id=?',await hashPassword(password(data.password)),id));
    else if (data.operation==='revoke') statements.push(q(db,'UPDATE one_time_project_access SET active=0,generation=generation+1 WHERE project_id=?',id));
    else {
