@@ -81,6 +81,7 @@ import { visibleContractDetails } from './contract-view.mjs';
   let accountState = null;
   let accountClientId = '';
   let accountClientLabel = '';
+  let accountEdit = null;
   let generation = 0;
   let offset = 0;
   let nextOffset = null;
@@ -113,6 +114,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     loginWindow = null;
     accountWindow = null;
     accountState = null;
+    accountEdit = null;
     $('workspace').hidden = true;
     $('welcome').hidden = false;
     $('content').replaceChildren();
@@ -555,8 +557,41 @@ import { visibleContractDetails } from './contract-view.mjs';
     list.replaceChildren();
     if (!result.rows.length) { list.textContent = 'Nu există încă utilizatori pentru acest client.'; return; }
     for (const row of result.rows) {
-      const line = document.createElement('p');
-      line.textContent = row.name + ' · ' + row.email;
+      const line = document.createElement('div');
+      line.className = 'account-entry';
+      const label = document.createElement('p');
+      label.textContent = row.name + ' · ' + row.email;
+      line.append(label);
+      const actions = document.createElement('div');
+      actions.className = 'account-actions';
+      for (const [title, action] of [
+        ['Editează', () => openAccount(row)],
+        ['Resetează parola', () => openAccount(row, true)],
+        ['Revocă accesul', async event => {
+          if (generation !== requestGeneration || currentClientId !== client || viewSequence !== requestView) return;
+          if (!window.confirm('Revoci accesul pentru ' + row.email + '? Sesiunile acestui cont vor fi închise. Istoricul clientului și celelalte conturi rămân disponibile.')) return;
+          const button = event.currentTarget;
+          button.disabled = true;
+          try {
+            await api('/api/users/' + encodeURIComponent(row.id), {
+              method: 'DELETE', body: JSON.stringify({ client_id: client }),
+            });
+            if (generation !== requestGeneration || currentClientId !== client || viewSequence !== requestView) return;
+            notice('Accesul pentru ' + row.email + ' a fost revocat.');
+            await refreshAccounts();
+          } catch (error) {
+            if (generation === requestGeneration && currentClientId === client && viewSequence === requestView) notice(error.message);
+          } finally { button.disabled = false; }
+        }],
+      ]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'secondary';
+        button.textContent = title;
+        button.addEventListener('click', action);
+        actions.append(button);
+      }
+      line.append(actions);
       list.append(line);
     }
   }
@@ -809,12 +844,13 @@ import { visibleContractDetails } from './contract-view.mjs';
       accountState && event.data?.state === accountState) {
       if (event.data.type === 'portal-account-ready' && token && user?.role === 'staff') {
         accountWindow.postMessage({ type: 'portal-account-start', state: accountState,
-          token, clientId: accountClientId, clientLabel: accountClientLabel }, API);
-      } else if (event.data.type === 'portal-account-created') {
+          token, clientId: accountClientId, clientLabel: accountClientLabel, account: accountEdit }, API);
+      } else if (['portal-account-created', 'portal-account-updated'].includes(event.data.type)) {
         accountWindow = null;
         accountState = null;
+        accountEdit = null;
         refreshAccounts().catch(error => notice(error.message));
-        notice('Contul de client a fost creat.');
+        notice(event.data.type === 'portal-account-created' ? 'Contul de client a fost creat.' : 'Contul de client a fost actualizat.');
       }
       return;
     }
@@ -960,16 +996,20 @@ import { visibleContractDetails } from './contract-view.mjs';
     } catch (error) { if (session === generation && client === currentClientId) notice(error.message); }
     finally { button.disabled = false; }
   });
-  $('open-account').addEventListener('click', () => {
+  function openAccount(row = null, resetPassword = false) {
     if (!ready() || !token || user?.role !== 'staff' || !currentClientId) return;
+    if (row && (typeof row.id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(row.id))) return;
+    if (accountWindow && !accountWindow.closed) accountWindow.close();
     const random = new Uint8Array(16);
     crypto.getRandomValues(random);
     accountState = Array.from(random, byte => byte.toString(16).padStart(2, '0')).join('');
     accountClientId = currentClientId;
     accountClientLabel = currentClientLabel;
+    accountEdit = row ? { id: row.id, name: row.name, email: row.email, resetPassword } : null;
     accountWindow = window.open(API + '/account.html?state=' + accountState, 'petru-ines-account', 'popup=yes,width=520,height=720');
-    if (!accountWindow) { accountState = null; notice('Permite fereastra pentru crearea contului.'); }
-  });
+    if (!accountWindow) { accountState = null; accountEdit = null; notice('Permite fereastra pentru administrarea contului.'); }
+  }
+  $('open-account').addEventListener('click', () => openAccount());
   function leiToBani(value) {
     const normalized = value.trim().replace(',', '.');
     if (!/^\d{1,8}(\.\d{1,2})?$/.test(normalized)) throw new Error('Introdu suma în lei, cu cel mult două zecimale.');
@@ -1087,4 +1127,3 @@ import { visibleContractDetails } from './contract-view.mjs';
     }).finally(() => { $('login').disabled = false; });
   }
 })();
-

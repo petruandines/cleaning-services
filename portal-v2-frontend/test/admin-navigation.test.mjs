@@ -7,7 +7,10 @@ const tick=()=>new Promise(resolve=>setTimeout(resolve,15));
 const code=(await build({entryPoints:[new URL('../app.js',import.meta.url).pathname],bundle:true,write:false,format:'iife'})).outputFiles[0].text;
 async function setup(role='staff'){
  const dom=new JSDOM(readFileSync(new URL('../index.html',import.meta.url),'utf8'),{url:'https://petruandines.github.io/cleaning-services/portal-v2-frontend/',runScripts:'outside-only'});
- const w=dom.window;const calls=[];let delay=null;
+ const w=dom.window;const calls=[];let delay=null;let popup=null;let confirmed=true;
+ const popups=[];
+ w.confirm=()=>confirmed;
+ w.open=(url)=>{popup={url,closed:false,messages:[],close(){this.closed=true;},postMessage(data,origin){this.messages.push({data,origin});}};popups.push(popup);return popup;};
  w.PETRU_INES_API_ORIGIN='https://api.example.test';w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.sessionStorage.setItem('petru-ines-portal-v2-session',JSON.stringify({token:'token',expiresAt:Date.now()+60000}));
  w.fetch=async(url,init={})=>{
@@ -18,7 +21,7 @@ async function setup(role='staff'){
    path.endsWith('/locations')?{rows:[{id:'l1',label:'Sediu',address:'A',active:1}],nextOffset:null}:
    path.endsWith('/payments')?{rows:[{id:'p',client_id:'c',client_name:'Client',amount_bani:12345,status:'pending',location_ids:['l1'],note:'Test'}],nextOffset:30}:
    path.endsWith('/contracts')?{rows:[{manager_name:'Manager'}],nextOffset:null}:
-   path.endsWith('/users')?{rows:[{name:'Client',email:'client@example.test'}]}:
+   path.endsWith('/users')?{rows:[{id:'u1',name:'Client',email:'client@example.test'},{id:'u2',name:'Second',email:'second@example.test'}]}:
    path.endsWith('/overview')?{unreadMessages:2,nextAppointment:null}:{rows:[],nextOffset:null,id:'new'};
   return {ok:true,json:async()=>data};
  };
@@ -26,7 +29,7 @@ async function setup(role='staff'){
  const d=w.document;
  const click=async(section,view='list')=>{d.querySelector(`button[data-section=${section}][data-view=${view}]`).click();await tick();await tick();};
  const client=async()=>{d.getElementById('client-picker').value='c';d.getElementById('client-picker').dispatchEvent(new w.Event('change'));await tick();await tick();};
- return {w,d,calls,click,client,setDelay:p=>delay=p,close:()=>w.close()};
+ return {w,d,calls,click,client,popups,setConfirm:value=>confirmed=value,setDelay:p=>delay=p,close:()=>w.close()};
 }
 test('admin list, export, create, contract and access are independent views',async()=>{
  const a=await setup();const {d}=a;const hidden=id=>d.getElementById(id).hidden;
@@ -75,5 +78,36 @@ test('client retains simple tabs and visible exports without admin forms',async(
   assert.equal(a.d.querySelectorAll('#tabs details').length,0);assert.equal(a.d.getElementById('staff-tools').hidden,true);
   assert.equal(a.d.getElementById('calendar-export').hidden,false);
   await a.click('payments');assert.equal(a.d.getElementById('payments-export').hidden,false);assert.equal(a.d.getElementById('staff-form').hidden,true);
+ }finally{a.close();}
+});
+
+test('account edit and password reset send only the selected account through the guarded popup',async()=>{
+ const a=await setup();try{
+  await a.client();await a.click('clients','access');
+  const entries=a.d.querySelectorAll('.account-entry');assert.equal(entries.length,2);
+  [...entries[1].querySelectorAll('button')].find(b=>b.textContent==='Editează').click();
+  const popup=a.popups.at(-1);const state=new URL(popup.url).searchParams.get('state');
+  const send=(origin,source)=>a.w.dispatchEvent(new a.w.MessageEvent('message',{origin,source,data:{type:'portal-account-ready',state}}));
+  send('https://untrusted.example',popup);assert.equal(popup.messages.length,0);
+  send('https://api.example.test',{});assert.equal(popup.messages.length,0);
+  send('https://api.example.test',popup);assert.equal(popup.messages[0].data.clientId,'c');
+  assert.deepEqual({...popup.messages[0].data.account},{id:'u2',name:'Second',email:'second@example.test',resetPassword:false});
+  [...entries[0].querySelectorAll('button')].find(b=>b.textContent==='Resetează parola').click();
+  assert.equal(popup.closed,true);
+  const reset=a.popups.at(-1);a.w.dispatchEvent(new a.w.MessageEvent('message',{origin:'https://api.example.test',source:reset,
+   data:{type:'portal-account-ready',state:new URL(reset.url).searchParams.get('state')}}));
+  assert.equal(reset.messages[0].data.account.id,'u1');assert.equal(reset.messages[0].data.account.resetPassword,true);
+ }finally{a.close();}
+});
+
+test('revocation needs confirmation and targets the selected account without a client delete',async()=>{
+ const a=await setup();try{
+  await a.client();await a.click('clients','access');
+  const button=[...a.d.querySelector('.account-entry').querySelectorAll('button')].find(b=>b.textContent==='Revocă accesul');
+  a.setConfirm(false);button.click();await tick();assert.equal(a.calls.filter(c=>c.method==='DELETE').length,0);
+  a.setConfirm(true);button.click();await tick();await tick();
+  const deleted=a.calls.filter(c=>c.method==='DELETE');assert.equal(deleted.length,1);
+  assert.equal(deleted[0].path,'/api/users/u1');assert.deepEqual(JSON.parse(deleted[0].body),{client_id:'c'});
+  assert.match(a.d.getElementById('notice').textContent,/revocat/);
  }finally{a.close();}
 });

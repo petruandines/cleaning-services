@@ -91,3 +91,5 @@ nav.admin-navigation{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px
 @media(max-width:720px){#staff-tools{grid-template-columns:1fr;padding:12px;gap:5px;top:0}#staff-tools{grid-template-columns:95px minmax(0,1fr)}#staff-tools label{font-size:12px}.admin-navigation details{flex-basis:100%}.admin-navigation>button{flex:1 1 40%;text-align:left}.admin-submenu button{padding:12px}}
 
 .menu-jump{grid-column:1/-1;font-size:13px;font-weight:700}#tabs{scroll-margin-top:170px}.section-heading,#section-title{scroll-margin-top:170px}
+
+.account-entry{padding:16px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.account-entry:last-child{border-bottom:0}.account-actions{display:flex;flex-wrap:wrap;gap:8px}
