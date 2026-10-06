@@ -818,6 +818,13 @@ import { visibleContractDetails } from './contract-view.mjs';
         parent.append(button);
       }
     }
+    if (user.role === 'staff') {
+      const projectsLink = document.createElement('a');
+      projectsLink.href = './projects/';
+      projectsLink.className = 'menu-jump';
+      projectsLink.textContent = 'Intervenții punctuale ↗';
+      $('tabs').append(projectsLink);
+    }
     selectSection('appointments');
     refreshClientContractTab().catch(error => notice(error.message));
     refreshOverview().catch(() => {});

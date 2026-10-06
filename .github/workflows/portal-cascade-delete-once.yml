@@ -1,4 +1,4 @@
-name: Portal cascade deletion production deploy
+name: Portal isolated one-time projects production deploy
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
       - name: Read verified backend source
         uses: actions/checkout@v4
         with:
-          ref: 2060d84af71fa271c7c69031dfd8b4ced2134e48
+          ref: 927dc5e65f1aba5de2f674d916311214f9e78775
           path: .backend-source
           persist-credentials: false
       - name: Read production policy
@@ -44,12 +44,25 @@ jobs:
       - name: Test reviewed backend
         working-directory: .backend-source/portal-v2-backend
         run: npm test
+      - name: Install frontend test dependencies without credentials
+        working-directory: .production-policy
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify existing frontend and one-time admin/client lifecycle
+        working-directory: .production-policy
+        env:
+          ONE_TIME_BACKEND_ROOT: ${{ github.workspace }}/.backend-source/portal-v2-backend
+        run: npm run test:portal
       - name: Apply hardened production routing
         run: node .production-policy/scripts/enforce-portal-worker-production-config.mjs .backend-source/portal-v2-backend/wrangler.jsonc
       - name: Compile production Worker
         working-directory: .backend-source/portal-v2-backend
         run: npx wrangler deploy --dry-run
-      - name: Deploy verified Worker code without D1 migration
+      - name: Apply isolated additive one-time schema
+        working-directory: .backend-source/portal-v2-backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+        run: node scripts/one-time-schema.mjs
+      - name: Deploy verified Worker code
         working-directory: .backend-source/portal-v2-backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
@@ -59,3 +72,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
         run: node .production-policy/scripts/cloudflare-migration.mjs inspect
+      - name: Verify live temporary access with isolated disposable fixtures
+        working-directory: .backend-source/portal-v2-backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+        run: node scripts/one-time-live-smoke.mjs
