@@ -43,5 +43,8 @@ test('admin and client DOM execute the complete lifecycle against actual isolate
   b('Confirmă intervenția ca finalizată').click();await wait(()=>d.querySelector('article').textContent.includes('Finalizată'));for(const t of tickers)await t();assert.ok(c.querySelector('.project-review a'));
   b('Revocă accesul').click();await wait(()=>d.body.textContent.includes('Acces: Revocat'));for(const t of tickers)await t();assert.equal(c.querySelector('.project-card'),null);assert.match(c.body.textContent,/n[u]? este disponibil/);
   assert.equal((await s.call('admin/'+p.id)).status,200);
+  admin.window.confirm=()=>false;b('Șterge proiect').click();await new Promise(r=>setTimeout(r,30));assert.equal((await s.call('admin/'+p.id)).status,200,'cancel keeps project');
+  admin.window.confirm=()=>true;b('Șterge proiect').click();await wait(()=>d.body.textContent.includes('Proiectul a fost șters.'));assert.equal((await s.call('admin/'+p.id)).status,404);assert.equal(b('Șterge proiect'),undefined);assert.match(d.body.textContent,/Nu există proiecte/);
+
  }finally{admin.window.close();client?.window.close();s.sqlite.close();}
 });
