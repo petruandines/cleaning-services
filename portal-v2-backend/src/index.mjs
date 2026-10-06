@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { handleApi } from './api.mjs';
 import { isPortalOrigin, corsOrigin } from './origins.mjs';
 import { authOptions } from './auth-options.mjs';
+import { handleOneTime } from './one-time.mjs';
 
 const CANONICAL_PORTAL_ORIGIN = 'https://petruandines.com';
 const CANONICAL_PORTAL_AUTH_PATHS = new Set([
@@ -35,6 +36,9 @@ export default {
     // audited authentication surface directly so Safari/iPadOS does not have
     // to preserve a cross-origin window.opener reference.
     if (origin && !isPortalOrigin(origin) && origin !== url.origin) return new Response('Forbidden', { status: 403 });
+    if (url.pathname.startsWith('/api/one-time/')) {
+      return handleOneTime(request, { db: env.DB, auth: createAuth(env) });
+    }
     if (url.pathname.startsWith('/api/auth/')) {
       // Account creation/roles go through the audited portal endpoint only.
       if (url.pathname.startsWith('/api/auth/admin/')) return new Response('Not found', { status: 404 });
