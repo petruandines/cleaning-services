@@ -819,11 +819,15 @@ import { visibleContractDetails } from './contract-view.mjs';
       }
     }
     if (user.role === 'staff') {
-      const projectsLink = document.createElement('a');
-      projectsLink.href = './projects/';
-      projectsLink.className = 'menu-jump';
-      projectsLink.textContent = 'Intervenții punctuale ↗';
-      $('tabs').append(projectsLink);
+      const projectsSession = token;
+      api('/api/one-time/admin').then(() => {
+        if (token !== projectsSession || user?.role !== 'staff') return;
+        const projectsLink = document.createElement('a');
+        projectsLink.href = './projects/';
+        projectsLink.className = 'menu-jump';
+        projectsLink.textContent = 'Intervenții punctuale ↗';
+        $('tabs').append(projectsLink);
+      }).catch(() => {});
     }
     selectSection('appointments');
     refreshClientContractTab().catch(error => notice(error.message));

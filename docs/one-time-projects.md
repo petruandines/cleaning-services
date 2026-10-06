@@ -1,5 +1,24 @@
 # Intervenții punctuale · Petru & Inés
 
+## Stare și activare
+
+Cod implementat și testat local/CI. Frontend publicat; modulul nu este încă activ
+în producție deoarece nu există un credential D1 utilizabil în GitHub Actions.
+Migrarea s-a oprit înainte de orice scriere, iar Worker-ul existent a rămas la
+`2060d84af71fa271c7c69031dfd8b4ced2134e48`.
+
+Pentru activare, creează în Cloudflare un token **Account → D1 → Edit**, limitat
+la contul în care se află `petru-ines-portal-eu`. Salvează-l în GitHub, repository
+`petruandines/cleaning-services`, Settings → Secrets and variables → Actions,
+cu numele exact **PORTAL_ONE_TIME_D1_TOKEN**. Nu trimite tokenul în conversație.
+Rulează manual workflow-ul **Portal isolated one-time projects production deploy**
+pe `main`. Acesta aplică schema dedicată, publică API-ul, apoi rulează smoke live.
+
+Fără secret, workflow-ul păstrează și verifică backend-ul original. Linkul nou din
+meniu apare numai când API-ul nou răspunde corect pentru adminul autentificat.
+Nu declara activarea completă înainte de succesul smoke-ului live. Conturile reale
+nu au fost utilizate pentru autentificări de test în producție.
+
 ## Utilizare
 
 Adminul intră în portal, cu autentificarea și verificarea în doi pași existente,
@@ -123,7 +142,7 @@ testele locale/UI. Nu se folosește și nu se resetează parola unui cont real.
 
 ## Rollback
 
-Revert al commitului de integrare din `main`, care restaurează workflow-ul cu
+Revert al commiturilor de integrare/activare din `main`, care restaurează workflow-ul cu
 backend-ul fixat la `2060d84af71fa271c7c69031dfd8b4ced2134e48` și elimină linkul
 modulului din portal. Publicarea folosește aceleași workflow-uri existente.
 Nu șterge tabelele noi: acestea păstrează istoricul pentru o eventuală repunere

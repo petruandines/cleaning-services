@@ -22,10 +22,21 @@ jobs:
       WRANGLER_SEND_METRICS: 'false'
       CLOUDFLARE_ACCOUNT_ID: 47b9f8498a9865c0fbbaca8f0f5cf59d
     steps:
+      - name: Select reviewed backend without changing the current production version when D1 activation is pending
+        id: module
+        env:
+          ONE_TIME_D1_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN }}
+        run: |
+          if [ -n "$ONE_TIME_D1_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "One-time activation pending: add PORTAL_ONE_TIME_D1_TOKEN. Existing production backend will be preserved."
+          fi
       - name: Read verified backend source
         uses: actions/checkout@v4
         with:
-          ref: 927dc5e65f1aba5de2f674d916311214f9e78775
+          ref: ${{ steps.module.outputs.enabled == 'true' && '927dc5e65f1aba5de2f674d916311214f9e78775' || '2060d84af71fa271c7c69031dfd8b4ced2134e48' }}
           path: .backend-source
           persist-credentials: false
       - name: Read production policy
@@ -51,7 +62,7 @@ jobs:
       - name: Verify existing frontend and one-time admin/client lifecycle
         working-directory: .production-policy
         env:
-          ONE_TIME_BACKEND_ROOT: ${{ github.workspace }}/.backend-source/portal-v2-backend
+          ONE_TIME_BACKEND_ROOT: ${{ steps.module.outputs.enabled == 'true' && format('{0}/.backend-source/portal-v2-backend', github.workspace) || '' }}
         run: npm run test:portal
       - name: Apply hardened production routing
         run: node .production-policy/scripts/enforce-portal-worker-production-config.mjs .backend-source/portal-v2-backend/wrangler.jsonc
@@ -59,9 +70,10 @@ jobs:
         working-directory: .backend-source/portal-v2-backend
         run: npx wrangler deploy --dry-run
       - name: Apply isolated additive one-time schema
+        if: steps.module.outputs.enabled == 'true'
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN || secrets.PORTAL_D1_CONTRACT_TOKEN || secrets.PORTAL_D1_FIELDS_TOKEN || secrets.PORTAL_D1_UPGRADE_TOKEN || secrets.PORTAL_D1_MIGRATE_TOKEN || secrets.PORTAL_D1_ADMIN_TOKEN || secrets.PORTAL_RESTORE_D1_EDIT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN }}
         run: node scripts/one-time-schema.mjs
       - name: Deploy verified Worker code
         working-directory: .backend-source/portal-v2-backend
@@ -74,7 +86,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
         run: node .production-policy/scripts/cloudflare-migration.mjs inspect
       - name: Verify live temporary access with isolated disposable fixtures
+        if: steps.module.outputs.enabled == 'true'
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN || secrets.PORTAL_D1_CONTRACT_TOKEN || secrets.PORTAL_D1_FIELDS_TOKEN || secrets.PORTAL_D1_UPGRADE_TOKEN || secrets.PORTAL_D1_MIGRATE_TOKEN || secrets.PORTAL_D1_ADMIN_TOKEN || secrets.PORTAL_RESTORE_D1_EDIT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN }}
         run: node scripts/one-time-live-smoke.mjs

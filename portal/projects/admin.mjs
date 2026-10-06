@@ -7,7 +7,7 @@ const errors={project_changed_reload:'Proiectul a fost modificat în altă pagin
 function notice(text){$('notice').textContent=text;$('notice').hidden=!text;}
 async function api(path='',data,method=data?'POST':'GET') {
  const response=await fetch(window.PETRU_INES_API_ORIGIN+path,{method,credentials:'omit',cache:'no-store',headers:{authorization:'Bearer '+token,...(data?{'content-type':'application/json'}:{})},...(data?{body:JSON.stringify(data)}:{})});
- const result=await response.json();if(!response.ok){if([401,403].includes(response.status)){authorized=false;root.replaceChildren();$('nav').hidden=true;throw new Error('Intră în portal cu contul admin și verificarea în doi pași.');}throw new Error(errors[result.error]||'Cererea nu a putut fi finalizată ('+result.error+').');}return result;
+ const result=await response.json();if(!response.ok){if([401,403].includes(response.status)){authorized=false;root.replaceChildren();$('nav').hidden=true;throw new Error('Intră în portal cu contul admin și verificarea în doi pași.');}if(response.status===404)throw new Error('Modulul Intervenții punctuale nu este încă activat. Revino în portalul existent.');throw new Error(errors[result.error]||'Cererea nu a putut fi finalizată ('+result.error+').');}return result;
 }
 const call=(suffix='',data,method)=>api('/api/one-time/admin'+suffix,data,method);
 function button(text,action,parent=root,style='secondary') {const b=el('button',text,style);b.type='button';b.addEventListener('click',async()=>{if(working)return;working=true;b.disabled=true;notice('');try{await action();}catch(e){notice(e.message);}finally{working=false;b.disabled=false;}});parent.append(b);return b;}
