@@ -1,5 +1,5 @@
 import { commitRecord, createStaffRecord } from './writes.mjs';
-import { changeInitialPassword, createClientUser, mustChangePassword } from './accounts.mjs';
+import { changeInitialPassword, createClientUser, manageClientAccess, mustChangePassword } from './accounts.mjs';
 import { changeStaffRecord } from './mutations.mjs';
 import { ORIGIN, isPortalOrigin, corsOrigin } from './origins.mjs';
 const LIMIT = 30;
@@ -135,6 +135,20 @@ async function dispatchApi(request, { db, auth }) {
   }
   if (staff && session.user.twoFactorEnabled !== true) return error(403, 'two_factor_required');
   if (initialPassword && name !== 'password') return error(403, 'initial_password_required');
+  if (name === 'users' && recordId && ['PATCH', 'DELETE'].includes(request.method)) {
+    if (!staff) return error(403, 'forbidden');
+    if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return error(415, 'json_required');
+    const raw = await request.text();
+    if (raw.length > 4000) return error(413, 'payload_too_large');
+    let data;
+    try { data = JSON.parse(raw); } catch { return error(400, 'invalid_json'); }
+    // Temporary passwords are entered only in the API-hosted account popup.
+    if (data?.password !== undefined && request.headers.get('Origin') !== url.origin)
+      return error(403, 'forbidden');
+    const result = await manageClientAccess({ db, actor: userId, userId: recordId, data,
+      revoke: request.method === 'DELETE' });
+    return result.error ? error(result.status, result.error) : json(result);
+  }
   if (name === 'contracts' && !recordId && request.method === 'GET') {
     const clientId = url.searchParams.get('client_id');
     if ((staff && (!clientId || !/^[a-zA-Z0-9_-]{1,100}$/.test(clientId))) ||

@@ -1,6 +1,76 @@
+import { hashPassword } from 'better-auth/crypto';
+
 export async function mustChangePassword(db, userId) {
   const result = await db.prepare('SELECT must_change_password FROM portal_accounts WHERE user_id = ? LIMIT 1').bind(userId).all();
   return result.results[0]?.must_change_password === 1;
+}
+
+// Called only after the API verifies a staff session with completed 2FA.
+// Keep credentials, session revocation, account gate and audit in one D1 batch.
+export async function manageClientAccess({ db, actor, userId, data, revoke = false }) {
+  const allowed = revoke ? ['client_id'] : ['client_id', 'name', 'email', 'password'];
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      Object.keys(data).some(key => !allowed.includes(key)) ||
+      typeof data.client_id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.client_id))
+    return { status: 400, error: 'invalid_fields' };
+  const name = data.name === undefined ? null : typeof data.name === 'string' ? data.name.trim() : '';
+  const email = data.email === undefined ? null : typeof data.email === 'string' ? data.email.trim().toLowerCase() : '';
+  const reset = data.password !== undefined;
+  if (!revoke && ((!reset && name === null && email === null) ||
+      (name !== null && (!name || name.length > 160)) ||
+      (email !== null && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) ||
+      (reset && (typeof data.password !== 'string' || data.password.length < 12 || data.password.length > 128))))
+    return { status: 400, error: 'invalid_account' };
+
+  const linked = await db.prepare(`SELECT u.id FROM "user" u
+    JOIN client_users cu ON cu.user_id = u.id JOIN clients c ON c.id = cu.client_id
+    WHERE u.id = ? AND u.role = 'user' AND cu.client_id = ?
+      AND c.deleted_at IS NULL AND c.status = 'active' LIMIT 1`).bind(userId, data.client_id).all();
+  if (!linked.results.length) return { status: 404, error: 'account_not_found' };
+  if (email !== null) {
+    const duplicate = await db.prepare('SELECT id FROM "user" WHERE lower(email) = ? AND id != ? LIMIT 1').bind(email, userId).all();
+    if (duplicate.results.length) return { status: 409, error: 'email_in_use' };
+  }
+  if (reset) {
+    const credential = await db.prepare('SELECT id FROM account WHERE "userId" = ? AND "providerId" = ? LIMIT 1').bind(userId, 'credential').all();
+    if (!credential.results.length) return { status: 409, error: 'credential_not_found' };
+  }
+  const hashed = reset ? await hashPassword(data.password) : null;
+  const at = new Date().toISOString();
+  // Recheck the association in each write: a concurrently revoked account
+  // must not be edited after it has been reassigned to a different client.
+  const scope = `EXISTS (SELECT 1 FROM client_users cu JOIN clients c ON c.id = cu.client_id
+    JOIN "user" u ON u.id = cu.user_id WHERE cu.user_id = ? AND cu.client_id = ?
+      AND u.role = 'user' AND c.deleted_at IS NULL AND c.status = 'active')`;
+  const scoped = [userId, data.client_id];
+  const statements = [];
+  if (!revoke) {
+    statements.push(db.prepare(`UPDATE "user" SET name = COALESCE(?, name),
+      "emailVerified" = CASE WHEN ? IS NOT NULL AND email != ? THEN 0 ELSE "emailVerified" END,
+      email = COALESCE(?, email), "updatedAt" = ? WHERE id = ? AND ${scope}`)
+      .bind(name, email, email, email, Date.now(), userId, ...scoped));
+    if (reset) {
+      statements.push(db.prepare(`UPDATE account SET password = ?, "updatedAt" = ?
+        WHERE "userId" = ? AND "providerId" = 'credential' AND ${scope}`)
+        .bind(hashed, Date.now(), userId, ...scoped));
+      statements.push(db.prepare(`INSERT INTO portal_accounts (user_id, must_change_password, created_at, updated_at)
+        SELECT ?, 1, ?, ? WHERE ${scope}
+        ON CONFLICT(user_id) DO UPDATE SET must_change_password = 1, updated_at = excluded.updated_at`)
+        .bind(userId, at, at, ...scoped));
+    }
+  }
+  statements.push(db.prepare(`DELETE FROM session WHERE "userId" = ? AND ${scope}`).bind(userId, ...scoped));
+  statements.push(db.prepare(`INSERT INTO audit_events (id, actor_user_id, client_id, action, entity_type, entity_id, occurred_at)
+    SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${scope}`).bind(crypto.randomUUID(), actor, data.client_id,
+      revoke ? 'access_revoked' : reset ? 'password_reset' : 'account_updated', 'client_user', userId, at, ...scoped));
+  if (revoke) statements.push(db.prepare(`DELETE FROM client_users WHERE user_id = ? AND client_id = ? AND ${scope}`)
+    .bind(userId, data.client_id, ...scoped));
+  try { await db.batch(statements); }
+  catch (error) {
+    if (/unique.*email|email.*unique/i.test(error.message || '')) return { status: 409, error: 'email_in_use' };
+    return { status: 500, error: 'account_update_failed' };
+  }
+  return { status: 200, id: userId, revoked: revoke, passwordReset: reset };
 }
 
 export async function createClientUser({ db, auth, headers, actor, data }) {
