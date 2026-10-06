@@ -132,7 +132,7 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    if (!s) fail(401,'login_required');
    return json(await publicView(db,await project(db,a.project_id)));
  }
- const admin = /^\/api\/one-time\/admin(?:\/([\w-]{1,100}))?(?:\/(preview|activity|access|start|complete))?$/.exec(path);
+ const admin = /^\/api\/one-time\/admin(?:\/([\w-]{1,100}))?(?:\/(preview|activity|access|start|complete|delete))?$/.exec(path);
  if (!admin) fail(404,'not_found');
  const session = await auth.api.getSession({headers:request.headers});
  if (!session?.user?.id) fail(401,'unauthorized');
@@ -166,6 +166,18 @@ async function dispatch(request, {db,auth,now = new Date().toISOString()}) {
    if (action) fail(405,'method_not_allowed'); return json(await adminView(db,p,now));
  }
  const data=await body(request);
+ if (action==='delete' && request.method==='POST') {
+   if (data.confirm!==true) fail(400,'confirmation_required');
+   if (data.version!==p.version) fail(409,'project_changed_reload');
+   // D1 batch is atomic: remove only this project's records and invalidate access.
+   await db.batch([
+     q(db,'UPDATE one_time_projects SET version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',p.version,id),
+     q(db,"DELETE FROM one_time_project_rate_limits WHERE key IN (SELECT 'token:'||token FROM one_time_project_access WHERE project_id=?)",id),
+     ...['one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'].map(table=>q(db,`DELETE FROM ${table} WHERE project_id=?`,id)),
+     q(db,'DELETE FROM one_time_projects WHERE id=?',id),
+   ]);
+   return json({ok:true});
+ }
  if (action==='access' && request.method==='POST') {
    if (!['generate','reset','revoke','reactivate'].includes(data.operation)) fail(400,'invalid_operation');
    const a=await first(db,'SELECT * FROM one_time_project_access WHERE project_id=?',id);

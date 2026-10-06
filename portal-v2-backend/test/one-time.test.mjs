@@ -82,3 +82,30 @@ test('checklist add/edit/delete/reorder and timestamp clearing, activity and pag
  r=await s.call('admin/'+p.id,{method:'PATCH',data:{version:updated.version,tasks:updated.tasks.map(t=>({id:t.id,title:t.title,done:false}))}});assert.equal(r.status,200);updated=await r.json();assert.equal(updated.tasks[0].completed_at,null);
  const events=(await(await s.call('admin/'+p.id+'/activity')).json()).rows.map(x=>x.type);for(const e of ['project_created','task_done','task_undone','task_added','task_deleted'])assert.ok(events.includes(e));s.sqlite.close();
 });
+
+
+test('confirmed admin deletion removes only the selected project and invalidates access',async()=>{
+ const s=setup();
+ try {
+  const p=await s.create(),a=await s.generate(p.id),{cookie}=await s.login(a.access.token);
+  const other=await s.create('Proiect păstrat'),oa=await s.generate(other.id),oc=await s.login(oa.access.token);
+  const path='admin/'+p.id+'/delete',data={confirm:true,version:p.version};
+  assert.equal((await s.call(path,{data,admin:false,cookie})).status,401);
+  for(const authorization of ['Bearer recurrent','Bearer pending'])assert.equal((await s.call(path,{data,authorization})).status,403);
+  assert.equal((await s.call(path,{data,origin:'https://evil.example'})).status,403);
+  assert.equal((await s.call(path,{data:{version:p.version}})).status,400);
+  assert.equal((await s.call(path,{data:{...data,version:0}})).status,409);
+  assert.equal((await s.call('client/'+a.access.token+'/view',{admin:false,cookie})).status,200);
+  assert.equal((await s.call(path,{data})).status,200);
+  for(const table of ['one_time_projects','one_time_project_tasks','one_time_project_access','one_time_project_sessions','one_time_project_activity']){
+   const column=table==='one_time_projects'?'id':'project_id';
+   assert.equal(s.sqlite.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${column}=?`).get(p.id).n,0);
+   assert.ok(s.sqlite.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${column}=?`).get(other.id).n>0);
+  }
+  assert.equal(s.sqlite.prepare('SELECT COUNT(*) n FROM one_time_project_rate_limits WHERE key=?').get('token:'+a.access.token).n,0);
+  assert.equal((await s.call('client/'+a.access.token+'/view',{admin:false,cookie})).status,403);
+  assert.equal((await s.call('client/'+a.access.token+'/login',{admin:false,data:{password:'parola-securizata-123'}})).status,403);
+  assert.equal((await s.call('client/'+oa.access.token+'/view',{admin:false,cookie:oc.cookie})).status,200);
+  assert.equal((await s.call('admin/'+p.id)).status,404);
+ } finally {s.sqlite.close();}
+});
