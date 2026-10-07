@@ -23,9 +23,16 @@ export function renderProject(root,p) {
  const progress=el('progress'); progress.max=p.tasks.length||1; progress.value=done; progress.setAttribute('aria-label','Progresul intervenției'); card.append(progress);
  const list=el('ul',undefined,'project-checklist');
  for(const t of p.tasks) {const item=el('li',(t.done?'✅ ':'⬜ ')+t.title); if(t.completed_at) item.append(el('small','Finalizată: '+date(t.completed_at))); list.append(item);} card.append(list);
- if(p.invoice_url) {const a=el('a','Vezi factura','primary'); a.href=p.invoice_url; a.target='_blank'; a.rel='noopener noreferrer'; card.append(a);}
+ if(p.invoice_url) {const a=el('a',p.invoice_label||'Descarcă factura','primary'); a.href=p.invoice_url; a.target='_blank'; a.rel='noopener noreferrer'; card.append(a);}
  if(p.review_url && p.completed_at && ['completed','closed'].includes(p.status)) {const review=el('section',undefined,'project-review'); review.append(el('h2','Mulțumit de serviciile Petru & Inés?'),el('p','⭐⭐⭐⭐⭐')); const a=el('a','Lasă-ne o recenzie pe Google','primary'); a.href=p.review_url; a.target='_blank'; a.rel='noopener noreferrer'; review.append(a); card.append(review);}
  card.append(el('p','Ultima actualizare: '+date(p.updated_at),'help')); root.append(card);
+ for(const [kind,info] of [['access-policy',p.access_policy],['service-terms',p.service_terms]])if(info){
+  const section=el('article',undefined,'project-card project-legal');section.dataset.card=kind;section.append(el('h2',info.title));const a=el('a','Citește documentul','secondary');a.href=info.url;a.target='_blank';a.rel='noopener noreferrer';section.append(a);root.append(section);
+ }
+ if(p.supplier){const section=el('article',undefined,'project-card project-supplier');section.dataset.card='supplier';section.append(el('h2','Informații despre furnizor'));const details=el('dl',undefined,'project-summary');
+  for(const [label,key] of [['Servicii furnizate de','name'],['CUI','cui'],['Număr registrul comerțului','registration'],['Adresă','address'],['IBAN','iban'],['Banca','bank']])details.append(el('dt',label),el('dd',p.supplier[key]));section.append(details);root.append(section);
+ }
+
 }
 // Date/time entry always refers to Romania, irrespective of the admin device timezone.
 export function bucharestLocal(iso) {
