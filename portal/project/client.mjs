@@ -1,4 +1,4 @@
-import {renderProject,countdown} from '../project-view.mjs';
+import {renderProject,updateProjectClock} from '../project-view.mjs';
 const $=id=>document.getElementById(id), token=new URL(location.href).searchParams.get('token');
 let p=null,timer=null,busy=false,generation=0;
 function notice(text) {$('notice').textContent=text;$('notice').hidden=!text;}
@@ -20,5 +20,5 @@ async function refresh() {
 $('login-form').addEventListener('submit',async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{await call('login',{password:$('password').value,remember:$('remember').checked});$('password').value='';await refresh();if(!timer)timer=setInterval(refresh,15000);}catch(err){failure(err);}finally{b.disabled=false;}});
 $('logout').addEventListener('click',async()=>{generation++;try{await call('logout',{});clear();$('login-panel').hidden=false;notice('Ai ieșit de pe acest dispozitiv.');}catch(e){failure(e);}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
-setInterval(()=>{if(p&&$('countdown'))$('countdown').textContent=countdown(p);},1000);
+setInterval(()=>{if(p)updateProjectClock($('project'));},1000);
 (async()=>{if(/^[a-f0-9]{64}$/.test(token||'')){await refresh();timer=setInterval(refresh,15000);}else notice('Linkul de acces nu este valid.');})();
