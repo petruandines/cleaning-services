@@ -1,3 +1,4 @@
+import {DISPLAY_DEFAULTS,ACCESS_POLICY,SERVICE_TERMS,SUPPLIER,validateDisplay,readDisplay,writeDisplay} from './one-time-display.mjs';
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { sealPassword, openPassword } from './one-time-password.mjs';
 import { isPortalOrigin } from './origins.mjs';
@@ -59,11 +60,14 @@ function validate(data) {
  if (data.expiry_days !== null && (!Number.isInteger(data.expiry_days) || data.expiry_days < 1 || data.expiry_days > 3650)) fail(400,'invalid_expiry');
  data.invoice_url = safeInvoice(data.invoice_url);
 }
+function checkedDisplay(input,previous){try{return validateDisplay(input,previous);}catch{fail(400,'invalid_display_options');}}
 async function project(db,id) { const p = await first(db,'SELECT * FROM one_time_projects WHERE id=?',id); if (!p) fail(404,'not_found'); return p; }
 async function tasks(db,id) { return rows(db,'SELECT id,title,position,done,completed_at FROM one_time_project_tasks WHERE project_id=? ORDER BY position,id',id); }
 async function publicView(db,p) {
+ const options=await readDisplay(db,p.id);
  return { name:p.name, status:p.status, scheduled_at:p.scheduled_at, location:p.show_location ? p.location : '',
- price_bani:p.price_bani, description:p.description, invoice_url:p.invoice_url, completed_at:p.completed_at,
+ price_bani:p.price_bani, description:p.description, invoice_url:options.invoice_enabled?p.invoice_url:'', invoice_label:options.invoice_label,
+ access_policy:options.show_access_policy?ACCESS_POLICY:null,service_terms:options.show_terms?SERVICE_TERMS:null,supplier:options.show_supplier?SUPPLIER:null,completed_at:p.completed_at,
  updated_at:p.updated_at, tasks:await tasks(db,p.id), review_url:p.completed_at && ['completed','closed'].includes(p.status) ? REVIEW_URL : null };
 }
 async function expire(db, now) {
@@ -78,7 +82,7 @@ async function expire(db, now) {
 }
 async function adminView(db,p,now) {
  const a = await first(db,'SELECT token,active,expires_at,last_login_at FROM one_time_project_access WHERE project_id=?',p.id);
- return {...p, tasks:await tasks(db,p.id), access:a ? {...a,status:accessState(a,now)} : {status:'not_created'}};
+ return {...p, display_options:await readDisplay(db,p.id),tasks:await tasks(db,p.id), access:a ? {...a,status:accessState(a,now)} : {status:'not_created'}};
 }
 function cookie(token,value,maxAge) {
  return `${COOKIE}=${value}; Path=/api/one-time/client/${token}/; Secure; HttpOnly; SameSite=Lax${maxAge === null ? '' : '; Max-Age='+maxAge}`;
@@ -149,11 +153,12 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    }
    if (request.method!=='POST') fail(405,'method_not_allowed');
    const data=await body(request); validate(data);
-   if (Object.keys(data).some(k=>!fields.includes(k) && k!=='tasks' && k!=='status')) fail(400,'invalid_field');
+   if (Object.keys(data).some(k=>!fields.includes(k) && k!=='tasks' && k!=='status' && k!=='display_options')) fail(400,'invalid_field');
    if (!['draft','scheduled','confirmed'].includes(data.status)) fail(400,'invalid_status');
+   const display=data.display_options===undefined?{...DISPLAY_DEFAULTS}:checkedDisplay(data.display_options);
    const projectId=crypto.randomUUID();
    const taskList=taskChanges(db,projectId,data.tasks,[],now);
-   await db.batch([q(db,`INSERT INTO one_time_projects(id,${fields.join(',')},status,created_at,updated_at) VALUES(${Array(15).fill('?').join(',')})`,projectId,...fields.map(k=>data[k]),data.status,now,now),...taskList,log(db,projectId,'project_created',actor,now)]);
+   await db.batch([q(db,`INSERT INTO one_time_projects(id,${fields.join(',')},status,created_at,updated_at) VALUES(${Array(15).fill('?').join(',')})`,projectId,...fields.map(k=>data[k]),data.status,now,now),...taskList,writeDisplay(db,projectId,display),log(db,projectId,'project_created',actor,now)]);
    return json(await adminView(db,await project(db,projectId),now),201);
  }
  const p=await project(db,id);
@@ -182,7 +187,7 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    await db.batch([
      q(db,'UPDATE one_time_projects SET version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',p.version,id),
      q(db,"DELETE FROM one_time_project_rate_limits WHERE key IN (SELECT 'token:'||token FROM one_time_project_access WHERE project_id=?)",id),
-     ...['one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'].map(table=>q(db,`DELETE FROM ${table} WHERE project_id=?`,id)),
+     ...['one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'].map(table=>q(db,`DELETE FROM ${table} WHERE project_id=?`,id)),
      q(db,'DELETE FROM one_time_projects WHERE id=?',id),
    ]);
    return json({ok:true});
@@ -225,13 +230,15 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
  }
  if (action || request.method!=='PATCH') fail(405,'method_not_allowed');
  if (data.version!==p.version) fail(409,'project_changed_reload');
- if (Object.keys(data).some(k=>!fields.includes(k) && !['tasks','status','version'].includes(k))) fail(400,'invalid_field');
+ if (Object.keys(data).some(k=>!fields.includes(k) && !['tasks','status','version','display_options'].includes(k))) fail(400,'invalid_field');
+ const display=data.display_options===undefined?null:checkedDisplay(data.display_options,await readDisplay(db,id));
  const updated={...p,...data}; validate(updated);
  if (!STATUSES.includes(updated.status) || (!p.completed_at && ['completed','closed'].includes(updated.status)) || (p.completed_at && !['completed','closed'].includes(updated.status)) || (updated.status==='in_progress' && p.status!=='in_progress')) fail(400,'use_start_or_complete');
  // Acquire a write lock via version compare. A failed compare rolls back the entire batch.
  const statements=[q(db,`UPDATE one_time_projects SET ${fields.map(k=>k+'=?').join(',')},status=?,updated_at=?,version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?`,...fields.map(k=>updated[k]),updated.status,now,p.version,id)];
  if (data.tasks!==undefined) statements.push(...taskChanges(db,id,data.tasks,await tasks(db,id),now,actor));
  statements.push(q(db,'UPDATE one_time_project_access SET expires_at=?,expired_logged_at=CASE WHEN expires_at IS ? THEN expired_logged_at ELSE NULL END WHERE project_id=?',expiry(updated),expiry(updated),id));
+ if(display){statements.push(writeDisplay(db,id,display),log(db,id,'display_options_changed',actor,now));}
  statements.push(log(db,id,'project_edited',actor,now));
  if (p.status!==updated.status) statements.push(log(db,id,'status_changed',actor,now,updated.status));
  if (p.invoice_url!==updated.invoice_url) statements.push(log(db,id,'invoice_changed',actor,now));

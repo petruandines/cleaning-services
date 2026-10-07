@@ -13,7 +13,7 @@ test('deployment creates only isolated tables and preserves populated existing s
   if(sql.startsWith('SELECT'))rows=sqlite.prepare(sql).all();else{writes++;assert.doesNotMatch(sql,/\b(?:DROP|ALTER|DELETE|UPDATE|INSERT)\b/);sqlite.exec(sql);}
   return Response.json({success:true,result:[{success:true,results:rows}]});
  };
- try{await import('../scripts/one-time-schema.mjs?test=first');assert.equal(writes,1);assert.equal(sqlite.prepare('SELECT name FROM clients').get().name,'Existing client');assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name LIKE 'one_time_%'").get().n,7);
+ try{await import('../scripts/one-time-schema.mjs?test=first');assert.equal(writes,1);assert.equal(sqlite.prepare('SELECT name FROM clients').get().name,'Existing client');assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='table' AND name LIKE 'one_time_%'").get().n,8);
   await import('../scripts/one-time-schema.mjs?test=second');assert.equal(writes,2);assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM clients').get().n,1);
  }finally{globalThis.fetch=original;if(account===undefined)delete process.env.CLOUDFLARE_ACCOUNT_ID;else process.env.CLOUDFLARE_ACCOUNT_ID=account;sqlite.close();}
 });

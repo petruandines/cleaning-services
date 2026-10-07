@@ -97,7 +97,7 @@ test('confirmed admin deletion removes only the selected project and invalidates
   assert.equal((await s.call(path,{data:{...data,version:0}})).status,409);
   assert.equal((await s.call('client/'+a.access.token+'/view',{admin:false,cookie})).status,200);
   assert.equal((await s.call(path,{data})).status,200);
-  for(const table of ['one_time_projects','one_time_project_tasks','one_time_project_access','one_time_project_sessions','one_time_project_activity','one_time_project_passwords']){
+  for(const table of ['one_time_projects','one_time_project_tasks','one_time_project_access','one_time_project_sessions','one_time_project_activity','one_time_project_passwords','one_time_project_display_options']){
    const column=table==='one_time_projects'?'id':'project_id';
    assert.equal(s.sqlite.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${column}=?`).get(p.id).n,0);
    assert.ok(s.sqlite.prepare(`SELECT COUNT(*) n FROM ${table} WHERE ${column}=?`).get(other.id).n>0);
@@ -139,5 +139,29 @@ test('admin password copy is encrypted, scoped, audited, and never resets client
   assert.equal((await s.call('client/'+token+'/view',{admin:false,cookie})).status,401);
   s.sqlite.prepare('DELETE FROM one_time_project_passwords WHERE project_id=?').run(p.id);
   const missing=await s.call(path,{data:{}});assert.equal(missing.status,409);assert.equal((await missing.json()).error,'password_copy_requires_reset');
+ }finally{s.sqlite.close();}
+});
+
+
+test('per-project invoice and information cards are controlled on the backend and isolated',async()=>{
+ const s=setup();
+ try{
+  let p=await s.create();const a=await s.generate(p.id),{cookie}=await s.login(a.access.token);
+  const view=async()=>{const r=await s.call('client/'+a.access.token+'/view',{admin:false,cookie});assert.equal(r.status,200);return r.json();};
+  let data=await view();assert.equal(data.invoice_label,'Descarcă factura');assert.equal(data.access_policy,null);assert.equal(data.service_terms,null);assert.equal(data.supplier,null);
+  const options={invoice_enabled:true,invoice_label:'Descarcă documentul',show_access_policy:true,show_terms:true,show_supplier:true};
+  const update=async(change)=>{const r=await s.call('admin/'+p.id,{method:'PATCH',data:{version:p.version,...change}});assert.equal(r.status,200,await r.clone().text());p=await r.json();};
+  await update({invoice_url:'https://example.com/invoice.pdf',display_options:options});
+  data=await view();assert.equal(data.invoice_url,'https://example.com/invoice.pdf');assert.equal(data.invoice_label,'Descarcă documentul');
+  assert.equal(data.access_policy.url,'https://petruandines.com/politica-acces-deplasare/');assert.equal(data.service_terms.url,'https://petruandines.com/conditii-prestare-servicii/');assert.equal(data.supplier.cui,'52403391');assert.equal(data.supplier.iban,'RO97REVO0000165356858695 (RON)');
+  assert.deepEqual(await(await s.call('admin/'+p.id+'/preview')).json(),data);
+  await update({display_options:{invoice_enabled:false,show_access_policy:false}});data=await view();assert.equal(data.invoice_url,'');assert.equal(data.access_policy,null);assert.ok(data.service_terms);assert.ok(data.supplier);assert.equal(p.invoice_url,'https://example.com/invoice.pdf','hide preserves saved invoice');
+  await update({display_options:{show_terms:false,show_supplier:false}});data=await view();assert.equal(data.service_terms,null);assert.equal(data.supplier,null);
+  await update({display_options:{invoice_enabled:true,invoice_label:'  '}});assert.equal((await view()).invoice_label,'Descarcă factura');
+  for(const display_options of [null,[],{show_terms:'yes'},{invoice_label:'x'.repeat(101)},{supplier:{name:'Forged'}},{show_terms:true,terms_url:'https://evil.example'}])assert.equal((await s.call('admin/'+p.id,{method:'PATCH',data:{version:p.version,display_options}})).status,400);
+  const other=await s.create('Alt proiect');assert.equal(other.display_options.show_terms,0);assert.equal(other.display_options.invoice_label,'Descarcă factura');
+  assert.equal((await s.call('admin/'+p.id,{authorization:'Bearer recurrent',method:'PATCH',data:{version:p.version,display_options:options}})).status,403);
+  s.sqlite.prepare('DELETE FROM one_time_project_display_options WHERE project_id=?').run(p.id);
+  assert.equal((await view()).invoice_url,'https://example.com/invoice.pdf','legacy project without options retains invoice');
  }finally{s.sqlite.close();}
 });

@@ -12,6 +12,9 @@ async function call(action,data,cookie){return fetch(`${API}/api/one-time/client
 let created=false;
 try{
  const denied=await fetch(API+'/api/one-time/admin',{headers:{Origin:ORIGIN},signal:AbortSignal.timeout(20000)});assert.equal(denied.status,401,'Admin endpoint must require the existing admin session');
+ for(const path of ['/politica-acces-deplasare/','/conditii-prestare-servicii/']){
+  const document=await fetch(ORIGIN+path,{signal:AbortSignal.timeout(20000)});assert.equal(document.status,200,'Client information document must be reachable');
+ }
  const now=new Date().toISOString();
  await query(`INSERT INTO one_time_projects(id,name,client_name,phone,location,scheduled_at,price_bani,status,created_at,updated_at,expiry_days)
  VALUES(?,?,?,?,?,?,?,?,?,?,?)`,[id,'Verificare automată · Petru & Inés','Date fictive','000','Locație fictivă',now,100,'scheduled',now,now,7]);created=true;
@@ -29,13 +32,17 @@ try{
  await query("UPDATE one_time_projects SET status='completed',completed_at=?,invoice_url='https://example.com/invoice.pdf' WHERE id=?",[now,id]);
  await query('UPDATE one_time_project_access SET expires_at=? WHERE project_id=?',[expires,id]);
  view=await(await call('view',null,cookie)).json();assert.equal(view.review_url,'https://g.page/r/CYhmtVqu_TcCEBE/review');assert.equal(view.invoice_url,'https://example.com/invoice.pdf');
+ await query('INSERT INTO one_time_project_display_options(project_id,invoice_enabled,invoice_label,show_access_policy,show_terms,show_supplier) VALUES(?,0,?,1,1,1)',[id,'Document test']);
+ view=await(await call('view',null,cookie)).json();assert.equal(view.invoice_url,'');assert.equal(view.access_policy.url,ORIGIN+'/politica-acces-deplasare/');assert.equal(view.service_terms.url,ORIGIN+'/conditii-prestare-servicii/');assert.equal(view.supplier.cui,'52403391');
+ await query('UPDATE one_time_project_display_options SET invoice_enabled=1,show_access_policy=0,show_terms=0,show_supplier=0 WHERE project_id=?',[id]);
+ view=await(await call('view',null,cookie)).json();assert.equal(view.invoice_url,'https://example.com/invoice.pdf');assert.equal(view.invoice_label,'Document test');assert.equal(view.access_policy,null);assert.equal(view.service_terms,null);assert.equal(view.supplier,null);
  await query('UPDATE one_time_project_access SET active=0,generation=generation+1 WHERE project_id=?',[id]);assert.equal((await call('view',null,cookie)).status,403);
  await query('UPDATE one_time_project_access SET active=1 WHERE project_id=?',[id]);assert.equal((await call('view',null,cookie)).status,401,'Reactivation does not revive old sessions');
  r=await call('login',{password:secret,remember:true});assert.equal(r.status,200);const nextCookie=r.headers.get('set-cookie').split(';')[0];
  assert.equal((await call('logout',{},nextCookie)).status,200);assert.equal((await call('view',null,nextCookie)).status,401);
  await query('UPDATE one_time_project_access SET expires_at=? WHERE project_id=?',[new Date(Date.now()-1000).toISOString(),id]);r=await call('view',null,cookie);assert.equal(r.status,410);assert.deepEqual(await r.json(),{error:'access_expired'});
- console.log('Live one-time HTTP smoke passed: password login, secure persistent cookie, scoped payload, progress, finalization/review, invoice, revoke/reactivate, logout, expiry. Admin auth gate remains closed to anonymous requests.');
+ console.log('Live one-time HTTP smoke passed: password login, secure persistent cookie, scoped payload, progress, finalization/review, invoice visibility/custom label, optional legal/provider cards, revoke/reactivate, logout, expiry. Admin auth gate remains closed to anonymous requests.');
 }finally{
- if(created)for(const table of ['one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access','one_time_projects'])await query(`DELETE FROM ${table} WHERE ${table==='one_time_projects'?'id':'project_id'}=?`,[id]);
+ if(created)for(const table of ['one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access','one_time_projects'])await query(`DELETE FROM ${table} WHERE ${table==='one_time_projects'?'id':'project_id'}=?`,[id]);
  console.log('Only disposable one-time smoke fixtures removed. Existing customers/users/data were not touched.');
 }
