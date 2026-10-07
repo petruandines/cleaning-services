@@ -22,6 +22,7 @@ test('hourly pricing, written minimum exception, travel, immutable final amount 
  p=await(await s.call('admin/'+p.id+'/start',{data:{}})).json();s.setNow('2026-10-15T15:00:00.000Z');p=await(await s.call('admin/'+p.id)).json();assert.equal(p.billing.total_bani,5000);
  await patch({status:'cancelled'});s.setNow('2026-10-15T16:00:00.000Z');await patch({description:'Cancelled details'});assert.equal(p.billing.total_bani,5000);
  assert.equal((await s.call('admin/'+p.id,{authorization:'Bearer recurrent',method:'PATCH',data:{version:p.version,service_options:{en_route:true}}})).status,403);
+ p=await s.create('Reprogramare înainte de începere');await patch({price_bani:10000,service_options:{billing_mode:'hourly',minimum_bani:0,minimum_agreement:'Acord scris'}});await patch({status:'cancelled'});await patch({status:'scheduled'});p=await(await s.call('admin/'+p.id+'/start',{data:{}})).json();s.setNow('2026-10-15T16:30:00.000Z');p=await(await s.call('admin/'+p.id)).json();assert.equal(p.billing.total_bani,5000);
  assert.equal((await s.call('admin/'+other.id)).status,200);const unchanged=await(await s.call('admin/'+other.id)).json();assert.equal(unchanged.billing.mode,'fixed');assert.equal(unchanged.price_bani,49900);
  }finally{s.sqlite.close();}
 });

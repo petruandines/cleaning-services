@@ -229,7 +229,7 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    await db.batch([
      q(db,'UPDATE one_time_projects SET status=?,started_at=?,completed_at=?,updated_at=?,version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',updated.status,updated.started_at,updated.completed_at,now,p.version,id),
      q(db,'UPDATE one_time_project_access SET expires_at=?,expired_logged_at=NULL WHERE project_id=?',expiry(updated),id),
-     writeService(db,id,{...service,en_route:0}),
+     writeService(db,id,{...service,en_route:0,stopped_at:null}),
      log(db,id,action==='start' ? 'intervention_started' : 'intervention_completed',actor,now),
    ]); return json(await adminView(db,await project(db,id),now));
  }
