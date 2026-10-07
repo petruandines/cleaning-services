@@ -30,7 +30,7 @@ export function renderProject(root,p) {
   const section=el('article',undefined,'project-card project-legal');section.dataset.card=kind;section.append(el('h2',info.title));const a=el('a','Citește documentul','secondary');a.href=info.url;a.target='_blank';a.rel='noopener noreferrer';section.append(a);root.append(section);
  }
  if(p.supplier){const section=el('article',undefined,'project-card project-supplier');section.dataset.card='supplier';section.append(el('h2','Informații despre furnizor'));const details=el('dl',undefined,'project-summary');
-  for(const [label,key] of [['Servicii furnizate de','name'],['CUI','cui'],['Număr registrul comerțului','registration'],['Adresă','address'],['IBAN','iban'],['Banca','bank']])details.append(el('dt',label),el('dd',p.supplier[key]));section.append(details);root.append(section);
+  for(const [label,key] of [['Servicii furnizate de','name'],['CUI','cui'],['Număr registrul comerțului','registration'],['IBAN','iban'],['Banca','bank']])details.append(el('dt',label),el('dd',p.supplier[key]));section.append(details);root.append(section);
  }
 
 }
