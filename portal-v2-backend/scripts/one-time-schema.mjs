@@ -7,9 +7,9 @@ const UUID='6816004b-dc95-48c9-be52-9bd4131d157e';
 const config=JSON.parse(readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8'));
 assert.equal(config.name,'petru-ines-portal-api');assert.equal(config.d1_databases[0].database_id,UUID);
 assert.equal(process.env.CLOUDFLARE_ACCOUNT_ID,ACCOUNT);
-const sql=['0001_one_time.sql','0002_password_copy.sql','0003_display_options.sql'].map(file=>readFileSync(new URL('../one-time-migrations/'+file,import.meta.url),'utf8')).join('\n');
+const sql=['0001_one_time.sql','0002_password_copy.sql','0003_display_options.sql','0005_service_options.sql'].map(file=>readFileSync(new URL('../one-time-migrations/'+file,import.meta.url),'utf8')).join('\n');
 const statements=sql.replace(/--[^\n]*/g,'').split(';').map(s=>s.trim()).filter(Boolean);
-assert.equal(statements.length,11);
+assert.equal(statements.length,12);
 for(const statement of statements)assert.match(statement,/^CREATE (?:TABLE|INDEX) IF NOT EXISTS (?:one_time_|otp_)/);
 const model=new DatabaseSync(':memory:');model.exec(sql);
 const oldDisplay=model.prepare("SELECT sql FROM sqlite_master WHERE name='one_time_project_display_options'").get().sql;
@@ -35,4 +35,4 @@ const after=await query("SELECT name,type,sql FROM sqlite_master WHERE name NOT 
 assert.deepEqual(after,before,'Existing application/auth schema changed');
 const actual=await query("SELECT name,type,sql FROM sqlite_master WHERE name LIKE 'one_time_%' OR name LIKE 'otp_%' ORDER BY name");
 assert.equal(actual.length,expected.length);for(const entry of actual)assert.equal(normalize(entry.sql),normalize(expected.find(x=>x.name===entry.name).sql));
-console.log('Verified eight additive one-time tables and three indexes. Existing schema preserved. No existing rows were updated or deleted.');
+console.log('Verified nine additive one-time tables and three indexes. Existing schema preserved. No existing rows were updated or deleted.');

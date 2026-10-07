@@ -26,13 +26,19 @@ try{
  const header=r.headers.get('set-cookie');assert.match(header,/Secure; HttpOnly; SameSite=Lax; Max-Age=/);const cookie=header.split(';')[0];
  r=await call('view',null,cookie);assert.equal(r.status,200);let view=await r.json();assert.equal(view.name,'Verificare automată · Petru & Inés');assert.equal(view.review_url,null);assert.equal(view.tasks.length,1);assert.equal('client_name' in view,false);assert.equal('access' in view,false);
  assert.equal((await call('view',null,cookie)).status,200,'Persistent cookie reusable');
- await query("UPDATE one_time_projects SET status='in_progress',started_at=?,updated_at=? WHERE id=?",[now,now,id]);
+ await query('INSERT INTO one_time_project_service_options(project_id,billing_mode,en_route,departed_at) VALUES(?,?,1,?)',[id,'hourly',now]);await query('UPDATE one_time_projects SET price_bani=10000 WHERE id=?',[id]);
+ view=await(await call('view',null,cookie)).json();assert.equal(view.en_route,true);assert.equal(view.billing.mode,'hourly');assert.equal(view.billing.total_bani,null);
+ const halfHourAgo=new Date(Date.parse(now)-1800000).toISOString();
+
+ await query("UPDATE one_time_projects SET status='in_progress',started_at=?,updated_at=? WHERE id=?",[halfHourAgo,now,id]);
+ await query('UPDATE one_time_project_service_options SET en_route=0 WHERE project_id=?',[id]);
  await query('UPDATE one_time_project_tasks SET done=1,completed_at=? WHERE project_id=?',[now,id]);
- view=await(await call('view',null,cookie)).json();assert.equal(view.status,'in_progress');assert.equal(view.tasks[0].done,1);
+ view=await(await call('view',null,cookie)).json();assert.equal(view.status,'in_progress');assert.equal(view.tasks[0].done,1);assert.equal(view.en_route,false);assert.equal(view.billing.total_bani,10000);assert.ok(view.billing.elapsed_ms>=1800000);
+ await query('UPDATE one_time_projects SET started_at=? WHERE id=?',[new Date(Date.parse(now)-5400000).toISOString(),id]);
  const expires=new Date(Date.now()+7*86400000).toISOString();
  await query("UPDATE one_time_projects SET status='completed',completed_at=?,invoice_url='https://example.com/invoice.pdf' WHERE id=?",[now,id]);
  await query('UPDATE one_time_project_access SET expires_at=? WHERE project_id=?',[expires,id]);
- view=await(await call('view',null,cookie)).json();assert.equal(view.review_url,'https://g.page/r/CYhmtVqu_TcCEBE/review');assert.equal(view.invoice_url,'https://example.com/invoice.pdf');
+ view=await(await call('view',null,cookie)).json();assert.equal(view.billing.total_bani,15000);assert.equal(view.billing.running,false);assert.equal(view.review_url,'https://g.page/r/CYhmtVqu_TcCEBE/review');assert.equal(view.invoice_url,'https://example.com/invoice.pdf');
  await query('UPDATE one_time_project_display_options SET invoice_enabled=0,invoice_label=?,show_access_policy=1,show_terms=1,show_supplier=1,show_review=0 WHERE project_id=?',['Document test',id]);
  view=await(await call('view',null,cookie)).json();assert.equal(view.invoice_url,'');assert.equal(view.review_url,null);assert.equal(view.access_policy.url,ORIGIN+'/politica-acces-deplasare/');assert.equal(view.service_terms.url,ORIGIN+'/conditii-prestare-servicii/');assert.equal(view.supplier.cui,'52403391');
  await query('UPDATE one_time_project_display_options SET invoice_enabled=1,show_access_policy=0,show_terms=0,show_supplier=0 WHERE project_id=?',[id]);
@@ -42,8 +48,8 @@ try{
  r=await call('login',{password:secret,remember:true});assert.equal(r.status,200);const nextCookie=r.headers.get('set-cookie').split(';')[0];
  assert.equal((await call('logout',{},nextCookie)).status,200);assert.equal((await call('view',null,nextCookie)).status,401);
  await query('UPDATE one_time_project_access SET expires_at=? WHERE project_id=?',[new Date(Date.now()-1000).toISOString(),id]);r=await call('view',null,cookie);assert.equal(r.status,410);assert.deepEqual(await r.json(),{error:'access_expired'});
- console.log('Live one-time HTTP smoke passed: password login, secure persistent cookie, scoped payload, progress, finalization and opt-in review, invoice visibility/custom label, optional legal/provider cards, revoke/reactivate, logout, expiry. Admin auth gate remains closed to anonymous requests.');
+ console.log('Live one-time HTTP smoke passed: travel notice, hourly rate, minimum charge, elapsed time and frozen final total, password login, secure persistent cookie, scoped payload, progress, finalization and opt-in review, invoice visibility/custom label, optional legal/provider cards, revoke/reactivate, logout, expiry. Admin auth gate remains closed to anonymous requests.');
 }finally{
- if(created)for(const table of ['one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access','one_time_projects'])await query(`DELETE FROM ${table} WHERE ${table==='one_time_projects'?'id':'project_id'}=?`,[id]);
+ if(created)for(const table of ['one_time_project_service_options','one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access','one_time_projects'])await query(`DELETE FROM ${table} WHERE ${table==='one_time_projects'?'id':'project_id'}=?`,[id]);
  console.log('Only disposable one-time smoke fixtures removed. Existing customers/users/data were not touched.');
 }

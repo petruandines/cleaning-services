@@ -1,3 +1,4 @@
+import {SERVICE_DEFAULTS,readService,validateService,writeService,billingView} from './one-time-service.mjs';
 import {DISPLAY_DEFAULTS,ACCESS_POLICY,SERVICE_TERMS,SUPPLIER,validateDisplay,readDisplay,writeDisplay} from './one-time-display.mjs';
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { sealPassword, openPassword } from './one-time-password.mjs';
@@ -63,10 +64,10 @@ function validate(data) {
 function checkedDisplay(input,previous){try{return validateDisplay(input,previous);}catch{fail(400,'invalid_display_options');}}
 async function project(db,id) { const p = await first(db,'SELECT * FROM one_time_projects WHERE id=?',id); if (!p) fail(404,'not_found'); return p; }
 async function tasks(db,id) { return rows(db,'SELECT id,title,position,done,completed_at FROM one_time_project_tasks WHERE project_id=? ORDER BY position,id',id); }
-async function publicView(db,p) {
- const options=await readDisplay(db,p.id);
+async function publicView(db,p,now) {
+ const options=await readDisplay(db,p.id),service=await readService(db,p.id);
  return { name:p.name, status:p.status, scheduled_at:p.scheduled_at, location:p.show_location ? p.location : '',
- price_bani:p.price_bani, description:p.description, invoice_url:options.invoice_enabled?p.invoice_url:'', invoice_label:options.invoice_label,
+ price_bani:p.price_bani, billing:billingView(p,service,now),en_route:!!service.en_route,departed_at:service.departed_at,started_at:p.started_at, description:p.description, invoice_url:options.invoice_enabled?p.invoice_url:'', invoice_label:options.invoice_label,
  access_policy:options.show_access_policy?ACCESS_POLICY:null,service_terms:options.show_terms?SERVICE_TERMS:null,supplier:options.show_supplier?SUPPLIER:null,completed_at:p.completed_at,
  updated_at:p.updated_at, tasks:await tasks(db,p.id), review_url:options.show_review && p.completed_at && ['completed','closed'].includes(p.status) ? REVIEW_URL : null };
 }
@@ -82,7 +83,7 @@ async function expire(db, now) {
 }
 async function adminView(db,p,now) {
  const a = await first(db,'SELECT token,active,expires_at,last_login_at FROM one_time_project_access WHERE project_id=?',p.id);
- return {...p, display_options:await readDisplay(db,p.id),tasks:await tasks(db,p.id), access:a ? {...a,status:accessState(a,now)} : {status:'not_created'}};
+ return {...p,service_options:await readService(db,p.id),billing:billingView(p,await readService(db,p.id),now), display_options:await readDisplay(db,p.id),tasks:await tasks(db,p.id), access:a ? {...a,status:accessState(a,now)} : {status:'not_created'}};
 }
 function cookie(token,value,maxAge) {
  return `${COOKIE}=${value}; Path=/api/one-time/client/${token}/; Secure; HttpOnly; SameSite=Lax${maxAge === null ? '' : '; Max-Age='+maxAge}`;
@@ -135,7 +136,7 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    const s = await first(db,`SELECT s.project_id FROM one_time_project_sessions s JOIN one_time_project_access a ON a.project_id=s.project_id
       WHERE s.hash=? AND s.project_id=? AND s.generation=a.generation AND a.active=1 AND a.token=? AND s.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)`,await digest(raw),a.project_id,token,now,now);
    if (!s) fail(401,'login_required');
-   return json(await publicView(db,await project(db,a.project_id)));
+   return json(await publicView(db,await project(db,a.project_id),now));
  }
  const admin = /^\/api\/one-time\/admin(?:\/([\w-]{1,100}))?(?:\/(preview|activity|access|start|complete|delete|password))?$/.exec(path);
  if (!admin) fail(404,'not_found');
@@ -153,17 +154,19 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    }
    if (request.method!=='POST') fail(405,'method_not_allowed');
    const data=await body(request); validate(data);
-   if (Object.keys(data).some(k=>!fields.includes(k) && k!=='tasks' && k!=='status' && k!=='display_options')) fail(400,'invalid_field');
+   if (Object.keys(data).some(k=>!fields.includes(k) && k!=='tasks' && k!=='status' && k!=='display_options' && k!=='service_options')) fail(400,'invalid_field');
    if (!['draft','scheduled','confirmed'].includes(data.status)) fail(400,'invalid_status');
    const display=data.display_options===undefined?{...DISPLAY_DEFAULTS}:checkedDisplay(data.display_options);
+   let service;try{service=data.service_options===undefined?{...SERVICE_DEFAULTS}:validateService(data.service_options,SERVICE_DEFAULTS,now);}catch(e){fail(400,e.message);}
+   if(service.en_route&&!['scheduled','confirmed'].includes(data.status))fail(400,'travel_requires_scheduled');
    const projectId=crypto.randomUUID();
    const taskList=taskChanges(db,projectId,data.tasks,[],now);
-   await db.batch([q(db,`INSERT INTO one_time_projects(id,${fields.join(',')},status,created_at,updated_at) VALUES(${Array(15).fill('?').join(',')})`,projectId,...fields.map(k=>data[k]),data.status,now,now),...taskList,writeDisplay(db,projectId,display),log(db,projectId,'project_created',actor,now)]);
+   await db.batch([q(db,`INSERT INTO one_time_projects(id,${fields.join(',')},status,created_at,updated_at) VALUES(${Array(15).fill('?').join(',')})`,projectId,...fields.map(k=>data[k]),data.status,now,now),...taskList,writeService(db,projectId,service),writeDisplay(db,projectId,display),log(db,projectId,'project_created',actor,now)]);
    return json(await adminView(db,await project(db,projectId),now),201);
  }
  const p=await project(db,id);
  if (request.method==='GET') {
-   if (action==='preview') return json(await publicView(db,p));
+   if (action==='preview') return json(await publicView(db,p,now));
    if (action==='activity') {
      const offset=Number(u.searchParams.get('offset')||0); if (!Number.isSafeInteger(offset)||offset<0) fail(400,'invalid_offset');
      const list=await rows(db,'SELECT type,actor,detail,created_at FROM one_time_project_activity WHERE project_id=? ORDER BY created_at DESC,rowid DESC LIMIT 101 OFFSET ?',id,offset);
@@ -187,7 +190,7 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    await db.batch([
      q(db,'UPDATE one_time_projects SET version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',p.version,id),
      q(db,"DELETE FROM one_time_project_rate_limits WHERE key IN (SELECT 'token:'||token FROM one_time_project_access WHERE project_id=?)",id),
-     ...['one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'].map(table=>q(db,`DELETE FROM ${table} WHERE project_id=?`,id)),
+     ...['one_time_project_service_options','one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'].map(table=>q(db,`DELETE FROM ${table} WHERE project_id=?`,id)),
      q(db,'DELETE FROM one_time_projects WHERE id=?',id),
    ]);
    return json({ok:true});
@@ -221,23 +224,31 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    if (['cancelled','closed','completed'].includes(p.status)) fail(409,'invalid_transition');
    if (action==='complete' && data.confirm!==true) fail(400,'confirmation_required');
    if (action==='start' && p.status==='in_progress') return json(await adminView(db,p,now));
+   const service=await readService(db,id);if(action==='complete'&&service.billing_mode==='hourly'&&!p.started_at)fail(409,'hourly_start_required');
    const updated={...p,status:action==='start' ? 'in_progress' : 'completed',started_at:action==='start' ? now : p.started_at,completed_at:action==='complete' ? now : null};
    await db.batch([
      q(db,'UPDATE one_time_projects SET status=?,started_at=?,completed_at=?,updated_at=?,version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',updated.status,updated.started_at,updated.completed_at,now,p.version,id),
      q(db,'UPDATE one_time_project_access SET expires_at=?,expired_logged_at=NULL WHERE project_id=?',expiry(updated),id),
+     writeService(db,id,{...service,en_route:0}),
      log(db,id,action==='start' ? 'intervention_started' : 'intervention_completed',actor,now),
    ]); return json(await adminView(db,await project(db,id),now));
  }
  if (action || request.method!=='PATCH') fail(405,'method_not_allowed');
  if (data.version!==p.version) fail(409,'project_changed_reload');
- if (Object.keys(data).some(k=>!fields.includes(k) && !['tasks','status','version','display_options'].includes(k))) fail(400,'invalid_field');
+ if (Object.keys(data).some(k=>!fields.includes(k) && !['tasks','status','version','display_options','service_options'].includes(k))) fail(400,'invalid_field');
  const display=data.display_options===undefined?null:checkedDisplay(data.display_options,await readDisplay(db,id));
+ const previousService=await readService(db,id);let service=null;if(data.service_options!==undefined){try{service=validateService(data.service_options,previousService,now);}catch(e){fail(400,e.message);}}
  const updated={...p,...data}; validate(updated);
+ if(p.started_at||p.completed_at){const next=service||previousService;if(next.billing_mode!==previousService.billing_mode||((next.billing_mode==='hourly'||previousService.billing_mode==='hourly')&&(updated.price_bani!==p.price_bani||next.minimum_bani!==previousService.minimum_bani||next.minimum_agreement!==previousService.minimum_agreement)))fail(409,'billing_locked_after_start');}
+ if(updated.status==='cancelled'&&p.status!=='cancelled'){service={...(service||previousService),en_route:0,stopped_at:now};}
+ if(p.status==='cancelled'&&updated.status!=='cancelled'&&p.started_at)fail(409,'billing_locked_after_start');
+ if(service?.en_route&& !['scheduled','confirmed'].includes(updated.status))fail(400,'travel_requires_scheduled');
  if (!STATUSES.includes(updated.status) || (!p.completed_at && ['completed','closed'].includes(updated.status)) || (p.completed_at && !['completed','closed'].includes(updated.status)) || (updated.status==='in_progress' && p.status!=='in_progress')) fail(400,'use_start_or_complete');
  // Acquire a write lock via version compare. A failed compare rolls back the entire batch.
  const statements=[q(db,`UPDATE one_time_projects SET ${fields.map(k=>k+'=?').join(',')},status=?,updated_at=?,version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?`,...fields.map(k=>updated[k]),updated.status,now,p.version,id)];
  if (data.tasks!==undefined) statements.push(...taskChanges(db,id,data.tasks,await tasks(db,id),now,actor));
  statements.push(q(db,'UPDATE one_time_project_access SET expires_at=?,expired_logged_at=CASE WHEN expires_at IS ? THEN expired_logged_at ELSE NULL END WHERE project_id=?',expiry(updated),expiry(updated),id));
+ if(service){statements.push(writeService(db,id,service),log(db,id,previousService.en_route!==service.en_route?(service.en_route?'travel_started':'travel_cancelled'):'billing_options_changed',actor,now));}
  if(display){statements.push(writeDisplay(db,id,display),log(db,id,'display_options_changed',actor,now));}
  statements.push(log(db,id,'project_edited',actor,now));
  if (p.status!==updated.status) statements.push(log(db,id,'status_changed',actor,now,updated.status));
