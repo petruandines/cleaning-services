@@ -10,7 +10,8 @@ export function validateService(input,previous=SERVICE_DEFAULTS,now){
 }
 export function writeService(db,id,options){return db.prepare(`INSERT INTO one_time_project_service_options(project_id,${fields.join(',')}) VALUES(${Array(fields.length+1).fill('?').join(',')}) ON CONFLICT(project_id) DO UPDATE SET ${fields.map(k=>k+'=excluded.'+k).join(',')}`).bind(id,...fields.map(k=>options[k]));}
 export function billingView(p,options,now){
+ if(options.billing_mode==='fixed')return {mode:'fixed',total_bani:p.price_bani};
  const end=p.completed_at||options.stopped_at||now;
  const elapsed=p.started_at?Math.max(0,Date.parse(end)-Date.parse(p.started_at)):0;
- return {mode:options.billing_mode,rate_bani:p.price_bani,minimum_bani:options.minimum_bani,minimum_agreement:options.minimum_agreement,elapsed_ms:elapsed,total_bani:options.billing_mode==='hourly'?(p.started_at?Math.max(options.minimum_bani,Math.round(p.price_bani*elapsed/3600000)):null):p.price_bani,running:options.billing_mode==='hourly'&&p.status==='in_progress'&&!!p.started_at,server_now:now};
+ return {mode:options.billing_mode,rate_bani:p.price_bani,minimum_bani:options.minimum_bani,minimum_agreement:options.minimum_agreement,elapsed_ms:elapsed,total_bani:options.billing_mode==='hourly'?(p.started_at?Math.max(options.minimum_bani,Math.round(p.price_bani*elapsed/3600000)):null):p.price_bani,running:options.billing_mode==='hourly'&&p.status==='in_progress'&&!!p.started_at};
 }
