@@ -8,6 +8,7 @@ export function setup(){
  sqlite.exec(readFileSync(new URL('../one-time-migrations/0001_one_time.sql',import.meta.url),'utf8'));
  sqlite.exec(readFileSync(new URL('../one-time-migrations/0002_password_copy.sql',import.meta.url),'utf8'));
  sqlite.exec(readFileSync(new URL('../one-time-migrations/0003_display_options.sql',import.meta.url),'utf8'));
+ sqlite.exec(readFileSync(new URL('../one-time-migrations/0004_review_visibility.sql',import.meta.url),'utf8'));
  const passwordSecret='test-only-'+ 'k'.repeat(48);
  const db={prepare(sql){return{bind(...args){const stmt=sqlite.prepare(sql);return{async all(){return{results:stmt.all(...args)};},async run(){return stmt.run(...args);}};}};},async batch(statements){sqlite.exec('BEGIN');try{const result=[];for(const s of statements)result.push(await s.run());sqlite.exec('COMMIT');return result;}catch(e){sqlite.exec('ROLLBACK');throw e;}}};
  const auth={api:{async getSession({headers}){const token=headers.get('authorization');return token==='Bearer admin'?{user:{id:'owner',role:'admin',twoFactorEnabled:true}}:token==='Bearer pending'?{user:{id:'owner',role:'admin',twoFactorEnabled:false}}:token==='Bearer recurrent'?{user:{id:'client',role:'user'}}:null;}}};

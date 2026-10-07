@@ -20,6 +20,7 @@ try{
  VALUES(?,?,?,?,?,?,?,?,?,?,?)`,[id,'Verificare automată · Petru & Inés','Date fictive','000','Locație fictivă',now,100,'scheduled',now,now,7]);created=true;
  await query('INSERT INTO one_time_project_tasks(id,project_id,title,position) VALUES(?,?,?,0)',[id+'-task',id,'Sarcină test']);
  await query('INSERT INTO one_time_project_access(project_id,token,password_hash,created_at) VALUES(?,?,?,?)',[id,token,await hashPassword(secret),now]);
+ await query('INSERT INTO one_time_project_display_options(project_id,show_review) VALUES(?,1)',[id]);
  let r=await call('view');assert.equal(r.status,401);
  r=await call('login',{password:secret,remember:true});assert.equal(r.status,200);assert.equal(r.headers.get('access-control-allow-origin'),ORIGIN);assert.equal(r.headers.get('access-control-allow-credentials'),'true');
  const header=r.headers.get('set-cookie');assert.match(header,/Secure; HttpOnly; SameSite=Lax; Max-Age=/);const cookie=header.split(';')[0];
@@ -32,8 +33,8 @@ try{
  await query("UPDATE one_time_projects SET status='completed',completed_at=?,invoice_url='https://example.com/invoice.pdf' WHERE id=?",[now,id]);
  await query('UPDATE one_time_project_access SET expires_at=? WHERE project_id=?',[expires,id]);
  view=await(await call('view',null,cookie)).json();assert.equal(view.review_url,'https://g.page/r/CYhmtVqu_TcCEBE/review');assert.equal(view.invoice_url,'https://example.com/invoice.pdf');
- await query('INSERT INTO one_time_project_display_options(project_id,invoice_enabled,invoice_label,show_access_policy,show_terms,show_supplier) VALUES(?,0,?,1,1,1)',[id,'Document test']);
- view=await(await call('view',null,cookie)).json();assert.equal(view.invoice_url,'');assert.equal(view.access_policy.url,ORIGIN+'/politica-acces-deplasare/');assert.equal(view.service_terms.url,ORIGIN+'/conditii-prestare-servicii/');assert.equal(view.supplier.cui,'52403391');
+ await query('UPDATE one_time_project_display_options SET invoice_enabled=0,invoice_label=?,show_access_policy=1,show_terms=1,show_supplier=1,show_review=0 WHERE project_id=?',['Document test',id]);
+ view=await(await call('view',null,cookie)).json();assert.equal(view.invoice_url,'');assert.equal(view.review_url,null);assert.equal(view.access_policy.url,ORIGIN+'/politica-acces-deplasare/');assert.equal(view.service_terms.url,ORIGIN+'/conditii-prestare-servicii/');assert.equal(view.supplier.cui,'52403391');
  await query('UPDATE one_time_project_display_options SET invoice_enabled=1,show_access_policy=0,show_terms=0,show_supplier=0 WHERE project_id=?',[id]);
  view=await(await call('view',null,cookie)).json();assert.equal(view.invoice_url,'https://example.com/invoice.pdf');assert.equal(view.invoice_label,'Document test');assert.equal(view.access_policy,null);assert.equal(view.service_terms,null);assert.equal(view.supplier,null);
  await query('UPDATE one_time_project_access SET active=0,generation=generation+1 WHERE project_id=?',[id]);assert.equal((await call('view',null,cookie)).status,403);
@@ -41,7 +42,7 @@ try{
  r=await call('login',{password:secret,remember:true});assert.equal(r.status,200);const nextCookie=r.headers.get('set-cookie').split(';')[0];
  assert.equal((await call('logout',{},nextCookie)).status,200);assert.equal((await call('view',null,nextCookie)).status,401);
  await query('UPDATE one_time_project_access SET expires_at=? WHERE project_id=?',[new Date(Date.now()-1000).toISOString(),id]);r=await call('view',null,cookie);assert.equal(r.status,410);assert.deepEqual(await r.json(),{error:'access_expired'});
- console.log('Live one-time HTTP smoke passed: password login, secure persistent cookie, scoped payload, progress, finalization/review, invoice visibility/custom label, optional legal/provider cards, revoke/reactivate, logout, expiry. Admin auth gate remains closed to anonymous requests.');
+ console.log('Live one-time HTTP smoke passed: password login, secure persistent cookie, scoped payload, progress, finalization and opt-in review, invoice visibility/custom label, optional legal/provider cards, revoke/reactivate, logout, expiry. Admin auth gate remains closed to anonymous requests.');
 }finally{
  if(created)for(const table of ['one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access','one_time_projects'])await query(`DELETE FROM ${table} WHERE ${table==='one_time_projects'?'id':'project_id'}=?`,[id]);
  console.log('Only disposable one-time smoke fixtures removed. Existing customers/users/data were not touched.');

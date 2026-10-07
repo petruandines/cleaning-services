@@ -12,6 +12,10 @@ const statements=sql.replace(/--[^\n]*/g,'').split(';').map(s=>s.trim()).filter(
 assert.equal(statements.length,11);
 for(const statement of statements)assert.match(statement,/^CREATE (?:TABLE|INDEX) IF NOT EXISTS (?:one_time_|otp_)/);
 const model=new DatabaseSync(':memory:');model.exec(sql);
+const oldDisplay=model.prepare("SELECT sql FROM sqlite_master WHERE name='one_time_project_display_options'").get().sql;
+const reviewSql=readFileSync(new URL('../one-time-migrations/0004_review_visibility.sql',import.meta.url),'utf8').trim();
+assert.equal(reviewSql,'ALTER TABLE one_time_project_display_options ADD COLUMN show_review INTEGER NOT NULL DEFAULT 0 CHECK(show_review IN (0,1));');
+model.exec(reviewSql);
 const expected=model.prepare("SELECT name,type,sql FROM sqlite_master WHERE name LIKE 'one_time_%' OR name LIKE 'otp_%' ORDER BY name").all();model.close();
 async function cf(path,method='GET',data){
  const response=await fetch('https://api.cloudflare.com/client/v4'+path,{method,headers:{authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN,'content-type':'application/json'},...(data?{body:JSON.stringify(data)}:{}),signal:AbortSignal.timeout(30000)});
@@ -23,8 +27,10 @@ const before=await query("SELECT name,type,sql FROM sqlite_master WHERE name NOT
 assert.ok(before.some(t=>t.name==='clients'));assert.ok(before.some(t=>t.name==='payment_locations'));
 const existing=await query("SELECT name,type,sql FROM sqlite_master WHERE name LIKE 'one_time_%' OR name LIKE 'otp_%' ORDER BY name");
 const normalize=value=>value.replace(/IF NOT EXISTS /g,'').replace(/\s+/g,' ').trim();
-for(const entry of existing){const match=expected.find(x=>x.name===entry.name);assert.ok(match,'Unexpected one-time schema');assert.equal(normalize(entry.sql),normalize(match.sql),'Existing one-time table definition differs');}
+for(const entry of existing){const match=expected.find(x=>x.name===entry.name);assert.ok(match,'Unexpected one-time schema');assert.ok(normalize(entry.sql)===normalize(match.sql)||(entry.name==='one_time_project_display_options'&&normalize(entry.sql)===normalize(oldDisplay)),'Existing one-time table definition differs');}
 await query(sql);
+const existingDisplay=existing.find(entry=>entry.name==='one_time_project_display_options');
+if(!existingDisplay||normalize(existingDisplay.sql)===normalize(oldDisplay))await query(reviewSql);
 const after=await query("SELECT name,type,sql FROM sqlite_master WHERE name NOT LIKE '%one_time_%' AND name NOT LIKE 'otp_%' ORDER BY name");
 assert.deepEqual(after,before,'Existing application/auth schema changed');
 const actual=await query("SELECT name,type,sql FROM sqlite_master WHERE name LIKE 'one_time_%' OR name LIKE 'otp_%' ORDER BY name");

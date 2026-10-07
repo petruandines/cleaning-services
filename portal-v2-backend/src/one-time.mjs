@@ -68,7 +68,7 @@ async function publicView(db,p) {
  return { name:p.name, status:p.status, scheduled_at:p.scheduled_at, location:p.show_location ? p.location : '',
  price_bani:p.price_bani, description:p.description, invoice_url:options.invoice_enabled?p.invoice_url:'', invoice_label:options.invoice_label,
  access_policy:options.show_access_policy?ACCESS_POLICY:null,service_terms:options.show_terms?SERVICE_TERMS:null,supplier:options.show_supplier?SUPPLIER:null,completed_at:p.completed_at,
- updated_at:p.updated_at, tasks:await tasks(db,p.id), review_url:p.completed_at && ['completed','closed'].includes(p.status) ? REVIEW_URL : null };
+ updated_at:p.updated_at, tasks:await tasks(db,p.id), review_url:options.show_review && p.completed_at && ['completed','closed'].includes(p.status) ? REVIEW_URL : null };
 }
 async function expire(db, now) {
  // The conditional insert and marking run atomically, preventing duplicate events.

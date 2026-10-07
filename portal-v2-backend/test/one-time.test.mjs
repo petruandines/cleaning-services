@@ -20,7 +20,7 @@ test('one-time lifecycle end-to-end, isolation, persistent cookie, invoice and r
  assert.equal((await s.call('client/'+second.access.token+'/view',{admin:false,cookie})).status,401);
  assert.equal((await s.call('client/'+'a'.repeat(64)+'/view',{admin:false,cookie})).status,403);
  assert.equal((await handleApi(new Request('https://api.petruandines.com/api/me',{headers:{cookie}}),{db:s.db,auth:s.auth})).status,401,'temporary session cannot access normal portal');
- const edit=await s.call('admin/'+p.id,{method:'PATCH',data:{version:1,tasks:[{id:p.tasks[0].id,title:'Aspirare',done:true},{id:p.tasks[1].id,title:'Control',done:false}],invoice_url:'https://example.com/invoice.pdf'}});assert.equal(edit.status,200,await edit.clone().text());
+ const edit=await s.call('admin/'+p.id,{method:'PATCH',data:{version:1,tasks:[{id:p.tasks[0].id,title:'Aspirare',done:true},{id:p.tasks[1].id,title:'Control',done:false}],invoice_url:'https://example.com/invoice.pdf',display_options:{show_review:true}}});assert.equal(edit.status,200,await edit.clone().text());
  view=await(await s.call('client/'+token+'/view',{admin:false,cookie})).json();assert.equal(view.tasks[0].done,1);assert.ok(view.tasks[0].completed_at);assert.equal(view.invoice_url,'https://example.com/invoice.pdf');
  assert.equal((await s.call('admin/'+p.id,{method:'PATCH',data:{version:1,name:'Stale'}})).status,409);
  assert.equal((await s.call('admin/'+p.id+'/start',{data:{}})).status,200);
@@ -163,5 +163,19 @@ test('per-project invoice and information cards are controlled on the backend an
   assert.equal((await s.call('admin/'+p.id,{authorization:'Bearer recurrent',method:'PATCH',data:{version:p.version,display_options:options}})).status,403);
   s.sqlite.prepare('DELETE FROM one_time_project_display_options WHERE project_id=?').run(p.id);
   assert.equal((await view()).invoice_url,'https://example.com/invoice.pdf','legacy project without options retains invoice');
+ }finally{s.sqlite.close();}
+});
+
+
+test('review is opt-in per project and remains unavailable before confirmed completion',async()=>{
+ const s=setup();
+ try{
+  let p=await s.create();const a=await s.generate(p.id),{cookie}=await s.login(a.access.token);
+  const view=async()=> (await s.call('client/'+a.access.token+'/view',{admin:false,cookie})).json();
+  const update=async(show_review)=>{const r=await s.call('admin/'+p.id,{method:'PATCH',data:{version:p.version,display_options:{show_review}}});assert.equal(r.status,200);p=await r.json();};
+  assert.equal(p.display_options.show_review,0);await update(true);assert.equal((await view()).review_url,null);
+  await update(false);const completed=await s.call('admin/'+p.id+'/complete',{data:{confirm:true}});assert.equal(completed.status,200);p=await completed.json();assert.equal((await view()).review_url,null);
+  await update(true);assert.equal((await view()).review_url,REVIEW_URL);assert.equal((await(await s.call('admin/'+p.id+'/preview')).json()).review_url,REVIEW_URL);
+  await update(false);assert.equal((await view()).review_url,null);assert.equal((await s.create('Other')).display_options.show_review,0);
  }finally{s.sqlite.close();}
 });
