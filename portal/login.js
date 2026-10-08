@@ -6,6 +6,7 @@
   const views = ['sign-in', 'totp', 'enroll', 'change-password'];
   let pendingToken = null;
   let trustThisDevice = false;
+  let rememberAdmin = false;
 
   function show(view) {
     for (const id of views) $(id).hidden = id !== view;
@@ -38,7 +39,15 @@
     if (user.twoFactorRequired) { show('enroll'); return; }
     if (user.mustChangePassword) { show('change-password'); return; }
     if (!window.opener || !/^[a-f0-9]{32}$/.test(state || '')) throw new Error('Portal session unavailable');
-    window.opener.postMessage({ type: 'petru-ines-auth', state, token, user }, location.origin);
+    let deviceResponse = null;
+    try { deviceResponse = await fetch(API + '/api/admin-device-session', {
+      method: user.role === 'staff' && rememberAdmin ? 'POST' : 'DELETE',
+      credentials: 'include', cache: 'no-store',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token }, body: '{}',
+    }); } catch { /* Preserve successful authentication if device persistence is unavailable. */ }
+    const remembered = user.role === 'staff' && rememberAdmin && deviceResponse?.ok;
+    window.opener.postMessage({ type: 'petru-ines-auth', state, token, user,
+      deviceBlocked: !deviceResponse?.ok, rememberFailed: user.role === 'staff' && rememberAdmin && !remembered }, location.origin);
     pendingToken = null;
     window.close();
   }
@@ -57,6 +66,7 @@
     button.disabled = true;
     try {
       trustThisDevice = form.elements.trustDevice.checked;
+      rememberAdmin = form.elements.rememberAdmin.checked;
       const { response, body } = await post('sign-in/email', {
         email: form.elements.email.value.trim(), password: form.elements.password.value,
       });

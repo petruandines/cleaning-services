@@ -9,7 +9,7 @@ for (const name of files) {
   const source = resolve(root, 'portal-v2-frontend', name);
   const target = resolve(root, 'portal', name);
   if (name === 'index.html') writeFileSync(target,
-    readFileSync(source, 'utf8').replace(/\?v=[a-zA-Z0-9-]+/g, '?v=portal-v2-20261008-admin-password'));
+    readFileSync(source, 'utf8').replace(/\?v=[a-zA-Z0-9-]+/g, '?v=portal-v2-20261008-admin-device'));
   else copyFileSync(source, target);
 }
 console.log('Published portal assets prepared from the reviewed v2 frontend.');
