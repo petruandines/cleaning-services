@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { handleApi } from './api.mjs';
 import { isPortalOrigin, corsOrigin } from './origins.mjs';
 import { authOptions } from './auth-options.mjs';
+import { guardAdminPassword } from './admin-password.mjs';
 import { handleOneTime } from './one-time.mjs';
 
 const CANONICAL_PORTAL_ORIGIN = 'https://petruandines.com';
@@ -10,6 +11,7 @@ const CANONICAL_PORTAL_AUTH_PATHS = new Set([
   '/api/auth/two-factor/verify-totp',
   '/api/auth/two-factor/enable',
   '/api/auth/sign-out',
+  '/api/auth/change-password',
 ]);
 
 function cors(response, request) {
@@ -54,7 +56,12 @@ export default {
         'access-control-allow-credentials': 'true',
         'access-control-max-age': '600', 'vary': 'Origin',
       }});
-      return cors(await createAuth(env).handler(request), request);
+      const auth = createAuth(env);
+      if (url.pathname === '/api/auth/change-password') {
+        const denied = await guardAdminPassword(request, auth);
+        if (denied) return cors(denied, request);
+      }
+      return cors(await auth.handler(request), request);
     }
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, { db: env.DB, auth: createAuth(env) });
