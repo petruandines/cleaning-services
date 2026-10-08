@@ -90,3 +90,19 @@ test('hourly report uses existing billing result and a 500-task recipe has safe 
   await parse(await save(s,p,a));
  }finally{s.sqlite.close();}
 });
+test('an interrupted saving request can resume, and a late storage write cannot revive a deleted document',async()=>{
+ const bucket=storage(),s=setup({reports:true,bucket});try{
+  const p=await complete(s,await s.create()),a=await prepare(s,p);
+  s.sqlite.prepare("UPDATE one_time_project_reports SET status='saving' WHERE project_id=?").run(p.id);
+  const resumed=await prepare(s,p);assert.equal(resumed.ticket,a.ticket);assert.equal(resumed.report.status,'failed');
+  let release;const gate=new Promise(r=>release=r),original=bucket.put.bind(bucket);bucket.put=async(...args)=>{await gate;return original(...args);};
+  const inFlight=save(s,p,resumed);
+  for(let i=0;i<100&&s.sqlite.prepare('SELECT status FROM one_time_project_reports WHERE project_id=?').get(p.id).status!=='saving';i++)await new Promise(r=>setTimeout(r,1));
+  assert.equal(s.sqlite.prepare('SELECT status FROM one_time_project_reports WHERE project_id=?').get(p.id).status,'saving');
+  await prepare(s,p); // Recovery sees no R2 object and invalidates the old CAS.
+  await parse(await s.call('admin/'+p.id+'/report',{data:{operation:'delete',confirm:true}}));
+  release();assert.equal((await inFlight).status,409);assert.equal(bucket.objects.size,0);
+  assert.equal((await parse(await s.call('admin/'+p.id))).report.status,'deleted');
+  assert.equal(s.sqlite.prepare('SELECT COUNT(*) n FROM one_time_project_report_files WHERE project_id=? AND delete_requested=1').get(p.id).n,1);
+ }finally{s.sqlite.close();}
+});

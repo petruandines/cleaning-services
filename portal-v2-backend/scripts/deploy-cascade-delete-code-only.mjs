@@ -27,6 +27,12 @@ function assertConfig() {
   assert.equal(config.vars?.PUBLIC_API_URL, CUSTOM_API);
   assert.equal(config.workers_dev, false);
   assert.equal(config.preview_urls, false);
+  if(config.r2_buckets?.length||config.vars?.PROJECT_REPORTS_ENABLED!==undefined){
+    assert.equal(config.r2_buckets?.length,1,'Reports require exactly one reviewed R2 bucket');
+    assert.equal(config.r2_buckets[0].binding,'PROJECT_REPORTS');
+    assert.match(config.r2_buckets[0].bucket_name,/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/);
+    assert.ok(['true','false'].includes(config.vars.PROJECT_REPORTS_ENABLED),'Reports require an explicit enable/disable flag');
+  }
 }
 
 async function cf(path) {
