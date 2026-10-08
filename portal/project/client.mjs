@@ -1,3 +1,4 @@
+import {downloadPDF} from '../reports/admin.mjs';
 import {renderProject,updateProjectClock} from '../project-view.mjs';
 const $=id=>document.getElementById(id), token=new URL(location.href).searchParams.get('token');
 let p=null,timer=null,busy=false,generation=0;
@@ -12,9 +13,16 @@ function failure(e) {
  else if([403,410,404].includes(e.status)) {clear();$('login-panel').hidden=true;clearInterval(timer);notice(e.status===410?'Accesul la această intervenție a expirat.':'Accesul la această intervenție nu este disponibil.');}
  else notice(e.status===429?'Prea multe încercări. Reîncearcă peste un minut.':'Nu am putut actualiza informațiile. Reîncercăm automat.');
 }
+async function downloadReport() {
+ try {
+  const response=await fetch(window.PETRU_INES_API_ORIGIN+'/api/one-time/client/'+token+'/report',{credentials:'include',cache:'no-store'});
+  if([401,403,410].includes(response.status)){const e=new Error('access_unavailable');e.status=response.status;failure(e);return;}
+  await downloadPDF(response);
+ }catch(e){notice(e.message||'Raportul nu a putut fi descărcat.');}
+}
 async function refresh() {
  if(busy||document.hidden)return;busy=true;const sequence=generation;
- try {const next=await call('view');if(sequence!==generation)return;if(JSON.stringify(next)!==JSON.stringify(p))renderProject($('project'),next);p=next;$('login-panel').hidden=true;$('logout').hidden=false;notice('');}
+ try {const next=await call('view');if(sequence!==generation)return;if(JSON.stringify(next)!==JSON.stringify(p))renderProject($('project'),next,downloadReport);p=next;$('login-panel').hidden=true;$('logout').hidden=false;notice('');}
  catch(e){if(sequence===generation)failure(e);}finally{busy=false;}
 }
 $('login-form').addEventListener('submit',async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{await call('login',{password:$('password').value,remember:$('remember').checked});$('password').value='';await refresh();if(!timer)timer=setInterval(refresh,15000);}catch(err){failure(err);}finally{b.disabled=false;}});

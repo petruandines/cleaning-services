@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {assertReportBindings} from './report-binding-guard.mjs';
 
 const ACCOUNT = '47b9f8498a9865c0fbbaca8f0f5cf59d';
 const ZONE = '556df3da801c06b34a4dcd7ea25c0d06';
@@ -26,7 +27,7 @@ async function inspect() {
   assert.equal(settings.bindings.find(b => b.name === 'DB')?.id,'6816004b-dc95-48c9-be52-9bd4131d157e');
   assert.ok(settings.bindings.some(b => b.name === 'BETTER_AUTH_SECRET' && b.type === 'secret_text'));
   assert.equal(settings.bindings.find(b => b.name === 'PUBLIC_API_URL')?.text,API);
-  assert.deepEqual(settings.bindings.map(b => b.name).sort(),['BETTER_AUTH_SECRET','DB','PUBLIC_API_URL']);
+  assertReportBindings(settings.bindings);
   assert.equal(settings.compatibility_date,'2026-09-24');
   assert.deepEqual(settings.compatibility_flags,['nodejs_compat']);
   const workerDomains = await cf(`/accounts/${ACCOUNT}/workers/domains`);

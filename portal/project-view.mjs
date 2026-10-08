@@ -20,7 +20,7 @@ export function updateProjectClock(root){
  if(duration){const seconds=Math.floor(elapsed/1000);duration.textContent=`${String(Math.floor(seconds/3600)).padStart(2,'0')}:${String(Math.floor(seconds/60)%60).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;}
  if(total)total.textContent=money(billing.running?Math.max(billing.minimum_bani,Math.round(billing.rate_bani*elapsed/3600000)):billing.total_bani);
 }
-export function renderProject(root,p) {
+export function renderProject(root,p,onReportDownload) {
  root.replaceChildren();clocks.set(root,{p,at:performance.now()});
  const card=el('article',undefined,'project-card');
  card.append(el('span','Petru & Inés · Intervenție punctuală','eyebrow'),el('h1',p.name),el('p',labels[p.status],'project-status'));
@@ -41,6 +41,10 @@ export function renderProject(root,p) {
  const progress=el('progress'); progress.max=p.tasks.length||1; progress.value=done; progress.setAttribute('aria-label','Progresul intervenției'); card.append(progress);
  const list=el('ul',undefined,'project-checklist');
  for(const t of p.tasks) {const item=el('li',(t.done?'✅ ':'⬜ ')+t.title); if(t.completed_at) item.append(el('small','Finalizată: '+date(t.completed_at))); list.append(item);} card.append(list);
+ if(p.report_available&&p.completed_at&&['completed','closed'].includes(p.status)) {
+  const report=el('section',undefined,'project-review');report.append(el('h2','Raportul intervenției'),el('p','Intervenția a fost finalizată. Puteți descărca raportul cu activitățile realizate și informațiile aferente lucrării.'));
+  if(onReportDownload){const button=el('button','Descarcă raport PDF','primary');button.type='button';button.addEventListener('click',async()=>{button.disabled=true;try{await onReportDownload();}finally{button.disabled=false;}});report.append(button);}card.append(report);
+ }
  if(p.invoice_url) {const a=el('a',p.invoice_label||'Descarcă factura','primary'); a.href=p.invoice_url; a.target='_blank'; a.rel='noopener noreferrer'; card.append(a);}
  if(p.review_url && p.completed_at && ['completed','closed'].includes(p.status)) {const review=el('section',undefined,'project-review'); review.append(el('h2','Ți-au plăcut serviciile noastre?'),el('p','⭐⭐⭐⭐⭐')); const a=el('a','Lasă-ne o recenzie pe Google','primary'); a.href=p.review_url; a.target='_blank'; a.rel='noopener noreferrer'; review.append(a); card.append(review);}
  card.append(el('p','Ultima actualizare: '+date(p.updated_at),'help')); root.append(card);
