@@ -87,5 +87,6 @@ try{
  }
  await cf('/workers/scripts/'+worker,'DELETE');
  await cf('/d1/database/'+db,'DELETE');
+ const trace=readFileSync(tailFile,'utf8');const cpu=[...trace.matchAll(/\"cpuTime\"\\s*:\\s*([0-9.]+)/g)].map(m=>Number(m[1]));console.log(JSON.stringify({cpuMeasurements:cpu.length,maxCPUms:cpu.length?Math.max(...cpu):null}));
  console.log('Removed isolated staging Worker and test D1; production data untouched.');
 }
