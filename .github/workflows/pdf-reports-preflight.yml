@@ -35,3 +35,16 @@ jobs:
           const pages=await read('/accounts/'+account+'/pages/projects/petruandines-site');
           if(pages) console.log(JSON.stringify({pagesProject:pages.name,productionBranch:pages.production_branch}));
           NODE
+      - name: Check existing deployment token compatibility without modifying resources
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          const account='47b9f8498a9865c0fbbaca8f0f5cf59d',token=process.env.CLOUDFLARE_API_TOKEN;
+          for(const path of ['/r2/buckets/petru-ines-project-reports','/subscriptions']){
+            const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+account+path,{headers:{Authorization:'Bearer '+token,...(path.includes('/r2/')?{'cf-r2-jurisdiction':'eu'}:{})}});
+            const d=await r.json();
+            if(path==='/subscriptions'&&r.ok&&d.success)console.log(JSON.stringify({plans:d.result.map(s=>({rate_plan:s.rate_plan?.id,state:s.state}))}));
+            else console.log(JSON.stringify({existingTokenPath:path,status:r.status,success:d.success,errorCodes:(d.errors||[]).map(e=>e.code)}));
+          }
+          NODE
