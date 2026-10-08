@@ -36,6 +36,15 @@ jobs:
           const domains=await read('/accounts/'+account+'/r2/buckets/petru-ines-project-reports/domains/custom');
           if(!managed||managed.enabled!==false||!domains||(domains.domains||[]).length)throw Error('Private bucket verification failed');
           console.log('POST_DEPLOY_PRIVATE_EU_REPORTS_VERIFIED');
+          const {createHash}=await import('node:crypto');
+          const expected=[{"sha":"39350a21742fc7babb112a736d6fba714a73e71a4e12a4135d89ceb91cf59b96","path":"portal/projects/admin.mjs"},{"sha":"43606300b0591ef7ceece86918694e5482c691cffc17bb16642ba095cb4d1298","path":"portal/project/client.mjs"},{"sha":"f98a5537abae3847fbabc8580f367d81071cf45a41fc402b9bc91852fe02e81d","path":"portal/project-view.mjs"},{"sha":"8b3eb4949437a77019209ce840bb638df741262bc57817b11c929719d3eae872","path":"portal/reports/admin.mjs"},{"sha":"f6ad694fff0f020c596298f45fee195b18b1939ed94ab583231b0496f7fef928","path":"portal/reports/pdf.mjs"},{"sha":"c20c1277c1a8d8866269788ec5c9fa0a551e4e2752cfcf770b48267de00ddd0e","path":"portal/reports/resources.json"}];
+          for(const file of expected){
+            const response=await fetch('https://petruandines.com/'+file.path,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(30000)});
+            if(response.status!==200)throw Error('Published file unavailable: '+file.path);
+            const actual=createHash('sha256').update(new Uint8Array(await response.arrayBuffer())).digest('hex');
+            if(actual!==file.sha)throw Error('Published file differs from reviewed source: '+file.path);
+          }
+          console.log('POST_DEPLOY_FRONTEND_HASHES_VERIFIED: six reviewed PDF/admin/client assets');
           const subscriptions=await read('/accounts/'+account+'/subscriptions');
           if(subscriptions) console.log(JSON.stringify({subscriptions:subscriptions.map(s=>({rate_plan:s.rate_plan?.id,state:s.state}))}));
           const pages=await read('/accounts/'+account+'/pages/projects/petruandines-site');
