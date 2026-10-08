@@ -1,6 +1,6 @@
-# Rapoarte de intervenție — pregătite pentru revizuire, nepublicate
+# Rapoarte de intervenție — Petru & Inés
 
-Data: 8 octombrie 2026. Producția și resursele Cloudflare nu sunt modificate.
+Data: 8 octombrie 2026. Activarea și publicarea au fost aprobate de utilizator după verificări.
 
 ## Surse inspectate
 
@@ -8,8 +8,12 @@ Data: 8 octombrie 2026. Producția și resursele Cloudflare nu sunt modificate.
 - Backend folosit de workflow-ul actual: `5e6e1401cf3ef9380d633be5885f28e719a43596`.
 - Branch-uri noi: `feat/one-time-pdf-reports` (frontend) și
   `feat/one-time-pdf-backend` (backend).
-- Wrangler are D1 și autentificarea actuală, fără binding R2. Starea contului R2,
-  planul efectiv și eventualele bucketuri existente nu au putut fi inspectate live.
+- Configurația inițială avea numai D1, secretul de autentificare și PUBLIC_API_URL.
+- Backend revizuit pentru activare: `8e34db0e6b8d2609fc2cf3ef2949794ce7d12e89`.
+- R2 a fost activat de utilizator. Bucketul `petru-ines-project-reports` este Standard,
+  în jurisdicția `eu`, verificat fără r2.dev public și fără Custom Domains.
+- Cloudflare a confirmat planul Workers Free prin răspunsul 100328 la configurarea
+  plafonului CPU exclusiv pe Workerul de test. Niciun plan Workers nu a fost schimbat.
 
 ## Implementare
 
@@ -24,7 +28,8 @@ verifică exact conținutul încărcat, înainte de R2, față de rețeta server
 Această alegere evită publicarea unui PDF arbitrar asociat unui JSON valid.
 Nu sunt folosite Browser Rendering, un browser pe server, CDN-uri sau servicii
 externe de conversie. Serializarea simplă de verificare necesită totuși CPU Worker;
-profilarea în Cloudflare este o condiție pentru activare, nu o promisiune de 0 CPU.
+consumul de verificare a fost testat pe Workers Free în Cloudflare, fără upgrade.
+Acest test nu reprezintă o promisiune de 0 CPU sau garanția tuturor timpilor viitori.
 
 Logo: originalul `assets/img/logo.png`, codificat fără pierderi. Culori din CSS-ul
 actual; font DejaVu Sans cu licența inclusă, text selectabil și hartă ToUnicode.
@@ -71,15 +76,27 @@ Un raport fictiv de patru pagini a fost randat și inspectat cu Poppler; extrac�
 textului și diacriticelor se verifică separat. Build-ul static și compilarea
 Worker dry-run sunt verificate fără publicare.
 
-Aceste verificări NU reprezintă un test în contul Cloudflare sau pe un telefon
-Android fizic. Profilarea pe Workers Free și smoke-ul Android rămân obligatorii
-în staging înainte de publicare. Pentru 500 de sarcini, măsurătorile locale ale
-operațiilor JavaScript pot depăși 10 ms, în special la prima execuție. Pregătirea
-și verificarea uploadului sunt separate în cereri, dar CPU Cloudflare real trebuie
-măsurat. Dacă depășește limita, se fragmentează verificarea; nu se activează un plan
-plătit pentru a ocoli problema.
+## Verificări în Cloudflare
 
-## Configurarea necesară — numai după verificarea contului și acord
+Au trecut 103 teste backend și 12 frontend, inclusiv configurația finală.
+Workflow-ul izolat folosește un Worker cu un secret temporar, o bază D1 separată
+și un bucket R2 privat de test. Auth-ul fictiv există exclusiv în acel Worker,
+protejat cu secretul temporar; autentificarea producției nu este substituită.
+Au trecut opt-out, opt-in, save/retry, download client, ștergere, regenerare,
+păstrarea finalizării, revocare și IDOR. Au fost generate rapoarte orare cu 45
+și 500 de sarcini (4 și 52 de pagini) pe planul Workers Free.
+Workerul temporar și D1 de test au fost eliminate. Bucketul de test este separat,
+privat și documentele fictive au fost șterse prin API-ul de rapoarte.
+
+Referință: https://github.com/petruandines/cleaning-services/actions/runs/37777555445
+Cloudflare Tail nu a furnizat valori CPU numerice în acest cont. Succesul sub
+plafonul fix Free este verificat; nu afirmăm un maxim CPU măsurat sau headroom
+cuantificat. Planul D1 și consumul agregat/facturarea contului nu sunt accesibile
+prin permisiunile actuale ale tokenului. Nu s-au activat planuri plătite suplimentare.
+Un Android fizic nu a fost disponibil pentru testare; acest smoke manual rămâne
+neexecutat și trebuie consemnat separat, fără a fi prezentat drept test trecut.
+
+## Configurație și procedură de activare
 
 1. În Cloudflare, verifică planul Workers/D1, dacă R2 este activ și condițiile de
    facturare. R2 Standard include un nivel gratuit, dar depășirile pot fi taxate.
@@ -138,11 +155,22 @@ Surse oficiale:
 - https://developers.cloudflare.com/d1/platform/pricing/
 - https://developers.cloudflare.com/r2/pricing/
 
+## Token de deployment
+
+Workflow-ul de producție folosește secretul GitHub Actions `PORTAL_REPORTS_CF_TOKEN`
+pentru backendul cu R2. Tokenul existent de migrare nu are acces la noul bucket.
+Tokenul nu este necesar pentru operațiunile admin/client din portal după deploy:
+acestea folosesc bindingurile Worker. Dacă tokenul temporar expiră, trebuie reînnoit
+pentru publicări ulterioare; portalul și downloadurile existente continuă să funcționeze.
+Nu afișa tokenul în loguri și nu îl salva în repository. Tokenurile vechi nu au fost înlocuite.
+
 ## Rollback
 
-Înainte de activare, nu este necesar rollback: codul este numai pe branch-uri.
-După activare: setează `PROJECT_REPORTS_ENABLED="false"`, republică backend-ul
-anterior verificat și revino la frontend-ul precedent. Păstrează tabelele noi și
+Rollback rapid, fără migrare inversă: setează `PROJECT_REPORTS_ENABLED="false"` în Wrangler și republică același backend
+verificat prin workflow-ul actual. Păstrează bindingul R2 și guardurile actualizate.
+Funcțiile noi rămân dezactivate, iar fluxul intervențiilor continuă. Dacă este
+necesară retragerea interfeței, revino numai la fișierele frontend precedente,
+fără a reveni la workflow-ul vechi care nu cunoaște bindingul R2. Păstrează tabelele noi și
 bucketul privat; nu șterge istoricul, autentificarea sau sesiunile. Guardurile de
 rollback trebuie să accepte binding-urile noi existente sau să le elimine numai
 din configurația Worker după aprobarea operatorului, fără ștergerea obiectelor.
