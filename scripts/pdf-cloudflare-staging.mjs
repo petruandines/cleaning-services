@@ -44,6 +44,13 @@ const subdomain=(await cf('/workers/subdomain')).subdomain;
 const api='https://'+worker+'.'+subdomain+'.workers.dev',origin='https://petruandines.com';
 const {assemblePDF}=await import(join(root,'src/reports/pdf.mjs'));
 const resources=JSON.parse(readFileSync(join(root,'src/reports/resources.json'),'utf8'));
+// Wait only on read-only readiness; never retry creation POSTs after an unknown response.
+let available=false;for(let attempt=0;attempt<30;attempt++){
+ const check=await fetch(api+'/api/one-time/admin',{headers:{origin,'x-test-gate':gate,authorization:'Bearer admin'}});
+ if(check.status===200){available=true;break;}
+ await new Promise(r=>setTimeout(r,2000));
+}
+assert.ok(available,'Isolated Worker route did not become ready');
 const ids=[];
 let tail;
 const tailFile=join(root,'.pdf-staging-tail.jsonl');
