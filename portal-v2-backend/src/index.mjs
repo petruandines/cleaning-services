@@ -3,6 +3,7 @@ import { handleApi } from './api.mjs';
 import { isPortalOrigin, corsOrigin } from './origins.mjs';
 import { authOptions } from './auth-options.mjs';
 import { guardAdminPassword } from './admin-password.mjs';
+import { handleAdminDeviceSession } from './admin-device-session.mjs';
 import { handleOneTime } from './one-time.mjs';
 
 const CANONICAL_PORTAL_ORIGIN = 'https://petruandines.com';
@@ -38,6 +39,15 @@ export default {
     // audited authentication surface directly so Safari/iPadOS does not have
     // to preserve a cross-origin window.opener reference.
     if (origin && !isPortalOrigin(origin) && origin !== url.origin) return new Response('Forbidden', { status: 403 });
+    if (url.pathname === '/api/admin-device-session') {
+      if (!['https://petruandines.com', url.origin].includes(origin)) return new Response('Forbidden', { status: 403 });
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: {
+        'access-control-allow-origin': origin, 'access-control-allow-credentials': 'true',
+        'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+        'access-control-allow-headers': 'Authorization, Content-Type', 'vary': 'Origin',
+      }});
+      return cors(await handleAdminDeviceSession(request, createAuth(env)), request);
+    }
     if (url.pathname.startsWith('/api/one-time/')) {
       return handleOneTime(request, { db: env.DB, auth: createAuth(env), passwordSecret: env.BETTER_AUTH_SECRET, reportBucket: env.PROJECT_REPORTS, reportsEnabled: env.PROJECT_REPORTS_ENABLED === 'true' });
     }
