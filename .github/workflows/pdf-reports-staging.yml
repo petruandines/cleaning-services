@@ -2,7 +2,7 @@ name: PDF reports isolated Cloudflare integration
 on:
   push:
     branches: [feat/one-time-pdf-reports]
-    paths: [.github/workflows/pdf-reports-staging.yml]
+    paths: [.github/workflows/pdf-reports-staging.yml, scripts/pdf-cloudflare-staging.mjs]
   workflow_dispatch:
 permissions:
   contents: read
