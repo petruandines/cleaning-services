@@ -20,31 +20,24 @@ jobs:
           const token=process.env.CLOUDFLARE_API_TOKEN;
           if(!token) throw Error('PORTAL_REPORTS_CF_TOKEN is missing');
           async function read(path){
-            const response=await fetch('https://api.cloudflare.com/client/v4'+path,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(30000)});
+            const response=await fetch('https://api.cloudflare.com/client/v4'+path,{headers:{Authorization:'Bearer '+token,...(path.includes('/r2/')?{'cf-r2-jurisdiction':'eu'}:{})},signal:AbortSignal.timeout(30000)});
             const data=await response.json();
             if(!response.ok||!data.success){console.log(JSON.stringify({path,status:response.status,errorCodes:(data.errors||[]).map(e=>e.code)}));return null;}
             return data.result;
           }
           const settings=await read('/accounts/'+account+'/workers/scripts/petru-ines-portal-api/settings');
           if(!settings) throw Error('Worker read permission failed');
+          if(settings.bindings.find(b=>b.name==='PROJECT_REPORTS_ENABLED')?.text!=='true')throw Error('Published report flag is not enabled');
+          if(settings.bindings.find(b=>b.name==='PROJECT_REPORTS')?.bucket_name!=='petru-ines-project-reports')throw Error('Wrong published reports bucket');
           console.log(JSON.stringify({worker:'petru-ines-portal-api',compatibility_date:settings.compatibility_date,usage_model:settings.usage_model,bindings:settings.bindings.map(b=>({name:b.name,type:b.type,...(b.name==='DB'?{id:b.id}:{}),...(b.type==='r2_bucket'?{bucket_name:b.bucket_name}:{}),...(b.name==='PROJECT_REPORTS_ENABLED'?{text:b.text}:{})}))}));
           const buckets=await read('/accounts/'+account+'/r2/buckets');
           if(buckets) console.log(JSON.stringify({r2Accessible:true,targetBucketExists:(buckets.buckets||buckets||[]).some(b=>b.name==='petru-ines-project-reports')}));
+          const managed=await read('/accounts/'+account+'/r2/buckets/petru-ines-project-reports/domains/managed');
+          const domains=await read('/accounts/'+account+'/r2/buckets/petru-ines-project-reports/domains/custom');
+          if(!managed||managed.enabled!==false||!domains||(domains.domains||[]).length)throw Error('Private bucket verification failed');
+          console.log('POST_DEPLOY_PRIVATE_EU_REPORTS_VERIFIED');
           const subscriptions=await read('/accounts/'+account+'/subscriptions');
           if(subscriptions) console.log(JSON.stringify({subscriptions:subscriptions.map(s=>({rate_plan:s.rate_plan?.id,state:s.state}))}));
           const pages=await read('/accounts/'+account+'/pages/projects/petruandines-site');
           if(pages) console.log(JSON.stringify({pagesProject:pages.name,productionBranch:pages.production_branch}));
-          NODE
-      - name: Check existing deployment token compatibility without modifying resources
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
-        run: |
-          node --input-type=module <<'NODE'
-          const account='47b9f8498a9865c0fbbaca8f0f5cf59d',token=process.env.CLOUDFLARE_API_TOKEN;
-          for(const path of ['/r2/buckets/petru-ines-project-reports','/subscriptions']){
-            const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+account+path,{headers:{Authorization:'Bearer '+token,...(path.includes('/r2/')?{'cf-r2-jurisdiction':'eu'}:{})}});
-            const d=await r.json();
-            if(path==='/subscriptions'&&r.ok&&d.success)console.log(JSON.stringify({plans:d.result.map(s=>({rate_plan:s.rate_plan?.id,state:s.state}))}));
-            else console.log(JSON.stringify({existingTokenPath:path,status:r.status,success:d.success,errorCodes:(d.errors||[]).map(e=>e.code)}));
-          }
           NODE
