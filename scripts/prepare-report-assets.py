@@ -23,4 +23,4 @@ data = {'version': 1, 'font': base64.b64encode(zlib.compress(font_path.read_byte
         'originalLogoSHA256': hashlib.sha256(logo_path.read_bytes()).hexdigest()}
 output.mkdir(parents=True, exist_ok=True)
 (output/'resources.json').write_text(json.dumps(data, separators=(',', ':')))
-(output/'FONT-LICENSE.txt').write_bytes(license_path.read_bytes())
+(output/'FONT-LICENSE.txt').write_text('\n'.join(line.rstrip() for line in license_path.read_text().splitlines())+'\n')
