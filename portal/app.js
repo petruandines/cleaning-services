@@ -121,6 +121,8 @@ import { visibleContractDetails } from './contract-view.mjs';
     $('message-form').hidden = true;
     $('staff-form').hidden = true;
     $('staff-tools').hidden = true;
+    $('open-admin-password').hidden = true;
+    closeAdminPassword();
     $('account-panel').hidden = true;
     $('pager').hidden = true;
     $('message-search-box').hidden = true;
@@ -787,6 +789,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     $('greeting').textContent = 'Bună, ' + (user.name || 'bine ai venit') + '!';
     $('role').textContent = user.role === 'staff' ? 'Echipa Petru & Inés' : 'Portalul tău';
     $('staff-tools').hidden = user.role !== 'staff';
+    $('open-admin-password').hidden = user.role !== 'staff';
     if (user.role === 'staff') refreshClientChoices().catch(error => notice(error.message));
     $('tabs').replaceChildren();
     $('tabs').classList.toggle('admin-navigation', user.role === 'staff');
@@ -1087,6 +1090,73 @@ import { visibleContractDetails } from './contract-view.mjs';
     if (adminMenus[section]) selectSection(section, 'list');
     else renderStaffForm();
   }
+  let passwordSaving = false;
+  function closeAdminPassword() {
+    $('admin-password-form').reset();
+    $('admin-password-panel').hidden = true;
+    $('open-admin-password').setAttribute('aria-expanded', 'false');
+    $('admin-password-status').textContent = '';
+  }
+  $('open-admin-password').addEventListener('click', () => {
+    if (user?.role !== 'staff' || passwordSaving) return;
+    if (!$('admin-password-panel').hidden) { closeAdminPassword(); return; }
+    $('admin-password-panel').hidden = false;
+    $('open-admin-password').setAttribute('aria-expanded', 'true');
+    $('admin-password-form').elements.currentPassword.focus();
+  });
+  $('cancel-admin-password').addEventListener('click', () => {
+    if (!passwordSaving) closeAdminPassword();
+  });
+  $('admin-password-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (passwordSaving || user?.role !== 'staff' || !token) return;
+    const form = event.currentTarget;
+    const status = $('admin-password-status');
+    const current = form.elements.currentPassword;
+    const next = form.elements.newPassword;
+    const confirmation = form.elements.confirmPassword;
+    if (next.value.length < 12 || next.value.length > 128 || next.value !== confirmation.value || next.value === current.value) {
+      status.textContent = 'Alege o parolă nouă de 12–128 de caractere, diferită de cea actuală, și confirmă identic.';
+      return;
+    }
+    const atStart = generation;
+    const sessionToken = token;
+    passwordSaving = true;
+    const controls = [...form.querySelectorAll('input, button')];
+    controls.forEach(control => control.disabled = true);
+    status.textContent = 'Se salvează parola…';
+    try {
+      const response = await fetch(API + '/api/auth/change-password', {
+        method: 'POST', credentials: 'omit', cache: 'no-store',
+        headers: { authorization: 'Bearer ' + sessionToken, 'content-type': 'application/json' },
+        body: JSON.stringify({ currentPassword: current.value, newPassword: next.value, revokeOtherSessions: true }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (generation !== atStart) return;
+        if (response.status === 401) { clearSession(); notice('Sesiunea a expirat. Intră din nou în cont.'); return; }
+        status.textContent = response.status === 429 ? 'Prea multe încercări. Așteaptă un minut și încearcă din nou.' :
+          'Parola nu a fost schimbată. Verifică parola actuală și încearcă din nou.';
+        return;
+      }
+      if (generation === atStart) {
+        clearSession();
+        notice('Parola de administrator a fost schimbată. Intră din nou în cont cu parola nouă și verificarea în doi pași.');
+      }
+      // Close the replacement session too: the next login performs normal TOTP.
+      const rotatedToken = response.headers.get('set-auth-token') || result.token;
+      if (rotatedToken) await fetch(API + '/api/auth/sign-out', {
+        method: 'POST', credentials: 'omit', cache: 'no-store',
+        headers: { authorization: 'Bearer ' + rotatedToken, 'content-type': 'application/json' }, body: '{}',
+      }).catch(() => {});
+    } catch {
+      if (generation === atStart) status.textContent = 'Nu am putut confirma rezultatul. Dacă salvarea a avut loc, intră din nou cu parola nouă.';
+    } finally {
+      form.reset();
+      controls.forEach(control => control.disabled = false);
+      passwordSaving = false;
+    }
+  });
   $('cancel-edit').addEventListener('click', cancelEdit);
   $('logout').addEventListener('click', async () => {
     const previous = token;
