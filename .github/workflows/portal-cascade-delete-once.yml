@@ -36,7 +36,7 @@ jobs:
       - name: Read verified backend source
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.module.outputs.enabled == 'true' && '5e6e1401cf3ef9380d633be5885f28e719a43596' || '2060d84af71fa271c7c69031dfd8b4ced2134e48' }}
+          ref: ${{ steps.module.outputs.enabled == 'true' && '8e34db0e6b8d2609fc2cf3ef2949794ce7d12e89' || '2060d84af71fa271c7c69031dfd8b4ced2134e48' }}
           path: .backend-source
           persist-credentials: false
       - name: Read production policy
@@ -73,21 +73,21 @@ jobs:
         if: steps.module.outputs.enabled == 'true'
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_REPORTS_CF_TOKEN || secrets.PORTAL_ONE_TIME_D1_TOKEN }}
         run: node scripts/one-time-schema.mjs
       - name: Deploy verified Worker code
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.module.outputs.enabled == 'true' && secrets.PORTAL_REPORTS_CF_TOKEN || secrets.CLOUDFLARE_MIGRATION_TOKEN }}
           PORTAL_WORKER_AUTH_SECRET: ${{ secrets.PORTAL_WORKER_AUTH_SECRET }}
         run: node scripts/deploy-cascade-delete-code-only.mjs
       - name: Verify production routing and bindings
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.module.outputs.enabled == 'true' && secrets.PORTAL_REPORTS_CF_TOKEN || secrets.CLOUDFLARE_MIGRATION_TOKEN }}
         run: node .production-policy/scripts/cloudflare-migration.mjs inspect
       - name: Verify live temporary access with isolated disposable fixtures
         if: steps.module.outputs.enabled == 'true'
         working-directory: .backend-source/portal-v2-backend
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_ONE_TIME_D1_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.PORTAL_REPORTS_CF_TOKEN || secrets.PORTAL_ONE_TIME_D1_TOKEN }}
         run: node scripts/one-time-live-smoke.mjs
