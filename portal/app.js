@@ -886,8 +886,13 @@ import { visibleContractDetails } from './contract-view.mjs';
           !['client', 'staff'].includes(verified.role)) throw new Error('invalid_session');
       token = candidate;
       user = verified;
+      try {
+        if (event.data.deviceBlocked) window.localStorage.setItem('pi-admin-device-blocked', 'true');
+        else window.localStorage.removeItem('pi-admin-device-blocked');
+      } catch {}
       const stored = rememberTabSession(window, candidate);
-      notice(stored ? '' : 'Browserul nu poate păstra sesiunea după reîncărcarea paginii.');
+      notice(event.data.rememberFailed ? 'Ai intrat în cont, dar dispozitivul nu a putut fi păstrat conectat. Încearcă din nou la următoarea autentificare.' :
+        stored ? '' : 'Browserul nu poate păstra sesiunea după reîncărcarea paginii.');
       showWorkspace();
     } catch { if (attempt === generation) { clearSession(); notice('Nu am putut valida sesiunea. Încearcă din nou.'); } }
   });
@@ -1141,6 +1146,7 @@ import { visibleContractDetails } from './contract-view.mjs';
       }
       if (generation === atStart) {
         clearSession();
+        await forgetRememberedDevice();
         notice('Parola de administrator a fost schimbată. Intră din nou în cont cu parola nouă și verificarea în doi pași.');
       }
       // Close the replacement session too: the next login performs normal TOTP.
@@ -1162,6 +1168,7 @@ import { visibleContractDetails } from './contract-view.mjs';
     const previous = token;
     clearSession();
     notice('Ai ieșit din cont.');
+    await forgetRememberedDevice();
     if (previous) {
       try { await fetch(API + '/api/auth/sign-out', { method: 'POST', credentials: 'omit', cache: 'no-store',
         headers: { authorization: 'Bearer ' + previous, 'content-type': 'application/json' }, body: '{}' }); } catch { /* Session already cleared locally. */ }
@@ -1183,28 +1190,69 @@ import { visibleContractDetails } from './contract-view.mjs';
     finally { button.disabled = false; }
   });
 
-  const saved = readTabSession(window);
-  if (saved && ready()) {
+  async function forgetRememberedDevice() {
+    try {
+      const response = await fetch(API + '/api/admin-device-session', {
+        method: 'DELETE', credentials: 'include', cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('device_logout_failed');
+    } catch {
+      // Suppress restoration locally even if offline logout cannot reach the API.
+      try { window.localStorage.setItem('pi-admin-device-blocked', 'true'); } catch {}
+      notice('Sesiunea locală este închisă. Revino online și autentifică-te din nou pentru a închide și accesul păstrat pe dispozitiv.');
+    }
+  }
+  async function restoreSession() {
+    if (!ready()) return;
     const attempt = ++generation;
     $('login').disabled = true;
-    notice('Verificăm sesiunea din această filă…');
-    fetch(API + '/api/me', {
-      headers: { authorization: 'Bearer ' + saved }, credentials: 'omit', cache: 'no-store',
-    }).then(async response => {
+    let blocked = false;
+    try { blocked = window.localStorage.getItem('pi-admin-device-blocked') === 'true'; } catch {}
+    if (blocked) { $('login').disabled = false; return; }
+    let candidate = readTabSession(window);
+    let fromDevice = false;
+    notice('Verificăm sesiunea…');
+    try {
+      if (!candidate) {
+        const device = await fetch(API + '/api/admin-device-session', {
+          credentials: 'include', cache: 'no-store',
+        });
+        if (!device.ok) { notice(''); return; }
+        const remembered = await device.json();
+        candidate = remembered.token;
+        fromDevice = true;
+        if (typeof candidate !== 'string' || !candidate || candidate.length > 2048) throw new Error('invalid_session');
+      }
+      let response = await fetch(API + '/api/me', {
+        headers: { authorization: 'Bearer ' + candidate }, credentials: 'omit', cache: 'no-store',
+      });
+      if (response.status === 401 && !fromDevice) {
+        const device = await fetch(API + '/api/admin-device-session', { credentials: 'include', cache: 'no-store' });
+        if (device.ok) {
+          candidate = (await device.json()).token;
+          if (typeof candidate !== 'string' || !candidate || candidate.length > 2048) throw new Error('invalid_session');
+          fromDevice = true;
+          response = await fetch(API + '/api/me', {
+            headers: { authorization: 'Bearer ' + candidate }, credentials: 'omit', cache: 'no-store',
+          });
+        }
+      }
       if (!response.ok) throw new Error('invalid_session');
       const verified = await response.json();
       if (attempt !== generation) return;
       if (!verified.id || verified.twoFactorRequired || verified.mustChangePassword ||
-          !['client', 'staff'].includes(verified.role)) throw new Error('invalid_session');
-      token = saved;
+          !['client', 'staff'].includes(verified.role) || (fromDevice && verified.role !== 'staff')) throw new Error('invalid_session');
+      token = candidate;
       user = verified;
+      rememberTabSession(window, candidate);
       notice('');
       showWorkspace();
-    }).catch(() => {
+    } catch {
       if (attempt === generation) {
         clearSession();
-        notice('Sesiunea a expirat. Intră din nou în cont.');
+        notice('Intră din nou în cont pentru a continua.');
       }
-    }).finally(() => { $('login').disabled = false; });
+    } finally { $('login').disabled = false; }
   }
+  restoreSession();
 })();
