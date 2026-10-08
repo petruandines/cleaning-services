@@ -2,15 +2,31 @@
   "name": "petru-ines-portal-api",
   "main": "src/index.mjs",
   "compatibility_date": "2026-09-24",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": "./public" },
-  "d1_databases": [{
-    "binding": "DB",
-    "database_name": "petru-ines-portal-eu",
-    "database_id": "6816004b-dc95-48c9-be52-9bd4131d157e",
-    "migrations_dir": "../docs/portal-v2"
-  }],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "./public"
+  },
+  "workers_dev": false,
+  "preview_urls": false,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "petru-ines-portal-eu",
+      "database_id": "6816004b-dc95-48c9-be52-9bd4131d157e",
+      "migrations_dir": "../docs/portal-v2"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PROJECT_REPORTS",
+      "bucket_name": "petru-ines-project-reports",
+      "jurisdiction": "eu"
+    }
+  ],
   "vars": {
-    "PUBLIC_API_URL": "https://petru-ines-portal-api.petruandines.workers.dev"
+    "PUBLIC_API_URL": "https://petru-ines-portal-api.petruandines.workers.dev",
+    "PROJECT_REPORTS_ENABLED": "true"
   }
 }

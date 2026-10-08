@@ -1,3 +1,4 @@
+import {ReportFault,reportsConfigured,reportMeta,reportAvailable,completionReportSnapshot,captureCompletion,reportDownload,reportAdmin,purgeProjectReportMetadata} from './one-time-reports.mjs';
 import {SERVICE_DEFAULTS,readService,validateService,writeService,billingView} from './one-time-service.mjs';
 import {DISPLAY_DEFAULTS,ACCESS_POLICY,SERVICE_TERMS,SUPPLIER,validateDisplay,readDisplay,writeDisplay} from './one-time-display.mjs';
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
@@ -64,9 +65,9 @@ function validate(data) {
 function checkedDisplay(input,previous){try{return validateDisplay(input,previous);}catch{fail(400,'invalid_display_options');}}
 async function project(db,id) { const p = await first(db,'SELECT * FROM one_time_projects WHERE id=?',id); if (!p) fail(404,'not_found'); return p; }
 async function tasks(db,id) { return rows(db,'SELECT id,title,position,done,completed_at FROM one_time_project_tasks WHERE project_id=? ORDER BY position,id',id); }
-async function publicView(db,p,now) {
+async function publicView(db,p,now,c={}) {
  const options=await readDisplay(db,p.id),service=await readService(db,p.id);
- return { name:p.name, status:p.status, scheduled_at:p.scheduled_at, location:p.show_location ? p.location : '',
+ return { ...(reportsConfigured(c)?{report_available:await reportAvailable(db,p,c)}:{}),name:p.name, status:p.status, scheduled_at:p.scheduled_at, location:p.show_location ? p.location : '',
  price_bani:p.price_bani, billing:billingView(p,service,now),en_route:!!service.en_route,departed_at:service.departed_at,started_at:p.started_at, description:p.description, invoice_url:options.invoice_enabled?p.invoice_url:'', invoice_label:options.invoice_label,
  access_policy:options.show_access_policy?ACCESS_POLICY:null,service_terms:options.show_terms?SERVICE_TERMS:null,supplier:options.show_supplier?SUPPLIER:null,completed_at:p.completed_at,
  updated_at:p.updated_at, tasks:await tasks(db,p.id), review_url:options.show_review && p.completed_at && ['completed','closed'].includes(p.status) ? REVIEW_URL : null };
@@ -81,9 +82,9 @@ async function expire(db, now) {
  q(db,'DELETE FROM one_time_project_sessions WHERE expires_at<=? OR project_id IN (SELECT project_id FROM one_time_project_access WHERE expires_at<=?)',now,now),
  ]);
 }
-async function adminView(db,p,now) {
+async function adminView(db,p,now,c={}) {
  const a = await first(db,'SELECT token,active,expires_at,last_login_at FROM one_time_project_access WHERE project_id=?',p.id);
- return {...p,service_options:await readService(db,p.id),billing:billingView(p,await readService(db,p.id),now), display_options:await readDisplay(db,p.id),tasks:await tasks(db,p.id), access:a ? {...a,status:accessState(a,now)} : {status:'not_created'}};
+ return {...p,...(reportsConfigured(c)?{report:await reportMeta(db,p.id,c)}:{}),service_options:await readService(db,p.id),billing:billingView(p,await readService(db,p.id),now), display_options:await readDisplay(db,p.id),tasks:await tasks(db,p.id), access:a ? {...a,status:accessState(a,now)} : {status:'not_created'}};
 }
 function cookie(token,value,maxAge) {
  return `${COOKIE}=${value}; Path=/api/one-time/client/${token}/; Secure; HttpOnly; SameSite=Lax${maxAge === null ? '' : '; Max-Age='+maxAge}`;
@@ -96,17 +97,18 @@ async function rate(db,key,limit,now) {
  await q(db,'DELETE FROM one_time_project_rate_limits WHERE resets_at<?',ms-60000).run();
  if (r[0].hits > limit) fail(429,'try_again_in_one_minute');
 }
-async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOString()}) {
+async function dispatch(request, c) {
+ const {db,auth,passwordSecret,now = new Date().toISOString()}=c;
  const u = new URL(request.url), path = u.pathname;
  const origin = request.headers.get('origin');
  if (origin && !isPortalOrigin(origin) && origin !== u.origin) fail(403,'origin_forbidden');
  if (request.method === 'OPTIONS') return new Response(null,{status:204});
  if (!['GET','POST','PATCH'].includes(request.method)) fail(405,'method_not_allowed');
  if (request.method !== 'GET' && (!origin || (!isPortalOrigin(origin) && origin !== u.origin))) fail(403,'origin_required');
- const client = /^\/api\/one-time\/client\/([a-f0-9]{64})\/(view|login|logout)$/.exec(path);
+ const client = /^\/api\/one-time\/client\/([a-f0-9]{64})\/(view|login|logout|report)$/.exec(path);
  if (client) {
    const [,token,action] = client;
-   if ((action==='view' && request.method!=='GET') || (action!=='view' && request.method!=='POST')) fail(405,'method_not_allowed');
+   if ((['view','report'].includes(action) && request.method!=='GET') || (!['view','report'].includes(action) && request.method!=='POST')) fail(405,'method_not_allowed');
    if (action==='logout') { const raw = request.headers.get('cookie')?.match(/(?:^|;\s*)__Secure-pi-project=([a-f0-9]{64})(?:;|$)/)?.[1];
      if (raw) await q(db,'DELETE FROM one_time_project_sessions WHERE hash=? AND project_id IN (SELECT project_id FROM one_time_project_access WHERE token=?)',await digest(raw),token).run();
      return json({ok:true},200,{'set-cookie':cookie(token,'',0)}); }
@@ -136,9 +138,14 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    const s = await first(db,`SELECT s.project_id FROM one_time_project_sessions s JOIN one_time_project_access a ON a.project_id=s.project_id
       WHERE s.hash=? AND s.project_id=? AND s.generation=a.generation AND a.active=1 AND a.token=? AND s.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)`,await digest(raw),a.project_id,token,now,now);
    if (!s) fail(401,'login_required');
-   return json(await publicView(db,await project(db,a.project_id),now));
+   if(action==='report') {
+    const response=await reportDownload(db,await project(db,a.project_id),c);
+    const valid=await first(db,`SELECT s.project_id FROM one_time_project_sessions s JOIN one_time_project_access a ON a.project_id=s.project_id WHERE s.hash=? AND s.project_id=? AND s.generation=a.generation AND a.active=1 AND a.token=? AND s.expires_at>? AND (a.expires_at IS NULL OR a.expires_at>?)`,await digest(raw),a.project_id,token,c.now||new Date().toISOString(),c.now||new Date().toISOString());
+    if(!valid)fail(403,'access_unavailable');return response;
+   }
+   return json(await publicView(db,await project(db,a.project_id),now,c));
  }
- const admin = /^\/api\/one-time\/admin(?:\/([\w-]{1,100}))?(?:\/(preview|activity|access|start|complete|delete|password))?$/.exec(path);
+ const admin = /^\/api\/one-time\/admin(?:\/([\w-]{1,100}))?(?:\/(preview|activity|access|start|complete|delete|password|report|report-download))?$/.exec(path);
  if (!admin) fail(404,'not_found');
  const session = await auth.api.getSession({headers:request.headers});
  if (!session?.user?.id) fail(401,'unauthorized');
@@ -150,7 +157,7 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
      const offset = Number(u.searchParams.get('offset') || 0);
      if (!Number.isSafeInteger(offset) || offset<0) fail(400,'invalid_offset');
      const list=await rows(db,'SELECT * FROM one_time_projects ORDER BY created_at DESC,id DESC LIMIT 31 OFFSET ?',offset);
-     return json({rows:await Promise.all(list.slice(0,30).map(p=>adminView(db,p,now))),nextOffset:list.length>30 ? offset+30 : null});
+     return json({rows:await Promise.all(list.slice(0,30).map(p=>adminView(db,p,now,c))),nextOffset:list.length>30 ? offset+30 : null});
    }
    if (request.method!=='POST') fail(405,'method_not_allowed');
    const data=await body(request); validate(data);
@@ -162,17 +169,19 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    const projectId=crypto.randomUUID();
    const taskList=taskChanges(db,projectId,data.tasks,[],now);
    await db.batch([q(db,`INSERT INTO one_time_projects(id,${fields.join(',')},status,created_at,updated_at) VALUES(${Array(15).fill('?').join(',')})`,projectId,...fields.map(k=>data[k]),data.status,now,now),...taskList,writeService(db,projectId,service),writeDisplay(db,projectId,display),log(db,projectId,'project_created',actor,now)]);
-   return json(await adminView(db,await project(db,projectId),now),201);
+   return json(await adminView(db,await project(db,projectId),now,c),201);
  }
  const p=await project(db,id);
+ if(action==='report')return reportAdmin(request,db,p,actor,now,c,body);
+ if(action==='report-download'){if(request.method!=='GET')fail(405,'method_not_allowed');return reportDownload(db,p,c);}
  if (request.method==='GET') {
-   if (action==='preview') return json(await publicView(db,p,now));
+   if (action==='preview') return json(await publicView(db,p,now,c));
    if (action==='activity') {
      const offset=Number(u.searchParams.get('offset')||0); if (!Number.isSafeInteger(offset)||offset<0) fail(400,'invalid_offset');
      const list=await rows(db,'SELECT type,actor,detail,created_at FROM one_time_project_activity WHERE project_id=? ORDER BY created_at DESC,rowid DESC LIMIT 101 OFFSET ?',id,offset);
      return json({rows:list.slice(0,100),nextOffset:list.length>100 ? offset+100 : null});
    }
-   if (action) fail(405,'method_not_allowed'); return json(await adminView(db,p,now));
+   if (action) fail(405,'method_not_allowed'); return json(await adminView(db,p,now,c));
  }
  const data=await body(request);
  if (action==='password' && request.method==='POST') {
@@ -186,6 +195,10 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
  if (action==='delete' && request.method==='POST') {
    if (data.confirm!==true) fail(400,'confirmation_required');
    if (data.version!==p.version) fail(409,'project_changed_reload');
+   if(reportsConfigured(c)){
+    await reportAdmin(new Request(request.url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({operation:'delete',confirm:true})}),db,p,actor,now,c,body);
+    await purgeProjectReportMetadata(db,id,c);
+   }
    // D1 batch is atomic: remove only this project's records and invalidate access.
    await db.batch([
      q(db,'UPDATE one_time_projects SET version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',p.version,id),
@@ -218,20 +231,21 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
    }
    if(encrypted) statements.push(q(db,'INSERT INTO one_time_project_passwords(project_id,ciphertext) VALUES(?,?) ON CONFLICT(project_id) DO UPDATE SET ciphertext=excluded.ciphertext',id,encrypted));
    await db.batch([...statements,q(db,'DELETE FROM one_time_project_sessions WHERE project_id=?',id),log(db,id,'access_'+data.operation,actor,now)]);
-   return json(await adminView(db,await project(db,id),now));
+   return json(await adminView(db,await project(db,id),now,c));
  }
  if (['start','complete'].includes(action) && request.method==='POST') {
    if (['cancelled','closed','completed'].includes(p.status)) fail(409,'invalid_transition');
    if (action==='complete' && data.confirm!==true) fail(400,'confirmation_required');
-   if (action==='start' && p.status==='in_progress') return json(await adminView(db,p,now));
+   if (action==='start' && p.status==='in_progress') return json(await adminView(db,p,now,c));
    const service=await readService(db,id);if(action==='complete'&&service.billing_mode==='hourly'&&!p.started_at)fail(409,'hourly_start_required');
    const updated={...p,status:action==='start' ? 'in_progress' : 'completed',started_at:action==='start' ? now : p.started_at,completed_at:action==='complete' ? now : null};
+   const completedSnapshot=action==='complete'?await completionReportSnapshot(db,{...updated,version:p.version+1},c):null;
    await db.batch([
      q(db,'UPDATE one_time_projects SET status=?,started_at=?,completed_at=?,updated_at=?,version=CASE WHEN version=? THEN version+1 ELSE -1 END WHERE id=?',updated.status,updated.started_at,updated.completed_at,now,p.version,id),
      q(db,'UPDATE one_time_project_access SET expires_at=?,expired_logged_at=NULL WHERE project_id=?',expiry(updated),id),
      writeService(db,id,{...service,en_route:0,stopped_at:null}),
      log(db,id,action==='start' ? 'intervention_started' : 'intervention_completed',actor,now),
-   ]); return json(await adminView(db,await project(db,id),now));
+   ]); if(action==='complete')await captureCompletion(db,await project(db,id),actor,now,c,completedSnapshot);return json(await adminView(db,await project(db,id),now,c));
  }
  if (action || request.method!=='PATCH') fail(405,'method_not_allowed');
  if (data.version!==p.version) fail(409,'project_changed_reload');
@@ -254,7 +268,7 @@ async function dispatch(request, {db,auth,passwordSecret,now = new Date().toISOS
  if (p.status!==updated.status) statements.push(log(db,id,'status_changed',actor,now,updated.status));
  if (p.invoice_url!==updated.invoice_url) statements.push(log(db,id,'invoice_changed',actor,now));
  try { await db.batch(statements); } catch (e) { if (/CHECK constraint/.test(e.message)) fail(409,'project_changed_reload'); throw e; }
- return json(await adminView(db,await project(db,id),now));
+ return json(await adminView(db,await project(db,id),now,c));
 }
 function taskChanges(db,id,input,existing,now,actor) {
  if (!Array.isArray(input) || input.length>500) fail(400,'invalid_tasks');
@@ -271,7 +285,7 @@ function taskChanges(db,id,input,existing,now,actor) {
  return statements;
 }
 export async function handleOneTime(request,context) {
- let response; try {response=await dispatch(request,context);} catch(e) {const conflict=/CHECK constraint failed: version/.test(e.message); response=json({error:e instanceof Fault ? e.message : conflict ? 'project_changed_reload' : 'server_error'},e instanceof Fault?e.status:conflict?409:500); if(!(e instanceof Fault)) console.error('one_time_error');}
+ let response; try {response=await dispatch(request,context);} catch(e) {const conflict=/CHECK constraint failed: version/.test(e.message); response=json({error:e instanceof Fault || e instanceof ReportFault ? e.message : conflict ? 'project_changed_reload' : 'server_error'},e instanceof Fault || e instanceof ReportFault?e.status:conflict?409:500); if(!(e instanceof Fault)&&!(e instanceof ReportFault)) console.error('one_time_error');}
  const headers=new Headers(response.headers), origin=request.headers.get('origin');
  if (origin && (isPortalOrigin(origin)||origin===new URL(request.url).origin)) {
    headers.set('access-control-allow-origin',origin); headers.set('access-control-allow-credentials','true');
