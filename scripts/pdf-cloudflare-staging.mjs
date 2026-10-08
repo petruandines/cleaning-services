@@ -36,10 +36,18 @@ export default {fetch(request,env){
  return handleOneTime(request,{db:env.DB,auth,passwordSecret:env.TEST_GATE,reportBucket:env.PROJECT_REPORTS,reportsEnabled:true,now:request.headers.get('x-test-now')||new Date().toISOString()});
 }};`);
 const config=join(root,'.pdf-staging.json');
-writeFileSync(config,JSON.stringify({name:worker,main:'.pdf-staging-entry.mjs',compatibility_date:'2026-09-24',compatibility_flags:['nodejs_compat'],workers_dev:true,preview_urls:false,d1_databases:[{binding:'DB',database_name:dbName,database_id:db}],r2_buckets:[{binding:'PROJECT_REPORTS',bucket_name:bucket,jurisdiction:'eu'}]}));
+writeFileSync(config,JSON.stringify({name:worker,main:'.pdf-staging-entry.mjs',compatibility_date:'2026-09-24',compatibility_flags:['nodejs_compat'],workers_dev:true,preview_urls:false,limits:{cpu_ms:10},d1_databases:[{binding:'DB',database_name:dbName,database_id:db}],r2_buckets:[{binding:'PROJECT_REPORTS',bucket_name:bucket,jurisdiction:'eu'}]}));
 const secrets=join(root,'.pdf-staging-secrets.json');writeFileSync(secrets,JSON.stringify({TEST_GATE:gate}),{mode:0o600});
 const cli=join(root,'node_modules/wrangler/bin/wrangler.js');
-execFileSync(process.execPath,[cli,'deploy','--config',config,'--secrets-file',secrets],{cwd:root,stdio:'inherit'});
+const deploy=()=>execFileSync(process.execPath,[cli,'deploy','--config',config,'--secrets-file',secrets],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+try{console.log(deploy());console.log('Staging CPU ceiling explicitly set to 10 ms');}
+catch(error){
+ const diagnostic=String(error.stderr||'')+String(error.stdout||'');
+ if(!diagnostic.includes('100328')||!/CPU limits are not supported for the Free plan/i.test(diagnostic))throw error;
+ const freeConfig=JSON.parse(readFileSync(config,'utf8'));delete freeConfig.limits;writeFileSync(config,JSON.stringify(freeConfig));
+ console.log('Cloudflare confirmed Workers Free (100328); staging uses the fixed platform CPU limit without any plan upgrade.');
+ console.log(deploy());
+}
 const subdomain=(await cf('/workers/subdomain')).subdomain;
 const api='https://'+worker+'.'+subdomain+'.workers.dev',origin='https://petruandines.com';
 const {assemblePDF}=await import(join(root,'src/reports/pdf.mjs'));
