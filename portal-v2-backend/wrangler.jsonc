@@ -26,7 +26,7 @@
     }
   ],
   "vars": {
-    "PUBLIC_API_URL": "https://api.petruandines.com",
+    "PUBLIC_API_URL": "https://petru-ines-portal-api.petruandines.workers.dev",
     "PROJECT_REPORTS_ENABLED": "true"
   }
 }
