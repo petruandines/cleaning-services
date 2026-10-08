@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {assertReportBindings} from './report-binding-guard.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,7 +52,9 @@ async function assertLiveBindings() {
   assert.equal(db?.type, 'd1', 'Live DB binding is not D1');
   assert.equal(secret?.type, 'secret_text', 'Live auth secret binding is missing');
   assert.equal(publicUrl?.text, CUSTOM_API, 'Live PUBLIC_API_URL changed');
-  assert.deepEqual(settings.bindings.map(binding => binding.name).sort(), ['BETTER_AUTH_SECRET', 'DB', 'PUBLIC_API_URL']);
+  const config=JSON.parse(readFileSync(join(ROOT,'wrangler.jsonc'),'utf8'));
+  const reportBinding=(config.r2_buckets||[]).find(b=>b.binding==='PROJECT_REPORTS');
+  assertReportBindings(settings.bindings,{allowReports:!!reportBinding,bucketName:reportBinding?.bucket_name});
 
   const subdomain = await cf(`/accounts/${ACCOUNT}/workers/scripts/${WORKER}/subdomain`);
   assert.equal(subdomain.enabled, false, 'workers.dev is enabled');

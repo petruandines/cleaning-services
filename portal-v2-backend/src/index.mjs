@@ -37,7 +37,7 @@ export default {
     // to preserve a cross-origin window.opener reference.
     if (origin && !isPortalOrigin(origin) && origin !== url.origin) return new Response('Forbidden', { status: 403 });
     if (url.pathname.startsWith('/api/one-time/')) {
-      return handleOneTime(request, { db: env.DB, auth: createAuth(env), passwordSecret: env.BETTER_AUTH_SECRET });
+      return handleOneTime(request, { db: env.DB, auth: createAuth(env), passwordSecret: env.BETTER_AUTH_SECRET, reportBucket: env.PROJECT_REPORTS, reportsEnabled: env.PROJECT_REPORTS_ENABLED === 'true' });
     }
     if (url.pathname.startsWith('/api/auth/')) {
       // Account creation/roles go through the audited portal endpoint only.
