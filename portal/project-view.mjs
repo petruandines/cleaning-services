@@ -1,3 +1,4 @@
+import {groupsOf} from './projects/checklist.mjs';
 export const labels = {draft:'Draft',scheduled:'Programată',confirmed:'Confirmată',in_progress:'În desfășurare',completed:'Finalizată',cancelled:'Anulată',closed:'Închisă'};
 export const accessLabels = {not_created:'Acces necreat',active:'Activ',revoked:'Revocat',expired:'Expirat'};
 export const date = value => value ? new Intl.DateTimeFormat('ro-RO',{timeZone:'Europe/Bucharest',dateStyle:'medium',timeStyle:'short'}).format(new Date(value)) : '—';
@@ -39,8 +40,8 @@ export function renderProject(root,p,onReportDownload) {
  const done=p.tasks.filter(t=>t.done).length;
  card.append(el('h2',`${done} din ${p.tasks.length} sarcini finalizate`));
  const progress=el('progress'); progress.max=p.tasks.length||1; progress.value=done; progress.setAttribute('aria-label','Progresul intervenției'); card.append(progress);
- const list=el('ul',undefined,'project-checklist');
- for(const t of p.tasks) {const item=el('li',(t.done?'✅ ':'⬜ ')+t.title); if(t.completed_at) item.append(el('small','Finalizată: '+date(t.completed_at))); list.append(item);} card.append(list);
+ for(const group of groupsOf(p.tasks)){const section=el('section',undefined,'checklist-group');if(group.category)section.append(el('h3',group.category));const list=el('ul',undefined,'project-checklist');
+  for(const t of group.tasks) {const item=el('li',(t.done?'✅ ':'⬜ ')+t.title); if(t.completed_at) item.append(el('small','Finalizată: '+date(t.completed_at))); list.append(item);} section.append(list);card.append(section);}
  if(p.report_available&&p.completed_at&&['completed','closed'].includes(p.status)) {
   const report=el('section',undefined,'project-review');report.append(el('h2','Raportul intervenției'),el('p','Intervenția a fost finalizată. Puteți descărca raportul cu activitățile realizate și informațiile aferente lucrării.'));
   if(onReportDownload){const button=el('button','Descarcă raport PDF','primary');button.type='button';button.addEventListener('click',async()=>{button.disabled=true;try{await onReportDownload();}finally{button.disabled=false;}});report.append(button);}card.append(report);
@@ -66,3 +67,4 @@ export function bucharestISO(local) {
  const matches=[2,3].map(h=>new Date(utc-h*3600000).toISOString()).filter(iso=>bucharestLocal(iso)===local);
  if(matches.length!==1) throw new Error('Ora aleasă este inexistentă sau ambiguă la schimbarea orei. Alege altă oră.'); return matches[0];
 }
+
