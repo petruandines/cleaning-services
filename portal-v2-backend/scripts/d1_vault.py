@@ -26,6 +26,11 @@ CHUNK_SIZE = 1024 * 1024
 PORTAL_TABLES = ("account", "appointments", "audit_events", "client_users", "clients",
                  "d1_migrations", "jobs", "locations", "messages", "payments",
                  "portal_accounts", "rateLimit", "session", "twoFactor", "user", "verification")
+ONE_TIME_TABLES = ("one_time_projects", "one_time_project_tasks", "one_time_project_access",
+                   "one_time_project_sessions", "one_time_project_activity",
+                   "one_time_project_rate_limits", "one_time_project_passwords",
+                   "one_time_project_display_options", "one_time_project_service_options",
+                   "one_time_project_reports", "one_time_project_report_files")
 
 
 def outside_repo(path):
@@ -196,7 +201,9 @@ def schema_first_sql(source, target):
 
 def expected_tables(names):
     base = set(PORTAL_TABLES)
-    if names not in (base, base | {"payment_locations"}):
+    with_payments = base | {"payment_locations"}
+    with_projects = with_payments | set(ONE_TIME_TABLES)
+    if names not in (base, with_payments, with_projects):
         raise ValueError("Backup schema does not match the expected portal tables")
     return sorted(names)
 
