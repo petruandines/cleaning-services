@@ -15,6 +15,37 @@ const ACCOUNT = '47b9f8498a9865c0fbbaca8f0f5cf59d';
 const DATABASE = 'petru-ines-portal-eu';
 const CONFIRMATION = `EXPORT PORTAL BACKUP ${UUID}`;
 
+// These are the eleven additive one-time-project tables reviewed in the
+// production one-time migrations (0001, 0002, 0003, 0005 and 0006).
+// Fail closed if a future schema change is not explicitly reviewed.
+export const ONE_TIME_BACKUP_TABLES = Object.freeze([
+  'one_time_projects',
+  'one_time_project_tasks',
+  'one_time_project_access',
+  'one_time_project_sessions',
+  'one_time_project_activity',
+  'one_time_project_rate_limits',
+  'one_time_project_passwords',
+  'one_time_project_display_options',
+  'one_time_project_service_options',
+  'one_time_project_reports',
+  'one_time_project_report_files',
+]);
+
+export function assertOneTimeBackupTables(tables) {
+  if (!Array.isArray(tables) || tables.some(name => typeof name !== 'string') ||
+      new Set(tables).size !== tables.length) {
+    throw new Error('Unexpected or repeated D1 table names');
+  }
+  const approved = new Set(ONE_TIME_BACKUP_TABLES);
+  if (ONE_TIME_BACKUP_TABLES.some(name => !tables.includes(name))) {
+    throw new Error('Required one-time project backup tables are missing');
+  }
+  // The existing nine-migration validator still checks the entire legacy
+  // schema, columns and history and rejects ALL other extra tables.
+  return tables.filter(name => !approved.has(name));
+}
+
 export function assertChoice(operation, confirmation) {
   if (!['inspect', 'export'].includes(operation)) throw new Error('Unknown backup operation');
   if (operation === 'inspect' && confirmation) throw new Error('Inspect confirmation must be empty');
@@ -84,8 +115,9 @@ export function run(operation, confirmation, env = process.env) {
   assertFiles();
   const details = verifyRemoteD1();
   assertTarget(details);
-  assertVersion(remoteState(details), true);
-  process.stdout.write('Verified exact EU D1 target, version 0009, all nine pinned migration files applied. No database writes.\n');
+  const state = remoteState(details);
+  assertVersion({ ...state, tables: assertOneTimeBackupTables(state.tables) }, true);
+  process.stdout.write('Verified EU D1, nine pinned portal migrations and eleven reviewed one-time tables. No database writes.\n');
   if (operation === 'inspect') return;
 
   // The runner's temporary directory and the output are outside the public
