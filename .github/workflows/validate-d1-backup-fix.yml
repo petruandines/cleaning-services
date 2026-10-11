@@ -1,0 +1,40 @@
+name: Validate isolated D1 backup fix
+
+on:
+  push:
+    branches:
+      - fix/portal-d1-backup-schema-20261011
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-local-restore:
+    if: github.repository == 'petruandines/cleaning-services'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed backup branch without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal-v2-backend/package-lock.json
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install locked test dependencies (no production secrets)
+        working-directory: portal-v2-backend
+        run: |
+          npm ci --no-audit --no-fund
+          python -m pip install -r scripts/requirements-backup.txt
+      - name: Test backend guards, encryption and isolated local restore
+        working-directory: portal-v2-backend
+        run: |
+          npm test
+          python -m unittest discover -s test -p backup_test.py
