@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { archiveDigest, assertChoice, assertRunner, assertTarget, decodeKey, safeVaultError } from '../scripts/backup-remote-phone.mjs';
+import { archiveDigest, assertChoice, assertRunner, assertTarget, assertOneTimeBackupTables, ONE_TIME_BACKUP_TABLES, decodeKey, safeVaultError } from '../scripts/backup-remote-phone.mjs';
 
 const valid = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'petruandines/cleaning-services',
   GITHUB_REF: 'refs/heads/main', CLOUDFLARE_ACCOUNT_ID: '47b9f8498a9865c0fbbaca8f0f5cf59d',
@@ -39,6 +39,21 @@ test('backup refuses a changed database UUID, name or migration directory', () =
     ['database_name', 'other'], ['migrations_dir', 'other']]) {
     assert.throws(() => assertTarget({ expected: { ...expected, [field]: value } }));
   }
+});
+
+test('backup accepts only the reviewed eleven one-time D1 tables', () => {
+  const legacy = ['account', 'appointments', 'audit_events', 'client_users', 'clients',
+    'd1_migrations', 'jobs', 'locations', 'messages', 'payments', 'portal_accounts',
+    'rateLimit', 'session', 'twoFactor', 'user', 'verification', 'payment_locations'];
+  const full = [...legacy, ...ONE_TIME_BACKUP_TABLES].sort();
+  assert.equal(ONE_TIME_BACKUP_TABLES.length, 11);
+  assert.deepEqual(assertOneTimeBackupTables(full).sort(), legacy.sort());
+  assert.throws(() => assertOneTimeBackupTables(full.filter(name => name !== 'one_time_project_reports')),
+    /Required one-time/);
+  assert.throws(() => assertOneTimeBackupTables([...full, 'unaudited_table']),
+    /Unexpected|repeated|Missing|Required|schema/);
+  assert.throws(() => assertOneTimeBackupTables([...full, 'one_time_projects']),
+    /repeated/);
 });
 
 test('backup digest streams the actual encrypted artifact', () => {
