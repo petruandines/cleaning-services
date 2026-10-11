@@ -15,6 +15,13 @@ const ACCOUNT = '47b9f8498a9865c0fbbaca8f0f5cf59d';
 const DATABASE = 'petru-ines-portal-eu';
 const CONFIRMATION = `EXPORT PORTAL BACKUP ${UUID}`;
 
+const LEGACY_BACKUP_TABLES = Object.freeze([
+  'account', 'appointments', 'audit_events', 'client_users', 'clients',
+  'd1_migrations', 'jobs', 'locations', 'messages', 'payments',
+  'portal_accounts', 'rateLimit', 'session', 'twoFactor', 'user', 'verification',
+  'payment_locations',
+]);
+
 // These are the eleven additive one-time-project tables reviewed in the
 // production one-time migrations (0001, 0002, 0003, 0005 and 0006).
 // Fail closed if a future schema change is not explicitly reviewed.
@@ -41,8 +48,12 @@ export function assertOneTimeBackupTables(tables) {
   if (ONE_TIME_BACKUP_TABLES.some(name => !tables.includes(name))) {
     throw new Error('Required one-time project backup tables are missing');
   }
-  // The existing nine-migration validator still checks the entire legacy
-  // schema, columns and history and rejects ALL other extra tables.
+  const permitted = new Set([...LEGACY_BACKUP_TABLES, ...ONE_TIME_BACKUP_TABLES]);
+  if (tables.length !== permitted.size || tables.some(name => !permitted.has(name))) {
+    throw new Error('Unexpected D1 table in the backup schema');
+  }
+  // The existing nine-migration validator additionally checks the entire
+  // legacy schema, columns and migration history.
   return tables.filter(name => !approved.has(name));
 }
 
