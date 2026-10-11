@@ -132,6 +132,32 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
                 vault.run_wrangler('d1', 'execute', database, '--local', '--cwd',
                                    str(source_dir), '--config', str(config),
                                    '--file', str(migrations / name), capture=True)
+            # Add the separately deployed one-time module schema. These are
+            # local-only fixtures and never touch the production D1 database.
+            one_time_migrations = vault.ROOT / 'one-time-migrations'
+            for name in ('0001_one_time.sql', '0002_password_copy.sql',
+                         '0003_display_options.sql', '0004_review_visibility.sql',
+                         '0005_service_options.sql', '0006_reports.sql'):
+                vault.run_wrangler('d1', 'execute', database, '--local', '--cwd',
+                                   str(source_dir), '--config', str(config),
+                                   '--file', str(one_time_migrations / name), capture=True)
+            one_time_seed = source_dir / 'one-time-seed.sql'
+            one_time_seed.write_text("""
+INSERT INTO one_time_projects
+(id, name, client_name, phone, location, scheduled_at, price_bani, created_at, updated_at)
+VALUES ('fixture-project', 'Lucrare fictivă', 'Client fictiv', '000',
+        'Locație fictivă', '2026-01-03T10:00:00Z', 30000,
+        '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+INSERT INTO one_time_project_tasks (id, project_id, title, position)
+VALUES ('fixture-task', 'fixture-project', 'Sarcină fictivă', 0);
+INSERT INTO one_time_project_reports (project_id, enabled)
+VALUES ('fixture-project', 1);
+INSERT INTO one_time_project_report_files (storage_key, project_id, ticket, created_at)
+VALUES ('fixture-key', 'fixture-project', 'fixture-ticket', '2026-01-01T00:00:00Z');
+""")
+            vault.run_wrangler('d1', 'execute', database, '--local', '--cwd',
+                               str(source_dir), '--config', str(config),
+                               '--file', str(one_time_seed), capture=True)
             exported = root / 'source.sql'
             vault.run_wrangler('d1', 'export', database, '--local', '--cwd',
                                str(source_dir), '--config', str(config),
@@ -150,6 +176,10 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
             self.assertEqual(counts['payments'], 1)
             self.assertEqual(counts['payment_locations'], 1)
             self.assertEqual(counts['d1_migrations'], 0)
+            self.assertEqual(counts['one_time_projects'], 1)
+            self.assertEqual(counts['one_time_project_tasks'], 1)
+            self.assertEqual(counts['one_time_project_reports'], 1)
+            self.assertEqual(counts['one_time_project_report_files'], 1)
             restored_db = root / 'inspected.sqlite'
             with sqlite3.connect(restored_db) as db:
                 db.executescript(restored_sql.read_text())
@@ -157,6 +187,19 @@ VALUES ('fixture-payment','fixture-client','fixture-job',12345,'confirmed','2026
                     'SELECT price_bani, amount_bani FROM jobs JOIN payments ON payments.job_id = jobs.id'
                 ).fetchone(), (12345, 12345))
                 self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(), [])
+
+    def test_expected_table_set_includes_all_reviewed_one_time_data(self):
+        original = set(vault.PORTAL_TABLES)
+        payment = original | {'payment_locations'}
+        complete = payment | set(vault.ONE_TIME_TABLES)
+        self.assertEqual(len(vault.ONE_TIME_TABLES), 11)
+        self.assertEqual(len(complete), 28)
+        self.assertEqual(set(vault.expected_tables(complete)), complete)
+        self.assertEqual(set(vault.expected_tables(payment)), payment)
+        with self.assertRaises(ValueError):
+            vault.expected_tables(complete - {'one_time_project_reports'})
+        with self.assertRaises(ValueError):
+            vault.expected_tables(complete | {'unreviewed_private_table'})
 
     def test_sql_counts_refuse_incomplete_schema(self):
         with tempfile.TemporaryDirectory() as folder:
