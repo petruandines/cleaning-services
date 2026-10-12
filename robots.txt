@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://petruandines.github.io/cleaning-services/sitemap.xml
+Sitemap: https://petruandines.com/sitemap.xml
