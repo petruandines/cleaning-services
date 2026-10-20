@@ -23,7 +23,7 @@ test('appointment conflicts and contact navigation fields are kept only in admin
  const all=eventsForRange(appointments,[],[weekly],'2026-10-20','2026-10-26',clients,locations);
  assert.equal(all.length,2);
  assert.equal(conflicts(all).length,1);
- assert.equal(safePhone(all[0].phone),'+40772000999');
+ assert.equal(safePhone(all.find(e=>e.kind==='recurring').phone),'+40772000999');
  const redacted=createAgendaICS(all,{now:new Date('2026-10-19T00:00:00Z')});
  assert.doesNotMatch(redacted,/Client Privat|Str\. Exemplu|0772|Pauză personală/);
  const expanded=createAgendaICS(all,{includePrivate:true,now:new Date('2026-10-19T00:00:00Z')});
