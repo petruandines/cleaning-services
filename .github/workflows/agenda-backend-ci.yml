@@ -1,0 +1,41 @@
+name: Agenda isolated backend checks (no deployment)
+on:
+  push:
+    branches: [feat/agenda-safe-backend-20261020]
+  pull_request:
+    paths:
+      - 'portal-v2-backend/src/agenda.mjs'
+      - 'portal-v2-backend/src/index.mjs'
+      - 'portal-v2-backend/src/one-time.mjs'
+      - 'portal-v2-backend/test/agenda.test.mjs'
+      - '.github/workflows/agenda-backend-ci.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal-v2-backend/package-lock.json
+      - name: Install locked dependencies
+        working-directory: portal-v2-backend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Syntax checks
+        working-directory: portal-v2-backend
+        run: |
+          node --check src/agenda.mjs
+          node --check src/index.mjs
+          node --check src/one-time.mjs
+      - name: Full existing backend tests and new agenda tests
+        working-directory: portal-v2-backend
+        run: npm test
+      - name: Worker compilation only - no Cloudflare account access
+        working-directory: portal-v2-backend
+        run: npx wrangler deploy --dry-run --outdir=./.agenda-dry-run
