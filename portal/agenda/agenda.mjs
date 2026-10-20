@@ -181,7 +181,7 @@ async function saveBlock(ev){
    }else payload={...data,version:stored.version,exceptions:stored.exceptions||{}};
   }
   await api(path,{method,body:JSON.stringify(payload)});
-  hidePanels();notice('Blocajul a fost salvat.');await refresh();
+  hidePanels();notice('Blocajul a fost salvat.');state.busy=false;await refresh();
  }catch(error){notice('Blocajul nu a fost salvat: '+error.message);}
  finally{state.busy=false;$('block-save').disabled=false;}
 }
