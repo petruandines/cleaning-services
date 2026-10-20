@@ -48,6 +48,7 @@ async function refresh(){
    state.blocks=blocks.rows||[];state.storage=true;
   }catch(e){state.blocks=[];state.storage=false;notice('Programările sunt vizibile, dar salvarea blocajelor este indisponibilă: '+e.message);}
   $('block-open').disabled=!state.storage;
+  $('backup-blocks').disabled=!state.storage;
   render();
   if(state.storage)notice('');
  }catch(e){notice('Nu s-a putut încărca agenda: '+e.message);}
@@ -224,6 +225,13 @@ async function start(){
   for(const b of document.querySelectorAll('[data-view]'))b.addEventListener('click',()=>{state.view=b.dataset.view;render();});
   $('prev').addEventListener('click',()=>move(-1));$('next').addEventListener('click',()=>move(1));$('today').addEventListener('click',()=>{state.anchor=dateKey(new Date().toISOString());render();});
   $('refresh').addEventListener('click',refresh);$('block-open').addEventListener('click',()=>openBlock());
+  $('backup-blocks').addEventListener('click',()=>{
+    if(!state.storage)return;
+    const body={format:'pi-agenda-blocks-v1',exported_at:new Date().toISOString(),blocks:state.blocks};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(body,null,2)],{type:'application/json'}));
+    const a=el('a');a.href=url;a.download='agenda-blocaje-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+    notice('Copia JSON a blocajelor a fost descărcată. Păstreaz-o într-un loc privat.');
+  });
   $('block-close').addEventListener('click',hidePanels);$('block-cancel').addEventListener('click',hidePanels);$('details-close').addEventListener('click',hidePanels);
   $('export-open').addEventListener('click',()=>{hidePanels();$('export-panel').hidden=false;const f=$('export-form');const range=visibleRange();f.elements.from.value=range.from;f.elements.to.value=range.to;});
   $('export-close').addEventListener('click',hidePanels);$('block-form').addEventListener('submit',saveBlock);$('export-form').addEventListener('submit',exportICS);
