@@ -63,6 +63,17 @@ test('admin and client DOM execute the complete lifecycle against actual isolate
   await toggle('show_review',false);for(const t of tickers)await t();assert.equal(c.querySelector('.project-review'),null);
 
 
+  // The admin overview marks only a completed intervention, without mutating its status.
+  d.getElementById('list').click();
+  await wait(()=>!!d.querySelector('.project-list .project-card--finished'));
+  const finishedCard=d.querySelector('.project-list .project-card--finished');
+  assert.equal(finishedCard.dataset.projectStatus,'completed');
+  assert.equal(finishedCard.querySelector('.project-card-badge').textContent,'✓ Finalizată');
+  assert.equal(finishedCard.querySelectorAll('.project-card-badge').length,1);
+  assert.match(finishedCard.textContent,/Client test/);
+  finishedCard.querySelector('button').click();
+  await wait(()=>!!d.querySelector('.project-panel')&&!!b('Revocă accesul'));
+
   b('Revocă accesul').click();await wait(()=>d.body.textContent.includes('Acces: Revocat'));for(const t of tickers)await t();assert.equal(c.querySelector('.project-card'),null);assert.match(c.body.textContent,/n[u]? este disponibil/);
   assert.equal((await s.call('admin/'+p.id)).status,200);
   admin.window.confirm=()=>false;b('Șterge proiect').click();await new Promise(r=>setTimeout(r,30));assert.equal((await s.call('admin/'+p.id)).status,200,'cancel keeps project');
