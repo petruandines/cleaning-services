@@ -156,7 +156,17 @@ async function dispatch(request, c) {
    if (request.method==='GET') {
      const offset = Number(u.searchParams.get('offset') || 0);
      if (!Number.isSafeInteger(offset) || offset<0) fail(400,'invalid_offset');
-     const list=await rows(db,'SELECT * FROM one_time_projects ORDER BY created_at DESC,id DESC LIMIT 31 OFFSET ?',offset);
+     const sort=u.searchParams.get('sort')||'upcoming',status=u.searchParams.get('status')||'all';
+     const orderings={
+       upcoming:'CASE WHEN scheduled_at>=? THEN 0 ELSE 1 END ASC, CASE WHEN scheduled_at>=? THEN scheduled_at END ASC, CASE WHEN scheduled_at<? THEN scheduled_at END DESC, id ASC',
+       date_asc:'scheduled_at ASC,id ASC',date_desc:'scheduled_at DESC,id DESC',
+       created:'created_at DESC,id DESC',name:'client_name COLLATE NOCASE ASC,scheduled_at ASC,id ASC',
+     };
+     if(!Object.hasOwn(orderings,sort)||!['all',...STATUSES].includes(status))fail(400,'invalid_sort_filter');
+     const where=status==='all'?'':' WHERE status=?';
+     const params=[...(status==='all'?[]:[status]),...(sort==='upcoming'?[now,now,now]:[]),offset];
+     // The whitelist makes every ORDER BY and status clause constant SQL, never user-controlled SQL.
+     const list=await rows(db,'SELECT * FROM one_time_projects'+where+' ORDER BY '+orderings[sort]+' LIMIT 31 OFFSET ?',...params);
      return json({rows:await Promise.all(list.slice(0,30).map(p=>adminView(db,p,now,c))),nextOffset:list.length>30 ? offset+30 : null});
    }
    if (request.method!=='POST') fail(405,'method_not_allowed');
