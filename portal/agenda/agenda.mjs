@@ -129,7 +129,7 @@ function details(event){
    addAction(actions,'WhatsApp ↗',()=>window.open('https://wa.me/'+whatsappPhone(event.phone),'_blank','noopener,noreferrer'));
   }
   addAction(actions,'Deschide intervenția',()=>{
-   location.href=event.kind==='one-time'?'../projects/':'../';
+   location.href=event.kind==='one-time'?'../projects/?project='+encodeURIComponent(event.sourceId):'../';
   },true);
  }
  $('details').scrollIntoView({behavior:'smooth',block:'nearest'});
