@@ -1,0 +1,41 @@
+name: Agenda isolated frontend checks (no deployment)
+on:
+  push:
+    branches: [feat/agenda-safe-frontend-20261020]
+  pull_request:
+    paths:
+      - 'portal/agenda/**'
+      - 'portal/projects/admin.mjs'
+      - 'portal/app.js'
+      - 'portal-v2-frontend/**'
+      - 'scripts/build-portal-v2.mjs'
+      - '.github/workflows/agenda-frontend-ci.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Syntax checks
+        run: |
+          node --check portal/agenda/core.mjs
+          node --check portal/agenda/agenda.mjs
+          node --check portal/projects/admin.mjs
+          node --check portal/app.js
+      - name: All existing and new frontend tests
+        run: npm run test:portal
+      - name: Assemble production static files without deploying
+        run: |
+          npm run build:portal
+          node scripts/build-cloudflare.mjs
+          test -f dist-cloudflare/portal/agenda/index.html
+          test -f dist-cloudflare/portal/agenda/agenda.mjs
