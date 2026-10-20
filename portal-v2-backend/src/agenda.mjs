@@ -10,7 +10,14 @@ const makeJSON=(body,status=200)=>new Response(JSON.stringify(body),{status,head
 class AgendaError extends Error{constructor(status,code){super(code);this.status=status;}}
 const fail=(s,c)=>{throw new AgendaError(s,c);};
 const validDate=value=>DATE.test(value)&&!Number.isNaN(Date.parse(value+'T12:00:00Z'))&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value&&value>='2020-01-01'&&value<='2100-12-31';
-const validLocal=value=>LOCAL.test(value)&&validDate(value.slice(0,10));
+const zoneFormatter=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Bucharest',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+function validLocal(value){
+ if(!LOCAL.test(value)||!validDate(value.slice(0,10)))return false;
+ // A Romanian wall clock can have a skipped or duplicated time on DST Sundays.
+ const base=Date.parse(value+':00Z');let matches=0;
+ for(const hours of [1,2,3])if(zoneFormatter.format(new Date(base-hours*3600000)).replace(' ','T')===value)matches++;
+ return matches===1;
+}
 const allowedKeys=new Set(['title','start','end','all_day','repeat','repeat_until','exceptions','version']);
 function validate(data){
  if(!data||typeof data!=='object'||Array.isArray(data)||Object.keys(data).some(k=>!allowedKeys.has(k)))fail(400,'invalid_fields');
