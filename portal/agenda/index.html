@@ -11,7 +11,7 @@
 <section id="app" hidden>
 <div class="agenda-tools"><div class="agenda-modes"><button type="button" data-view="month">Lună</button><button type="button" data-view="week">Săptămână</button><button type="button" data-view="day">Zi</button><button type="button" data-view="list">Listă</button></div>
 <div class="agenda-navigation"><button id="prev" type="button" class="secondary" aria-label="Perioada anterioară">←</button><button id="today" type="button" class="secondary">Azi</button><button id="next" type="button" class="secondary" aria-label="Perioada următoare">→</button><strong id="period"></strong></div>
-<div class="agenda-actions"><button id="refresh" type="button" class="secondary">Actualizează</button><button id="block-open" type="button" class="primary">+ Blochează interval</button><button id="export-open" type="button" class="secondary">Export .ics</button><button id="backup-blocks" type="button" class="secondary">Backup blocaje JSON</button></div></div>
+<div class="agenda-actions"><button id="refresh" type="button" class="secondary">Actualizează</button><button id="block-open" type="button" class="primary">+ Blochează interval</button><button id="export-open" type="button" class="secondary">Export .ics</button><button id="pdf-open" type="button" class="primary">Export PDF</button><button id="backup-blocks" type="button" class="secondary">Backup blocaje JSON</button></div></div>
 <div class="agenda-legend"><span><i class="dot one"></i>Intervenții punctuale</span><span><i class="dot recurring"></i>Programări recurente</span><span><i class="dot blocked"></i>Intervale blocate</span></div>
 <section id="calendar" aria-label="Calendar intervenții"></section><p id="calendar-note">Intervențiile punctuale fără oră de final estimată sunt afișate cu o durată orientativă de 3 ore. Verifică durata reală înainte de a programa alte lucrări.</p></section>
 <section id="details" class="agenda-panel" hidden><div class="agenda-panel-head"><h2 id="details-title"></h2><button type="button" id="details-close" class="secondary">Închide</button></div><div id="details-body"></div><div id="details-actions" class="agenda-button-row"></div></section>
@@ -28,4 +28,17 @@
 <label class="agenda-inline"><input name="private" type="checkbox"> Include numele, adresele și notele clienților</label></div>
 <p class="agenda-help">Fișierul este creat local. Nu conține tokenuri, parole sau linkuri private; importul nu sincronizează automat modificările ulterioare.</p>
 <button type="submit" class="primary">Descarcă .ics</button></form></section>
+<section id="pdf-panel" class="agenda-panel" hidden><div class="agenda-panel-head"><h2>Export PDF · Agenda programărilor</h2><button id="pdf-close" type="button" class="secondary">Închide</button></div>
+<form id="pdf-form"><div class="agenda-form-grid">
+<label>Perioada raportului<select name="view" id="pdf-view"><option value="month">Lună</option><option value="week">Săptămână</option><option value="day">Zi</option><option value="list">Listă · interval personalizat</option></select></label>
+<div class="agenda-pdf-description">Document A4, cu antet Petru &amp; Inés, dată și ore, fișe grupate cronologic, numere de pagină și date fără tăieri.</div>
+<label>Din data de<input name="from" type="date" required></label>
+<label>Până la data de<input name="to" type="date" required></label>
+<label class="agenda-inline"><input type="checkbox" name="includeContacts" checked> Include adresele și telefoanele</label>
+<label class="agenda-inline"><input type="checkbox" name="includeNotes"> Include observațiile și descrierile</label>
+<label class="agenda-inline"><input type="checkbox" name="includeBlocks"> Include perioadele blocate</label>
+<label class="agenda-inline"><input type="checkbox" name="includeCancelled"> Include programările anulate</label>
+</div>
+<p class="agenda-help">PDF-ul este generat pe dispozitiv, din programările actualizate în momentul exportului. Nu conține parole, tokenuri de acces sau linkuri private. Fișele normale nu se despart între pagini; observațiile foarte lungi continuă cu o mențiune explicită. Păstrează documentul în siguranță, deoarece poate include datele clienților.</p>
+<div class="agenda-button-row"><button id="pdf-download" type="submit" class="primary">Descarcă PDF profesional</button><span id="pdf-hint" role="status" aria-live="polite"></span></div></form></section>
 <noscript>Pentru a folosi agenda activează JavaScript.</noscript></main><footer>Petru &amp; Inés · Agendă privată administrativă</footer></body></html>
