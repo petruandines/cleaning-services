@@ -26,7 +26,20 @@ async function list(){if(!authorized)return;const sequence=++viewSequence;curren
  statusSelect.value=statusFilter;statusSelect.addEventListener('change',()=>{statusFilter=statusSelect.value;offset=0;list().catch(e=>notice(e.message));});statusLabel.append(statusSelect);
  controls.append(sortLabel,statusLabel);root.append(controls);
  const grid=el('div',undefined,'project-list');root.append(grid);
- for(const p of data.rows){const card=el('article',undefined,'project-card');card.append(el('h2',p.name),el('p',p.client_name+' · '+date(p.scheduled_at)),el('p',labels[p.status]+' · '+money(p.price_bani)+(p.service_options?.billing_mode==='hourly'?' / oră':'')),el('p',`${p.tasks.filter(t=>t.done).length}/${p.tasks.length} sarcini finalizate`),el('p','Acces: '+accessLabels[p.access.status]+(p.access.expires_at?' · expiră '+date(p.access.expires_at):'')));button('Deschide proiect',()=>detail(p.id),card);grid.append(card);}
+ for(const p of data.rows){
+  const finished=p.status==='completed'||(p.status==='closed'&&!!p.completed_at);
+  const card=el('article',undefined,finished?'project-card project-card--finished':'project-card');
+  card.dataset.projectStatus=p.status;
+  const heading=el('div',undefined,'project-card-heading');
+  heading.append(el('h2',p.name));
+  if(finished){
+   const badge=el('span','✓ Finalizată','project-card-badge project-card-badge--finished');
+   badge.setAttribute('aria-label','Intervenție finalizată');
+   heading.append(badge);
+  }
+  card.append(heading,el('p',p.client_name+' · '+date(p.scheduled_at)),el('p',labels[p.status]+' · '+money(p.price_bani)+(p.service_options?.billing_mode==='hourly'?' / oră':'')),el('p',`${p.tasks.filter(t=>t.done).length}/${p.tasks.length} sarcini finalizate`),el('p','Acces: '+accessLabels[p.access.status]+(p.access.expires_at?' · expiră '+date(p.access.expires_at):'')));
+  button('Deschide proiect',()=>detail(p.id),card);grid.append(card);
+ }
  if(!data.rows.length)grid.append(el('p','Nu există proiecte în această pagină.','project-empty'));
  const pager=el('div',undefined,'project-actions');root.append(pager);if(offset)button('← Înapoi',async()=>{offset=Math.max(0,offset-30);await list();},pager);if(data.nextOffset!==null)button('Înainte →',async()=>{offset=data.nextOffset;await list();},pager);
 }
