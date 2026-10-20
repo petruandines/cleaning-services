@@ -5,6 +5,7 @@ import { authOptions } from './auth-options.mjs';
 import { guardAdminPassword } from './admin-password.mjs';
 import { handleAdminDeviceSession } from './admin-device-session.mjs';
 import { handleOneTime } from './one-time.mjs';
+import { handleAgenda } from './agenda.mjs';
 
 const CANONICAL_PORTAL_ORIGIN = 'https://petruandines.com';
 const CANONICAL_PORTAL_AUTH_PATHS = new Set([
@@ -47,6 +48,9 @@ export default {
         'access-control-allow-headers': 'Authorization, Content-Type', 'vary': 'Origin',
       }});
       return cors(await handleAdminDeviceSession(request, createAuth(env)), request);
+    }
+    if (url.pathname.startsWith('/api/agenda/')) {
+      return handleAgenda(request, {auth:createAuth(env),bucket:env.PROJECT_REPORTS});
     }
     if (url.pathname.startsWith('/api/one-time/')) {
       return handleOneTime(request, { db: env.DB, auth: createAuth(env), passwordSecret: env.BETTER_AUTH_SECRET, reportBucket: env.PROJECT_REPORTS, reportsEnabled: env.PROJECT_REPORTS_ENABLED === 'true' });
