@@ -102,7 +102,11 @@ function edit(p=null){viewSequence++;root.replaceChildren();const form=el('form'
 }
 async function listView(){await list();}
 $('list').addEventListener('click',()=>{offset=0;notice('');list().catch(e=>notice(e.message));});$('create').addEventListener('click',()=>{if(authorized){notice('');edit();}});
-(async()=>{try{if(!token)throw new Error('Intră întâi în portal cu contul admin, în aceeași filă.');const me=await api('/api/me');if(me.role!=='staff'||me.twoFactorRequired)throw new Error('Acces permis numai adminului autentificat cu verificare în doi pași.');authorized=true;await list();$('nav').hidden=false;}catch(e){notice(e.message);}})();
+(async()=>{try{if(!token)throw new Error('Intră întâi în portal cu contul admin, în aceeași filă.');const me=await api('/api/me');if(me.role!=='staff'||me.twoFactorRequired)throw new Error('Acces permis numai adminului autentificat cu verificare în doi pași.');authorized=true;
+ const selected=new URL(window.location.href).searchParams.get('project');
+ if(selected&&/^[A-Za-z0-9_-]{1,100}$/.test(selected)){try{await detail(selected);}catch(e){notice(e.message);await list();}}
+ else await list();
+ $('nav').hidden=false;}catch(e){notice(e.message);}})();
 
 setInterval(()=>{const preview=$('preview-client-view');if(preview)updateProjectClock(preview);},1000);
 
