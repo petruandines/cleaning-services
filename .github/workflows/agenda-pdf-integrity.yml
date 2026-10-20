@@ -39,4 +39,5 @@ jobs:
         with:
           name: agenda-pdf-demo-no-real-clients
           path: .agenda-pdf-fixtures/
+          include-hidden-files: true
           retention-days: 7
