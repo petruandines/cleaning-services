@@ -4,3 +4,17 @@
 
 .checklist-group{margin:18px 0;padding:16px;border:1px solid #dce6df;border-radius:12px;background:#fbfdfb}.checklist-group h3,.checklist-group h4{margin:0 0 8px;color:#195a2a}.checklist-group .project-checklist{margin:0}.checklist-edit label{display:flex;flex-direction:column;gap:7px}.checklist-edit .task-editor{grid-template-columns:24px minmax(0,1fr) repeat(3,auto)}.checklist-edit .project-actions{margin:8px 0 0}
 
+
+/* Admin project list: finished work is legible at a glance (not color alone). */
+.project-list .project-card--finished{
+ border-color:#a9d4b7;
+ border-left:5px solid #18854a;
+ background:linear-gradient(140deg,#f1faf3 0%,#ffffff 68%);
+ box-shadow:0 7px 24px #12331d0d;
+}
+.project-card-heading{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:9px}
+.project-card-heading h2{margin:0;min-width:0;overflow-wrap:anywhere}
+.project-card-badge{display:inline-flex;align-items:center;flex:0 0 auto;padding:6px 11px;border-radius:999px;font-size:.78rem;font-weight:750;line-height:1.3;letter-spacing:.01em;white-space:nowrap}
+.project-card-badge--finished{background:#d9f2e1;color:#145b32;border:1px solid #9dd4ad}
+.project-list .project-card--finished .project-card-heading h2{color:#145b32}
+@media(max-width:540px){.project-card-heading{gap:8px}.project-card-badge{font-size:.75rem}}
