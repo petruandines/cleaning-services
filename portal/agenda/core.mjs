@@ -62,7 +62,7 @@ export function createAgendaICS(events,{includePrivate=false,now=new Date()}={})
   lines.push('BEGIN:VEVENT','UID:'+uid,'DTSTAMP:'+utc(now));
   if(e.allDay){lines.push('DTSTART;VALUE=DATE:'+e.start.slice(0,10).replace(/-/g,''),'DTEND;VALUE=DATE:'+addDays(e.end.slice(0,10),1).replace(/-/g,''));}
   else {lines.push('DTSTART:'+stamp(e.start),'DTEND:'+stamp(e.end>e.start?e.end:e.start.slice(0,10)+'T23:59'));}
-  lines.push('SUMMARY:'+clean(e.kind==='blocked'?'Indisponibil':includePrivate?e.service+' · '+e.name:e.service),'TRANSP:OPAQUE','STATUS:CONFIRMED');
+  lines.push('SUMMARY:'+clean(e.kind==='blocked'?'Indisponibil':includePrivate?e.service+' · '+e.name:e.kind==='one-time'?'Intervenție punctuală':'Programare recurentă'),'TRANSP:OPAQUE','STATUS:CONFIRMED');
   if(includePrivate&&e.kind!=='blocked'){if(e.address)lines.push('LOCATION:'+clean(e.address));if(e.notes)lines.push('DESCRIPTION:'+clean(e.notes));}
   lines.push('END:VEVENT');
  }
