@@ -154,6 +154,7 @@ function openBlock(mode='create',event=null){
  form.elements.repeat.disabled=mode==='occurrence';form.elements.repeat_until.disabled=mode==='occurrence';
  $('block-form-panel').scrollIntoView({behavior:'smooth',block:'start'});
 }
+function editableBlock(b){return {title:b.title,start:b.start,end:b.end,all_day:b.all_day,repeat:b.repeat,repeat_until:b.repeat_until||null,exceptions:b.exceptions||{},version:b.version};}
 async function saveBlock(ev){
  ev.preventDefault();if(state.busy)return;
  const form=ev.currentTarget;const mode=state.editing?.mode||'create',event=state.editing?.event;
@@ -177,7 +178,7 @@ async function saveBlock(ev){
    if(!stored)throw new Error('Blocajul nu mai este disponibil. Actualizează.');
    path+='/'+encodeURIComponent(stored.id);method='PATCH';
    if(mode==='occurrence'){
-    payload={...stored,version:stored.version,exceptions:{...stored.exceptions,[event.occurrence]:{title:data.title,start,end,all_day}}};
+    payload={...editableBlock(stored),exceptions:{...stored.exceptions,[event.occurrence]:{title:data.title,start,end,all_day}}};
    }else payload={...data,version:stored.version,exceptions:stored.exceptions||{}};
   }
   await api(path,{method,body:JSON.stringify(payload)});
@@ -188,7 +189,7 @@ async function saveBlock(ev){
 async function removeOccurrence(event){
  if(!confirm('Elimini numai această apariție? Seria rămâne activă.'))return;
  const b=state.blocks.find(x=>x.id===event.blockId);if(!b)return;
- try{await api('/api/agenda/blocks/'+encodeURIComponent(b.id),{method:'PATCH',body:JSON.stringify({...b,exceptions:{...b.exceptions,[event.occurrence]:null}})});hidePanels();await refresh();}
+ try{await api('/api/agenda/blocks/'+encodeURIComponent(b.id),{method:'PATCH',body:JSON.stringify({...editableBlock(b),exceptions:{...b.exceptions,[event.occurrence]:null}})});hidePanels();await refresh();}
  catch(e){notice('Apariția nu a fost eliminată: '+e.message);}
 }
 async function removeBlock(event){
