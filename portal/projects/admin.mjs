@@ -4,6 +4,7 @@ import {el,labels,accessLabels,date,money,renderProject,updateProjectClock,bucha
 import {groupsOf,packTask,unpackTask,parseChecklistText,parseChecklistXlsx} from './checklist.mjs';
 const $=id=>document.getElementById(id), token=readTabSession(window);
 let current=null,offset=0,authorized=false,working=false,viewSequence=0;
+let sortOrder='upcoming',statusFilter='all';
 const root=$('content');
 const displayToggles=[['invoice_enabled','Afișează butonul facturii'],['show_access_policy','Afișează Politica privind accesul, deplasarea și întreruperea lucrărilor'],['show_terms','Afișează Condiții de prestare a serviciilor'],['show_supplier','Afișează informațiile despre furnizor'],['show_review','Afișează invitația la Google Review după finalizare']];
 const errors={...reportErrors,project_changed_reload:'Proiectul a fost modificat în altă pagină. Reîncarcă înainte de salvare.',change_expiry_before_reactivation:'Accesul este expirat. Editează întâi durata accesului.',password_length_12_128:'Parola trebuie să aibă între 12 și 128 de caractere.',password_copy_requires_reset:'Parola acestui acces nu are încă o copie criptată. Setează parola o dată folosind Setează/resetează parola.',password_copy_unavailable:'Copia parolei nu poate fi decriptată. Setează o parolă nouă.',minimum_agreement_required:'Pentru un minimum diferit de 100 lei, introdu referința acordului scris.',billing_locked_after_start:'Tariful și minimumul nu se mai pot modifica după începerea intervenției.',hourly_start_required:'Începe intervenția înainte de finalizare pentru a măsura timpul.',travel_requires_scheduled:'Deplasarea poate fi activată numai pentru o intervenție programată sau confirmată.',use_start_or_complete:'Folosește acțiunile Începe / Confirmă finalizarea pentru acest status.'};
@@ -15,7 +16,16 @@ async function api(path='',data,method=data?'POST':'GET') {
 const reports=reportController({call:(...args)=>call(...args),token,notice,refresh:(id)=>detail(id),button});
 const call=(suffix='',data,method)=>api('/api/one-time/admin'+suffix,data,method);
 function button(text,action,parent=root,style='secondary') {const b=el('button',text,style);b.type='button';b.addEventListener('click',async()=>{if(working)return;working=true;b.disabled=true;notice('');try{await action();}catch(e){notice(e.message);}finally{working=false;b.disabled=false;}});parent.append(b);return b;}
-async function list(){if(!authorized)return;const sequence=++viewSequence;current=null;const data=await call('?offset='+offset);if(sequence!==viewSequence)return;root.replaceChildren();const grid=el('div',undefined,'project-list');root.append(grid);
+async function list(){if(!authorized)return;const sequence=++viewSequence;current=null;const data=await call('?offset='+offset+'&sort='+encodeURIComponent(sortOrder)+'&status='+encodeURIComponent(statusFilter));if(sequence!==viewSequence)return;root.replaceChildren();
+ const controls=el('div',undefined,'project-actions');
+ const sortLabel=el('label','Sortează: '),sortSelect=el('select');sortSelect.id='sort-projects';
+ for(const [value,label] of [['upcoming','Programări viitoare primele'],['date_asc','Data crescător'],['date_desc','Data descrescător'],['created','Data creării'],['name','Numele clientului']]){const option=el('option',label);option.value=value;sortSelect.append(option);}
+ sortSelect.value=sortOrder;sortSelect.addEventListener('change',()=>{sortOrder=sortSelect.value;offset=0;list().catch(e=>notice(e.message));});sortLabel.append(sortSelect);
+ const statusLabel=el('label',' Status: '),statusSelect=el('select');statusSelect.id='filter-projects';
+ for(const [value,label] of [['all','Toate'],['scheduled','Programate'],['confirmed','Confirmate'],['in_progress','În desfășurare'],['completed','Finalizate'],['cancelled','Anulate'],['draft','Draft'],['closed','Închise']]){const option=el('option',label);option.value=value;statusSelect.append(option);}
+ statusSelect.value=statusFilter;statusSelect.addEventListener('change',()=>{statusFilter=statusSelect.value;offset=0;list().catch(e=>notice(e.message));});statusLabel.append(statusSelect);
+ controls.append(sortLabel,statusLabel);root.append(controls);
+ const grid=el('div',undefined,'project-list');root.append(grid);
  for(const p of data.rows){const card=el('article',undefined,'project-card');card.append(el('h2',p.name),el('p',p.client_name+' · '+date(p.scheduled_at)),el('p',labels[p.status]+' · '+money(p.price_bani)+(p.service_options?.billing_mode==='hourly'?' / oră':'')),el('p',`${p.tasks.filter(t=>t.done).length}/${p.tasks.length} sarcini finalizate`),el('p','Acces: '+accessLabels[p.access.status]+(p.access.expires_at?' · expiră '+date(p.access.expires_at):'')));button('Deschide proiect',()=>detail(p.id),card);grid.append(card);}
  if(!data.rows.length)grid.append(el('p','Nu există proiecte în această pagină.','project-empty'));
  const pager=el('div',undefined,'project-actions');root.append(pager);if(offset)button('← Înapoi',async()=>{offset=Math.max(0,offset-30);await list();},pager);if(data.nextOffset!==null)button('Înainte →',async()=>{offset=data.nextOffset;await list();},pager);
