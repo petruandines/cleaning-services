@@ -1,6 +1,7 @@
 import {isPortalOrigin} from './origins.mjs';
 
 const PREFIX='agenda-blocks/v1/';
+const INDEX=PREFIX+'index.json';
 const ID=/^[0-9a-f]{8}-[0-9a-f-]{27,40}$/i;
 const DATE=/^\d{4}-\d{2}-\d{2}$/;
 const LOCAL=/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -44,26 +45,19 @@ async function input(request){
  if(!value||typeof value!=='object'||Array.isArray(value))fail(400,'invalid_json');
  return value;
 }
-async function read(store,id){
- const object=await store.get(PREFIX+id);
- if(!object)return null;
- let data;try{data=JSON.parse(await object.text());}catch{fail(503,'corrupt_block');}
- return {object,data};
+async function readCatalog(store){
+ const object=await store.get(INDEX);
+ if(!object)return {object:null,rows:[]};
+ let data;try{data=JSON.parse(await object.text());}catch{fail(503,'corrupt_agenda');}
+ if(data?.format!==1||!Array.isArray(data.rows)||data.rows.length>1000)fail(503,'corrupt_agenda');
+ return {object,rows:data.rows};
 }
-async function list(store){
- const objects=await store.list({prefix:PREFIX,limit:501});
- if(objects.truncated||objects.objects.length>500)fail(503,'agenda_too_large');
- const result=[];
- for(let i=0;i<objects.objects.length;i+=25){
-  const chunk=await Promise.all(objects.objects.slice(i,i+25).map(item=>store.get(item.key)));
-  for(const obj of chunk){
-   if(!obj)continue;
-   let data;try{data=JSON.parse(await obj.text());}catch{fail(503,'corrupt_block');}
-   if(data&&!data.deleted&&ID.test(data.id))result.push(data);
-  }
- }
- result.sort((a,b)=>a.start.localeCompare(b.start)||a.id.localeCompare(b.id));
- return result;
+async function writeCatalog(store,catalog,rows){
+ if(rows.length>1000)fail(413,'agenda_too_large');
+ const contents=JSON.stringify({format:1,rows});
+ if(contents.length>512000)fail(413,'agenda_too_large');
+ const result=await store.put(INDEX,contents,{onlyIf:catalog.object?{etagMatches:catalog.object.etag}:{etagDoesNotMatch:'*'},httpMetadata:{contentType:'application/json'}});
+ if(!result)fail(409,'block_changed_reload');
 }
 async function dispatch(request,{auth,bucket}){
  const url=new URL(request.url),origin=request.headers.get('origin');
@@ -78,9 +72,10 @@ async function dispatch(request,{auth,bucket}){
  // The existing R2 bucket is private. Only this prefix is accessed; no report data is modified.
  if(!bucket)fail(503,'agenda_storage_unavailable');
  const id=match[1];
+ const catalog=await readCatalog(bucket);
  if(request.method==='GET'){
   if(id)fail(405,'method_not_allowed');
-  return makeJSON({rows:await list(bucket)});
+  return makeJSON({rows:catalog.rows.filter(row=>!row.deleted).sort((a,b)=>a.start.localeCompare(b.start)||a.id.localeCompare(b.id))});
  }
  if(!origin||(!isPortalOrigin(origin)&&origin!==url.origin))fail(403,'origin_required');
  const value=await input(request);
@@ -88,26 +83,23 @@ async function dispatch(request,{auth,bucket}){
   if(id)fail(405,'method_not_allowed');
   const block=validate(value),now=new Date().toISOString();
   const record={...block,id:crypto.randomUUID(),version:crypto.randomUUID(),created_at:now,updated_at:now};
-  const saved=await bucket.put(PREFIX+record.id,JSON.stringify(record),{httpMetadata:{contentType:'application/json'}});
-  if(!saved)fail(503,'write_failed');
+  await writeCatalog(bucket,catalog,[...catalog.rows,record]);
   return makeJSON(record,201);
  }
  if(!id||!ID.test(id))fail(404,'not_found');
- const prior=await read(bucket,id);
- if(!prior||prior.data.deleted)fail(404,'not_found');
- if(typeof value.version!=='string'||value.version!==prior.data.version)fail(409,'block_changed_reload');
+ const index=catalog.rows.findIndex(row=>row.id===id&&!row.deleted);
+ if(index<0)fail(404,'not_found');
+ const prior=catalog.rows[index];
+ if(typeof value.version!=='string'||value.version!==prior.version)fail(409,'block_changed_reload');
  if(request.method==='DELETE'){
   if(Object.keys(value).length!==1)fail(400,'invalid_fields');
-  // Conditional tombstone keeps optimistic concurrency and avoids a race with another edit.
-  const deleted={...prior.data,deleted:true,updated_at:new Date().toISOString(),version:crypto.randomUUID()};
-  const result=await bucket.put(PREFIX+id,JSON.stringify(deleted),{onlyIf:{etagMatches:prior.object.etag},httpMetadata:{contentType:'application/json'}});
-  if(!result)fail(409,'block_changed_reload');
+  await writeCatalog(bucket,catalog,catalog.rows.filter(row=>row.id!==id));
   return makeJSON({deleted:true});
  }
  if(request.method!=='PATCH')fail(405,'method_not_allowed');
- const block=validate(value),record={...block,id,created_at:prior.data.created_at,updated_at:new Date().toISOString(),version:crypto.randomUUID()};
- const result=await bucket.put(PREFIX+id,JSON.stringify(record),{onlyIf:{etagMatches:prior.object.etag},httpMetadata:{contentType:'application/json'}});
- if(!result)fail(409,'block_changed_reload');
+ const block=validate(value),record={...block,id,created_at:prior.created_at,updated_at:new Date().toISOString(),version:crypto.randomUUID()};
+ const updated=catalog.rows.slice();updated[index]=record;
+ await writeCatalog(bucket,catalog,updated);
  return makeJSON(record);
 }
 export async function handleAgenda(request,context){
