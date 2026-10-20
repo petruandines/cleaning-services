@@ -105,7 +105,7 @@ function eventButton(e,small=false){
  b.append(el('span',e.allDay?'Zi întreagă':e.start.slice(11,16),'agenda-event-time'),el('span',small?e.name:e.service+' · '+e.name));
  b.addEventListener('click',()=>details(e));return b;
 }
-function hidePanels(){for(const id of ['details','block-form-panel','export-panel'])$(id).hidden=true;}
+function hidePanels(){for(const id of ['details','block-form-panel','export-panel','pdf-panel'])$(id).hidden=true;}
 function addAction(parent,title,action,primary=false){const b=el('button',title,primary?'primary':'secondary');b.type='button';b.addEventListener('click',action);parent.append(b);return b;}
 function details(event){
  state.selected=event;hidePanels();$('details').hidden=false;$('details-title').textContent=event.kind==='blocked'?'Perioadă blocată':event.service;
@@ -213,6 +213,64 @@ async function exportICS(ev){
   notice('Fișierul .ics a fost generat pentru '+events.length+' evenimente.');
  }catch(e){notice('Exportul nu a reușit: '+e.message);}
 }
+function updatePdfRange(resetList=false){
+ const form=$('pdf-form'),view=form.elements.view.value;
+ // The month range excludes filler days from the six-week visual grid.
+ const d=state.anchor,offset=(key,n)=>addDays(key,n);
+ let range;
+ if(view==='month'){const first=d.slice(0,7)+'-01';range={from:first,to:addDays(monthMove(first,1),-1)};}
+ else if(view==='week'){const first=startOfWeek(d);range={from:first,to:offset(first,6)};}
+ else if(view==='day')range={from:d,to:d};
+ else range={from:offset(d,-7),to:offset(d,35)};
+ if(view!=='list'||resetList||!form.elements.from.value||!form.elements.to.value){
+  form.elements.from.value=range.from;form.elements.to.value=range.to;
+ }
+ form.elements.from.readOnly=view!=='list';
+ form.elements.to.readOnly=view!=='list';
+ $('pdf-hint').textContent=view==='list'?'Poți alege orice interval de până la 366 de zile.':'Perioada este preluată din selecția agendei.';
+}
+async function exportPDF(ev){
+ ev.preventDefault();if(state.busy)return;
+ const form=ev.currentTarget,download=$('pdf-download');
+ const view=form.elements.view.value;
+ const from=form.elements.from.value,to=form.elements.to.value;
+ if(!from||!to||from>to||Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z')>365*86400000){
+  $('pdf-hint').textContent='Selectează o perioadă validă de cel mult 366 de zile.';return;
+ }
+ state.busy=true;download.disabled=true;$('pdf-hint').textContent='Se actualizează programările și se compune PDF-ul…';
+ try{
+  // Read only: no project or client records are updated.
+  const includeBlocks=form.elements.includeBlocks.checked;
+  const [appointments,projects,clients,locations,blockResponse,resources,lib]=await Promise.all([
+   pages('/api/appointments'),pages('/api/one-time/admin',1200),
+   pages('/api/clients'),pages('/api/locations'),
+   includeBlocks?api('/api/agenda/blocks'):Promise.resolve({rows:[]}),
+   fetch(new URL('../reports/resources.json',import.meta.url),{cache:'force-cache'}).then(async response=>{
+    if(!response.ok)throw new Error('Fontul și sigla PDF nu sunt disponibile.');
+    return response.json();
+   }),
+   import('./pdf.mjs')
+  ]);
+  const range=lib.reportRange(view,state.anchor,view==='list'?{from,to}:undefined);
+  // Reuse the same normalized data as the visible agenda; no PDF-only estimates.
+  const all=eventsForRange(appointments,projects,blockResponse.rows||[],range.from,range.to,clients,locations);
+  const selected=lib.filterReportEvents(all,range,{
+   includeBlocks,includeCancelled:form.elements.includeCancelled.checked
+  });
+  const bytes=lib.generateAgendaPDF(selected,resources,{
+   from:range.from,to:range.to,view:range.view,
+   includeBlocks,includeContacts:form.elements.includeContacts.checked,
+   includeNotes:form.elements.includeNotes.checked,generatedAt:new Date()
+  });
+  if(!(bytes instanceof Uint8Array)||bytes.length<500)throw new Error('Fișierul PDF este incomplet.');
+  const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'})),a=el('a');
+  a.href=url;a.download='Agenda-Petru-Ines-'+range.from+'-'+range.to+'.pdf';
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+  $('pdf-hint').textContent='PDF generat: '+selected.length+' înregistrări, în ordine cronologică.';
+ }catch(e){
+  $('pdf-hint').textContent='Exportul nu a reușit: '+(e?.message||'Eroare necunoscută')+'. Datele portalului nu au fost modificate.';
+ }finally{state.busy=false;download.disabled=false;}
+}
 function move(step){
  state.anchor=state.view==='month'?monthMove(state.anchor,step):addDays(state.anchor,step*(state.view==='week'?7:state.view==='list'?35:1));render();
 }
@@ -235,6 +293,14 @@ async function start(){
   $('block-close').addEventListener('click',hidePanels);$('block-cancel').addEventListener('click',hidePanels);$('details-close').addEventListener('click',hidePanels);
   $('export-open').addEventListener('click',()=>{hidePanels();$('export-panel').hidden=false;const f=$('export-form');const range=visibleRange();f.elements.from.value=range.from;f.elements.to.value=range.to;});
   $('export-close').addEventListener('click',hidePanels);$('block-form').addEventListener('submit',saveBlock);$('export-form').addEventListener('submit',exportICS);
+  $('pdf-open').addEventListener('click',()=>{
+    hidePanels();$('pdf-panel').hidden=false;
+    $('pdf-form').elements.view.value=state.view;updatePdfRange(true);
+    $('pdf-panel').scrollIntoView({behavior:'smooth',block:'start'});
+  });
+  $('pdf-close').addEventListener('click',hidePanels);
+  $('pdf-form').elements.view.addEventListener('change',()=>updatePdfRange(true));
+  $('pdf-form').addEventListener('submit',exportPDF);
   await refresh();
  }catch(error){notice('Acces restricționat: '+error.message);}
 }

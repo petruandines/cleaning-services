@@ -1,0 +1,43 @@
+name: Agenda PDF visual integrity (no deploy)
+on:
+  push:
+    branches: [feat/agenda-professional-pdf-20261021]
+permissions:
+  contents: read
+jobs:
+  pdf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies with locked versions
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test entire frontend including PDF page breaks
+        run: npm run test:portal
+      - name: Generate sample PDFs from actual production serializer
+        run: node scripts/agenda-pdf-fixture.mjs
+      - name: Inspect sample PDF files with Poppler
+        run: |
+          if ! command -v pdfinfo >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils; fi
+          for file in .agenda-pdf-fixtures/*.pdf; do
+            pdfinfo "$file" | grep -E 'Pages:|Page size:'
+            pdftotext -layout "$file" "$file.txt"
+            grep -q 'PETRU & INÉS' "$file.txt"
+            grep -q 'Pagina 1 /' "$file.txt"
+            grep -q 'SITUAȚIA PROGRAMĂRILOR' "$file.txt"
+          done
+          grep -q 'CONTINUARE A ACELEIAȘI PROGRAMĂRI' .agenda-pdf-fixtures/note-lungi.pdf.txt
+          mkdir -p .agenda-pdf-fixtures/preview
+          pdftoppm -f 1 -l 1 -scale-to 1100 -png -singlefile .agenda-pdf-fixtures/luna-completa.pdf .agenda-pdf-fixtures/preview/luna-pagina-1
+          pdftoppm -f 1 -l 1 -scale-to 1100 -png -singlefile .agenda-pdf-fixtures/note-lungi.pdf .agenda-pdf-fixtures/preview/note-pagina-1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agenda-pdf-demo-no-real-clients
+          path: .agenda-pdf-fixtures/
+          include-hidden-files: true
+          retention-days: 7
