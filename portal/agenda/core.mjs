@@ -19,11 +19,14 @@ export function recurringRows(block,from,to){
  const results=[];let cursor=repeats==='none'?anchor:anchor;
  // Day arithmetic at 12:00 UTC avoids shifting local dates at DST transitions.
  for(let iterations=0;iterations<3700 && cursor<=limit;iterations++,cursor=addDays(cursor,1)){
-  if(cursor<anchor||cursor<from)continue;
+  if(cursor<anchor||(repeats!=='none'&&cursor<from))continue;
   const delta=Math.round((Date.parse(cursor+'T12:00Z')-Date.parse(anchor+'T12:00Z'))/86400000);
   const valid=repeats==='none'?delta===0:repeats==='daily'?true:repeats==='weekly'?delta%7===0:repeats==='monthly'?cursor.slice(8)===anchor.slice(8):false;
   if(!valid)continue;
-  results.push({id:'block:'+block.id+':'+cursor,source:'block',name:block.title||'Indisponibil',start:cursor+'T'+startMinute,end:cursor+'T'+endMinute,allDay:!!block.all_day,kind:'blocked',status:'blocked',blockId:block.id,version:block.version,repeat:repeats});
+  const exceptions=block.exceptions||{};
+  if(Object.prototype.hasOwnProperty.call(exceptions,cursor)&&exceptions[cursor]===null)continue;
+  const override=exceptions[cursor];
+  results.push({id:'block:'+block.id+':'+cursor,source:'block',name:override?.title||block.title||'Indisponibil',start:override?.start||(repeats==='none'?block.start:cursor+'T'+startMinute),end:override?.end||(repeats==='none'?block.end:cursor+'T'+endMinute),allDay:override?.all_day??!!block.all_day,kind:'blocked',status:'blocked',blockId:block.id,version:block.version,repeat:repeats,occurrence:cursor});
  }
  return results;
 }
