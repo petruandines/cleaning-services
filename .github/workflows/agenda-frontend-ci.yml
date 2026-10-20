@@ -31,7 +31,18 @@ jobs:
           node --check portal/agenda/agenda.mjs
           node --check portal/projects/admin.mjs
           node --input-type=module --check < portal/app.js
-      - name: All existing and new frontend tests
+      - name: Read exact reviewed backend into separate isolated test directory
+        uses: actions/checkout@v4
+        with:
+          ref: b33bd64938b766187a5d9ddcd3ab8c80f244822f
+          path: .agenda-backend-source
+          persist-credentials: false
+      - name: Install isolated backend test dependencies
+        working-directory: .agenda-backend-source/portal-v2-backend
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: All existing and new frontend tests including real admin/client backend lifecycle
+        env:
+          ONE_TIME_BACKEND_ROOT: ${{ github.workspace }}/.agenda-backend-source/portal-v2-backend
         run: npm run test:portal
       - name: Assemble production static files without deploying
         run: |
