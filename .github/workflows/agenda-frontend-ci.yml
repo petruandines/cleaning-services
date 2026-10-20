@@ -30,7 +30,7 @@ jobs:
           node --check portal/agenda/core.mjs
           node --check portal/agenda/agenda.mjs
           node --check portal/projects/admin.mjs
-          node --check portal/app.js
+          node --input-type=module --check < portal/app.js
       - name: All existing and new frontend tests
         run: npm run test:portal
       - name: Assemble production static files without deploying
