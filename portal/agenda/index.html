@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' https://api.petruandines.com; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta name="theme-color" content="#16842a"><title>Agenda administrativă · Petru &amp; Inés</title>
+<link rel="icon" href="../../assets/img/favicon-32.png"><link rel="stylesheet" href="../portal.css"><link rel="stylesheet" href="./agenda.css">
+<script src="../config.js" defer></script><script type="module" src="./agenda.mjs"></script></head>
+<body><header class="site-header"><a class="brand" href="../"><img src="../../assets/img/brandmark.webp" width="44" height="44" alt=""><span>PETRU &amp; INÉS<small>ADMIN · AGENDĂ PRIVATĂ</small></span></a><a href="../">Înapoi în portal</a></header>
+<main class="agenda-main"><h1>Agenda Petru &amp; Inés</h1><p>Intervenții punctuale, programări recurente și perioade indisponibile – acces exclusiv administrator.</p>
+<p id="notice" class="agenda-notice" role="status" aria-live="polite">Se verifică autentificarea…</p>
+<section id="app" hidden>
+<div class="agenda-tools"><div class="agenda-modes"><button type="button" data-view="month">Lună</button><button type="button" data-view="week">Săptămână</button><button type="button" data-view="day">Zi</button><button type="button" data-view="list">Listă</button></div>
+<div class="agenda-navigation"><button id="prev" type="button" class="secondary" aria-label="Perioada anterioară">←</button><button id="today" type="button" class="secondary">Azi</button><button id="next" type="button" class="secondary" aria-label="Perioada următoare">→</button><strong id="period"></strong></div>
+<div class="agenda-actions"><button id="refresh" type="button" class="secondary">Actualizează</button><button id="block-open" type="button" class="primary">+ Blochează interval</button><button id="export-open" type="button" class="secondary">Export .ics</button><button id="backup-blocks" type="button" class="secondary">Backup blocaje JSON</button></div></div>
+<div class="agenda-legend"><span><i class="dot one"></i>Intervenții punctuale</span><span><i class="dot recurring"></i>Programări recurente</span><span><i class="dot blocked"></i>Intervale blocate</span></div>
+<section id="calendar" aria-label="Calendar intervenții"></section><p id="calendar-note">Intervențiile punctuale fără oră de final estimată sunt afișate cu o durată orientativă de 3 ore. Verifică durata reală înainte de a programa alte lucrări.</p></section>
+<section id="details" class="agenda-panel" hidden><div class="agenda-panel-head"><h2 id="details-title"></h2><button type="button" id="details-close" class="secondary">Închide</button></div><div id="details-body"></div><div id="details-actions" class="agenda-button-row"></div></section>
+<section id="block-form-panel" class="agenda-panel" hidden><div class="agenda-panel-head"><h2 id="block-title">Blochează interval</h2><button id="block-close" type="button" class="secondary">Închide</button></div>
+<form id="block-form"><div class="agenda-form-grid"><label>Motiv (vizibil numai adminului)<input name="title" maxlength="100" placeholder="Indisponibil / concediu / personal" required></label>
+<label>Repetare<select name="repeat"><option value="none">Nu se repetă</option><option value="daily">Zilnic</option><option value="weekly">Săptămânal</option><option value="monthly">Lunar</option></select></label>
+<label>De la data și ora<input type="datetime-local" name="start" required></label><label>Până la data și ora<input type="datetime-local" name="end" required></label>
+<label class="agenda-inline"><input type="checkbox" name="all_day"> Zi întreagă (data de sfârșit inclusiv)</label>
+<label>Repetă până la data (opțional)<input type="date" name="repeat_until"></label></div>
+<p class="agenda-help">Orele sunt interpretate în fusul Europe/Bucharest. Blocajele nu schimbă nicio programare existentă. Suprapunerile sunt semnalate, nu anulate.</p>
+<div class="agenda-button-row"><button type="submit" class="primary" id="block-save">Salvează blocajul</button><button type="button" class="secondary" id="block-cancel">Anulează</button></div></form></section>
+<section id="export-panel" class="agenda-panel" hidden><div class="agenda-panel-head"><h2>Export calendar (.ics)</h2><button id="export-close" type="button" class="secondary">Închide</button></div>
+<form id="export-form"><div class="agenda-form-grid"><label>De la<input name="from" type="date" required></label><label>Până la<input name="to" type="date" required></label><label>Ce exportăm?<select name="scope"><option value="all">Programări și blocaje</option><option value="appointments">Doar intervenții</option><option value="blocks">Doar blocaje</option></select></label>
+<label class="agenda-inline"><input name="private" type="checkbox"> Include numele, adresele și notele clienților</label></div>
+<p class="agenda-help">Fișierul este creat local. Nu conține tokenuri, parole sau linkuri private; importul nu sincronizează automat modificările ulterioare.</p>
+<button type="submit" class="primary">Descarcă .ics</button></form></section>
+<noscript>Pentru a folosi agenda activează JavaScript.</noscript></main><footer>Petru &amp; Inés · Agendă privată administrativă</footer></body></html>

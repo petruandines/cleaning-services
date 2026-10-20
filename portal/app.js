@@ -832,6 +832,13 @@ import { visibleContractDetails } from './contract-view.mjs';
         $('tabs').append(projectsLink);
       }).catch(() => {});
     }
+    if (user.role === 'staff') {
+      const agendaLink = document.createElement('a');
+      agendaLink.href = './agenda/';
+      agendaLink.className = 'menu-jump';
+      agendaLink.textContent = 'Agenda privată ↗';
+      $('tabs').append(agendaLink);
+    }
     selectSection('appointments');
     refreshClientContractTab().catch(error => notice(error.message));
     refreshOverview().catch(() => {});
