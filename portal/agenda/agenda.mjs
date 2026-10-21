@@ -97,7 +97,7 @@ function render(){
   }root.append(list);
  }
  const bad=conflicts(state.events);
- $('calendar-note').textContent=(bad.length?('Atenție: '+bad.length+' suprapunere/suprapuneri între programări și blocaje. '):'')+'Intervențiile punctuale sunt afișate orientativ cu o durată de 3 ore (ora finalizării nu există în înregistrarea actuală).';
+ $('calendar-note').textContent=(bad.length?('Atenție: '+bad.length+' suprapunere/suprapuneri între programări și blocaje. '):'')+'Intervențiile punctuale fără oră de finalizare sunt afișate cu o durată orientativă de 30 de minute. Verifică durata reală înainte de a programa alte lucrări.';
 }
 function eventButton(e,small=false){
  const b=el('button',undefined,'agenda-event '+(e.kind==='blocked'?'blocked':e.kind==='one-time'?'one':'recurring'));b.type='button';
