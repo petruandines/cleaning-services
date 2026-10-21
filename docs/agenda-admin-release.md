@@ -4,7 +4,7 @@
 - Frontend nou: /portal/agenda/ (HTML/CSS/ESM), din sesiunea admin existentă.
 - Secțiunea clienților, autentificarea, parola, TOTP, conturile și rutele /portal/project/ și /portal/projects/ nu se rescriu.
 - Agenda citește listele administrative /api/appointments și /api/one-time/admin, cu paginare.
-- Intervențiile punctuale nu au ora de finalizare estimată; se afișează trei ore ORIENTATIVE și un avertisment.
+- Intervențiile punctuale fără oră de finalizare se afișează cu 30 de minute ORIENTATIVE și un avertisment; durata reală nu se rescrie.
 - Lista intervențiilor punctuale are sortare SQL globală înainte de paginare și filtrare pe status.
 - Agenda nu creează, nu anulează și nu mută intervențiile clientului.
 

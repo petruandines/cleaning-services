@@ -42,7 +42,7 @@ export function eventsForRange(appointments,projects,blocks,from,to,clients=[],l
  for(const p of projects){
   if(!p?.scheduled_at||!Number.isFinite(Date.parse(p.scheduled_at)))continue;
   const start=localStamp(p.scheduled_at);
-  const estimatedEnd=localStamp(new Date(Date.parse(p.scheduled_at)+3*3600000).toISOString());
+  const estimatedEnd=localStamp(new Date(Date.parse(p.scheduled_at)+30*60000).toISOString());
   events.push({id:'project:'+p.id,source:'project',sourceId:p.id,name:p.client_name||p.name||'Intervenție punctuală',kind:'one-time',status:p.status||'scheduled',start,end:estimatedEnd,allDay:false,phone:p.phone||'',address:p.location||'',notes:p.description||'',service:p.name||'Intervenție punctuală',approx:true});
  }
  for(const b of blocks)events.push(...recurringRows(b,from,to));

@@ -29,6 +29,25 @@ test('appointment conflicts and contact navigation fields are kept only in admin
  const expanded=createAgendaICS(all,{includePrivate:true,now:new Date('2026-10-19T00:00:00Z')});
  assert.match(expanded,/Client Privat/);
 });
+
+test('one-time projects display 30 minutes by default, including overlap and ICS, without changing source',()=>{
+ const projects=[{id:'p1',name:'Curățenie',scheduled_at:'2026-10-21T07:00:00Z',status:'scheduled'}];
+ const blocks=[
+  {id:'inside',title:'Blocaj 1',start:'2026-10-21T10:20',end:'2026-10-21T10:25',repeat:'none'},
+  {id:'outside',title:'Blocaj 2',start:'2026-10-21T10:30',end:'2026-10-21T11:00',repeat:'none'}
+ ];
+ const events=eventsForRange([],projects,blocks,'2026-10-21','2026-10-21');
+ const one=events.find(e=>e.kind==='one-time');
+ assert.equal(one.start,'2026-10-21T10:00');
+ assert.equal(one.end,'2026-10-21T10:30');
+ assert.equal(one.approx,true);
+ assert.equal(conflicts(events).length,1,'only the block inside the estimated 30-minute interval overlaps');
+ assert.equal(projects[0].scheduled_at,'2026-10-21T07:00:00Z','persisted project fields are not changed');
+ const ics=createAgendaICS([one],{now:new Date('2026-10-21T00:00:00Z')});
+ assert.match(ics,/DTSTART:20261021T070000Z/);
+ assert.match(ics,/DTEND:20261021T073000Z/);
+});
+
 test('date arithmetic does not jump days at Romanian DST boundaries',()=>{
  assert.equal(addDays('2026-10-24',1),'2026-10-25');
  assert.equal(addDays('2026-10-25',1),'2026-10-26');
