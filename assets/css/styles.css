@@ -369,3 +369,19 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
   .home-offer-countdown .offer-countdown-values{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
   .home-offer-countdown .offer-countdown-values>span{min-width:0;padding:7px 4px}
 }
+
+
+/* Before/after photos — real cleaning jobs, no cropping of original labels */
+.before-after-section .section-head{margin-bottom:24px}
+.before-after-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}
+.before-after-card{min-width:0;margin:0;border:1px solid var(--line,#e1e8e4);border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 5px 22px rgba(10,36,27,.045)}
+.before-after-photo{display:flex;align-items:center;justify-content:center;background:#edf0ef;overflow:hidden;height:min(46vw,530px);text-decoration:none}
+.before-after-photo img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}
+.before-after-photo:focus-visible{outline:3px solid #247a45;outline-offset:-3px}
+.before-after-card figcaption{padding:17px 18px 20px}
+.before-after-card figcaption h3{font-size:1.06rem;line-height:1.35;margin:0 0 7px}
+.before-after-card figcaption p{font-size:.93rem;line-height:1.55;color:var(--muted,#5d6d66);margin:0}
+.before-after-card--wide{grid-column:span 2}
+.before-after-card--wide .before-after-photo img{max-width:100%}
+@media(max-width:900px){.before-after-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.before-after-photo{height:min(62vw,510px)}}
+@media(max-width:600px){.before-after-grid{grid-template-columns:1fr;gap:16px}.before-after-card--wide{grid-column:auto}.before-after-photo{height:auto;max-height:none;display:block}.before-after-photo img{width:100%;height:auto;max-height:none}.before-after-card figcaption{padding:16px}.before-after-card figcaption h3{font-size:1rem}}
