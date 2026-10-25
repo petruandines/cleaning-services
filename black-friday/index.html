@@ -334,25 +334,41 @@ updateRefer();
 
 // Standalone dependency-free PDF export. Each page is drawn at 150 dpi to preserve
 // Romanian diacritics and page layouts; then embedded as high-quality JPEG in PDF 1.4.
-function makePdf(key){try{let s=state[key],c=getCalc(key),pages=[];const W=1240,H=1754,margin=105,right=W-105,bottom=H-98;let canvas,ctx,y,pageN=0;const colors={green:'#187445',dark:'#23362a',muted:'#5d7163',line:'#d8e4da',gold:'#e6b943'};
-function beginPage(){if(canvas)pages.push(canvas.toDataURL('image/jpeg',.91).split(',')[1]);canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle=key==='black'?'#15191b':'#154b31';ctx.fillRect(0,0,W,34);ctx.fillStyle=colors.dark;ctx.font='900 41px Arial, sans-serif';ctx.fillText('Petru & Inés',margin,115);ctx.font='19px Arial, sans-serif';ctx.fillStyle=colors.muted;ctx.fillText('Curățenie profesională · București & Ilfov',margin,148);ctx.fillStyle=colors.line;ctx.fillRect(margin,168,right-margin,2);y=190;pageN++;}
-function ensure(n){if(y+n>bottom)beginPage()}
-function title(t){ensure(85);ctx.fillStyle=colors.dark;ctx.font='bold 42px Arial, sans-serif';ctx.fillText(t,margin,y);y+=65}
-function sub(t){ensure(60);ctx.fillStyle=colors.green;ctx.font='bold 27px Arial, sans-serif';ctx.fillText(t,margin,y);y+=38}
-function p(text,fontSize=22,color=colors.dark,indent=0){ctx.font=`${fontSize}px Arial, sans-serif`;let max=right-margin-indent;let words=String(text).split(/\s+/),line='';function draw(t){ensure(31);ctx.fillStyle=color;ctx.fillText(t,margin+indent,y);y+=30}for(const word of words){let test=line?line+' '+word:word;if(ctx.measureText(test).width>max&&line){draw(line);line=word}else line=test}if(line)draw(line);y+=3}
-function bullet(t){ensure(33);ctx.fillStyle=colors.green;ctx.font='bold 25px Arial';ctx.fillText('•',margin+8,y);p(t,20,colors.dark,38)}
-function pair(left,value,strong=false){ensure(39);let x=margin;ctx.font=`${strong?'bold ':''}22px Arial`;ctx.fillStyle=strong?colors.dark:colors.muted;ctx.fillText(left,x,y);ctx.textAlign='right';ctx.font=`${strong?'bold ':''}23px Arial`;ctx.fillStyle=colors.dark;ctx.fillText(value,right,y);ctx.textAlign='left';y+=38}
-function footer(){pages.push(canvas.toDataURL('image/jpeg',.91).split(',')[1]);pages.forEach((src,i)=>{/* watermark already below */})}
-beginPage();ctx.fillStyle=key==='black'?'#ab4e12':colors.green;ctx.font='900 22px Arial';ctx.fillText('ESTIMARE INFORMATIVĂ • '+(key==='black'?'BLACK CLEAN WEEK':'OFERTA LUNII'),margin,y);y+=46;ctx.fillStyle=colors.dark;ctx.font='bold 52px Arial';ctx.fillText(OFFERS[key].name,margin,y);y+=50;p(OFFERS[key].date,22,colors.muted);y+=13;sub('Serviciul ales');pair('Curățenie generală Deep Clean',s.rooms+' camere');pair('Suprafață declarată',fmt(c.area)+' m²');pair('Suprafață inclusă',fmt(c.cap)+' m²');if(s.zone)pair('Zona',s.zone.slice(0,55));if(key==='black'){bullet('Canapea textilă standard, maximum 3 locuri, eligibilă după verificarea fotografiilor.');if(!eligible('black'))bullet('ATENȚIE: canapea neeligibilă automat! Este necesară ofertare separată.')}else bullet('Bonus ales: '+BONUS[s.bonus].name+'. '+BONUS[s.bonus].details);
-y+=12;sub('Calcul transparent');pair('Preț de bază (până la '+c.cap+' m²)',fmt(c.base)+' lei');pair('Supliment: '+fmt(c.extra)+' m² × '+new Intl.NumberFormat('ro-RO',{minimumFractionDigits:3,maximumFractionDigits:4}).format(c.base/c.cap)+' lei/m²',fmt(c.subtotal)+' lei');pair('Majorare 10% exclusiv pentru surplus',fmt(c.increase)+' lei');ensure(82);ctx.fillStyle='#e7f4ea';ctx.fillRect(margin,y-20,right-margin,75);ctx.font='bold 30px Arial';ctx.fillStyle=colors.green;ctx.fillText('TOTAL ESTIMAT',margin+19,y+27);ctx.textAlign='right';ctx.font='bold 39px Arial';ctx.fillText(fmt(c.total)+' lei',right-19,y+29);ctx.textAlign='left';y+=84;
-sub('Ce este inclus');INCLUDED.forEach(bullet);if(key==='black')bullet('Curățare canapea textilă standard eligibilă, în limitele menționate în ofertă.');else bullet('Un bonus la alegere în limitele tehnice și de suprafață declarate.');
-sub('Ce nu este inclus');EXCLUDED.forEach(bullet);if(key==='black')EXTRA_BLACK.forEach(bullet);else bullet('Canapea, saltea, al doilea bonus și lucrări în afara limitelor bonusului ales.');
-sub('Condiții și informații importante');p('Program obișnuit: luni–vineri 05:00–20:00. Lucrăm personal: Petru și Inés. Deplasarea în București și Ilfov este gratuită. Venim cu echipamentele și produsele necesare.',20);p('Plată exclusiv prin transfer bancar. Se emite factură. În funcție de lucrare poți primi acces personalizat la portalul de clienți.',20);p('Prețul de mai sus este o ESTIMARE CU CARACTER INFORMATIV; nu este ofertă contractuală fermă și nu confirmă programarea. Detaliile, accesul, starea locuinței și eligibilitatea serviciilor se verifică înainte de confirmare.',20);p('Măcriș Petru Ionatan – PFA | CUI 52403391 | 0772 053 562 | petruandines.com',20,colors.muted);
-const basenames=pages.length; // finalized after drawing each page
-if(canvas)pages.push(canvas.toDataURL('image/jpeg',.91).split(',')[1]);
-const pdf=buildPdf(pages);const blob=new Blob([pdf],{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Petru-si-Ines_'+(key==='black'?'Black-Clean-Week':'Oferta-Noiembrie')+'_'+s.rooms+'-camere.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);toast('Oferta PDF a fost generată.');}catch(err){console.error(err);toast('Nu s-a putut genera PDF-ul. Încearcă din nou.')}}
-function buildPdf(base64s){const encoder=new TextEncoder(),parts=[],offsets=[0];let length=0;function add(v){let b=typeof v==='string'?encoder.encode(v):v;parts.push(b);length+=b.length}function obj(num,inner){offsets[num]=length;add(`${num} 0 obj\n`);if(typeof inner==='string')add(inner);else inner();add('\nendobj\n')}function bytes64(src){let bin=atob(src),out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
-const ids=base64s.map((_,i)=>({page:3+i*3,content:4+i*3,image:5+i*3}));add('%PDF-1.4\n');obj(1,'<< /Type /Catalog /Pages 2 0 R >>');obj(2,`<< /Type /Pages /Count ${ids.length} /Kids [${ids.map(i=>i.page+' 0 R').join(' ')}] >>`);ids.forEach((ids,i)=>{obj(ids.page,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 ${ids.image} 0 R >> >> /Contents ${ids.content} 0 R >>`);const c='q\n595.28 0 0 841.89 0 0 cm\n/Im0 Do\nQ\n';obj(ids.content,()=>{add(`<< /Length ${encoder.encode(c).length} >>\nstream\n`);add(c);add('endstream')});const img=bytes64(base64s[i]);obj(ids.image,()=>{add(`<< /Type /XObject /Subtype /Image /Width 1240 /Height 1754 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.length} >>\nstream\n`);add(img);add('\nendstream')})});const start=length;add('xref\n0 '+(3+ids.length*3)+'\n0000000000 65535 f \n');for(let i=1;i<3+ids.length*3;i++)add(String(offsets[i]).padStart(10,'0')+' 00000 n \n');add('trailer\n<< /Size '+(3+ids.length*3)+' /Root 1 0 R >>\nstartxref\n'+start+'\n%%EOF');const output=new Uint8Array(length);let cursor=0;parts.forEach(p=>{output.set(p,cursor);cursor+=p.length});return output}
+
+/* Detailed, text-native PDF estimate, using the same selectable-text PDF engine
+   as the public shareable offer. No canvas screenshots or full-page JPEGs. */
+async function makePdf(key){
+  if(key!=='black'||promoStatus()==='expired'){toast('Oferta Black Friday nu mai este disponibilă.');return}
+  try{
+    const pdfMake=await getTextPdfMake();
+    const logo=await pdfBrandImage();
+    const c=getCalc('black'),s=state.black,doc=blackShareDoc(logo);
+    const fmtMoney=n=>new Intl.NumberFormat('ro-RO',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+' lei';
+    const rows=[
+      [{text:'ELEMENT',bold:true,color:'#20372B'},{text:'VALOARE',bold:true,color:'#20372B'}],
+      ['Pachet Deep Clean '+s.rooms+' camere (până la '+c.cap+' m²)',fmtMoney(c.base)],
+      ['Suprafață declarată',new Intl.NumberFormat('ro-RO').format(c.area)+' m²'],
+      ['Suprafață suplimentară',new Intl.NumberFormat('ro-RO').format(c.extra)+' m²'],
+      ['Tarif proporțional pentru suprafața suplimentară',fmtMoney(c.subtotal)],
+      ['Majorare 10% numai pentru suprafața suplimentară',fmtMoney(c.increase)],
+      [{text:'TOTAL ESTIMAT',bold:true,color:'#16251B'},{text:fmtMoney(c.total),bold:true,color:'#16251B'}]
+    ];
+    const custom=[
+      {text:'Estimarea personalizată a solicitării',fontSize:16,bold:true,color:'#187445',margin:[0,0,0,11]},
+      {text:'Zonă / localitate: '+(s.zone||'urmează să fie confirmată'),fontSize:10,margin:[0,0,0,7]},
+      {table:{widths:['*','auto'],body:rows},fontSize:9,layout:{
+        fillColor:(i)=>i===0?'#F7E7AB':i===rows.length-1?'#EAF4EC':null,
+        hLineColor:()=> '#E0E9E0',vLineColor:()=> '#E0E9E0',
+        paddingTop:()=>7,paddingBottom:()=>7,paddingLeft:()=>9,paddingRight:()=>9
+      },margin:[0,0,0,9]},
+      {text:eligible('black')?'Canapea textilă eligibilă numai după verificarea fotografiilor.':'ATENȚIE: canapeaua selectată nu este eligibilă automat; este necesară evaluare și preț individual.',fontSize:9,color:eligible('black')?'#187445':'#B54F38',bold:true,margin:[0,0,0,12]}
+    ];
+    doc.content.splice(2,0,...custom);
+    doc.info.title='Estimare personalizată Black Clean Week – Petru & Inés';
+    pdfMake.createPdf(doc).download('Petru-si-Ines_Black-Clean-Week_Estimare_'+s.rooms+'-camere.pdf');
+    toast('PDF cu text selectabil și linkuri pregătit pentru descărcare.');
+  }catch(e){toast('PDF-ul nu a putut fi generat. Verifică conexiunea sau solicită oferta pe WhatsApp.')}
+}
 })();
 </script>
 </body></html>
