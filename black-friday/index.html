@@ -152,6 +152,7 @@ function referLine(c,t,x,y,max,font,line,colour){c.font=font+'px Arial';c.fillSt
 async function referPdf(){if(referClosed())return;const btn=$('refer-pdf');btn.disabled=true;const previous=btn.textContent;btn.textContent='Pregătim PDF-ul…';try{
 const cn=document.createElement('canvas');cn.width=1240;cn.height=1754;const c=cn.getContext('2d');
 c.fillStyle='#fffefa';c.fillRect(0,0,1240,1754);c.fillStyle='#15191c';c.fillRect(0,0,1240,477);
+try{const brand=new Image();brand.src='/assets/img/brandmark.webp';await brand.decode();if(brand.naturalWidth){c.fillStyle='#fff';c.fillRect(1066,54,112,112);c.drawImage(brand,1074,62,96,96)}}catch(e){/* Wordmark remains if the logo cannot load. */}
 c.fillStyle='#ffe171';c.font='bold 29px Arial';c.fillText('PETRU & INÉS · BLACK CLEAN WEEK',80,109);
 c.fillStyle='#fff';c.font='bold 72px Arial';c.fillText('Vrei casa albă',80,239);c.fillStyle='#ffe171';c.fillText('de Black Friday?',80,322);
 c.fillStyle='#fff';c.font='bold 27px Arial';c.fillText('REZERVĂRI DESCHISE · INTERVENȚII 5–9 NOIEMBRIE 2026',80,412);
