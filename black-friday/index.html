@@ -99,7 +99,7 @@
 </div>
 <button class="refer-link" type="button" id="refer-copy">Copiază linkul ofertei</button>
 <a href="/oferte/" class="refer-expired">Oferta Black Friday s-a încheiat. Vezi ofertele actuale →</a>
-<p class="refer-pdf-note">PDF de prezentare, o singură pagină A4, fără date personale. Informațiile și prețurile sunt orientative și se confirmă înainte de programare.</p>
+<p class="refer-pdf-note">PDF detaliat pe mai multe pagini, cu text selectabil, hyperlinkuri și condiții complete. Document cu caracter informativ, fără date personale.</p>
 <div class="refer-feedback" role="status" aria-live="polite" id="refer-result"></div>
 </div></div></div></section>
 
@@ -149,26 +149,183 @@ function updateRefer(){const closed=referClosed();$('trimite-oferta').classList.
 async function referCopy(){if(referClosed())return;try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(REFER_URL);else{const t=document.createElement('textarea');t.value=REFER_URL;t.style.position='fixed';t.style.left='-9999px';document.body.appendChild(t);t.select();if(!document.execCommand('copy'))throw Error('copy');t.remove()}referStatus('✓ Linkul a fost copiat.')}catch(e){referStatus('Copiază linkul: '+REFER_URL)}}
 async function referShare(){if(referClosed())return;try{if(navigator.share)await navigator.share({title:'Black Clean Week – Petru & Inés',text:REFER_TEXT,url:REFER_URL});else await referCopy()}catch(e){if(e.name!=='AbortError')await referCopy()}}
 function referLine(c,t,x,y,max,font,line,colour){c.font=font+'px Arial';c.fillStyle=colour;let start='',a=t.split(' ');for(const word of a){const v=start?start+' '+word:word;if(start&&c.measureText(v).width>max){c.fillText(start,x,y);y+=line;start=word}else start=v}if(start){c.fillText(start,x,y);y+=line}return y}
-async function referPdf(){if(referClosed())return;const btn=$('refer-pdf');btn.disabled=true;const previous=btn.textContent;btn.textContent='Pregătim PDF-ul…';try{
-const cn=document.createElement('canvas');cn.width=1240;cn.height=1754;const c=cn.getContext('2d');
-c.fillStyle='#fffefa';c.fillRect(0,0,1240,1754);c.fillStyle='#15191c';c.fillRect(0,0,1240,477);
-try{const brand=new Image();brand.src='/assets/img/brandmark.webp';await brand.decode();if(brand.naturalWidth){c.fillStyle='#fff';c.fillRect(1066,54,112,112);c.drawImage(brand,1074,62,96,96)}}catch(e){/* Wordmark remains if the logo cannot load. */}
-c.fillStyle='#ffe171';c.font='bold 29px Arial';c.fillText('PETRU & INÉS · BLACK CLEAN WEEK',80,109);
-c.fillStyle='#fff';c.font='bold 72px Arial';c.fillText('Vrei casa albă',80,239);c.fillStyle='#ffe171';c.fillText('de Black Friday?',80,322);
-c.fillStyle='#fff';c.font='bold 27px Arial';c.fillText('REZERVĂRI DESCHISE · INTERVENȚII 5–9 NOIEMBRIE 2026',80,412);
-c.fillStyle='#ffe171';c.fillRect(0,465,1240,13);
-for(const card of [{x:80,price:'599 lei',cap:'2 camere · maximum 60 m²'},{x:642,price:'749 lei',cap:'3 camere · maximum 80 m²'}]){
-c.fillStyle='#fcf4db';c.fillRect(card.x,528,519,235);c.strokeStyle='#e5d4a4';c.lineWidth=2;c.strokeRect(card.x,528,519,235);
-c.fillStyle='#233429';c.font='bold 27px Arial';c.fillText(card.cap,card.x+27,590);c.fillStyle='#15191c';c.font='bold 78px Arial';c.fillText(card.price,card.x+27,684);c.fillStyle='#526154';c.font='23px Arial';c.fillText('Deep Clean + canapea eligibilă',card.x+27,730);}
-let y=836;c.fillStyle='#172a20';c.font='bold 35px Arial';c.fillText('Ce primești',80,y);y+=57;
-for(const t of ['Curățenie generală Deep Clean, inclusiv bucătărie, baie, geamuri și pardoseli accesibile.','Curățarea unei canapele textile de cel mult 3 locuri, după verificarea fotografiilor.','Vin personal Petru și Inés. Produsele, echipamentele și deplasarea București–Ilfov sunt incluse.','Se emite factură; plata se face exclusiv prin transfer bancar.']){c.font='bold 27px Arial';c.fillStyle='#188149';c.fillText('✓',85,y);y=referLine(c,t,122,y,1020,24,35,'#1d2d23')+13}
-y+=21;c.fillStyle='#172a20';c.font='bold 35px Arial';c.fillText('Limite importante',80,y);y+=56;
-for(const t of ['Nu include piele/ecopiele, materiale mixte, murdărie severă sau piese suplimentare.','Nu include lucrări după constructor, vopsea, mucegai sau alte intervenții speciale.','Metri pătrați peste suprafața standard: tarif proporțional și +10% doar pe suprafața suplimentară.']){c.fillStyle='#b84d3d';c.font='bold 26px Arial';c.fillText('–',87,y);y=referLine(c,t,122,y,1010,22,32,'#28362c')+9}
-c.fillStyle='#ffe171';c.fillRect(0,1490,1240,119);c.fillStyle='#15191c';c.font='bold 29px Arial';c.fillText('Oferta completă și condițiile:',80,1540);c.font='bold 33px Arial';c.fillText('petruandines.com/black-friday/',80,1581);
-c.fillStyle='#40564a';c.font='bold 22px Arial';c.fillText('Telefon / WhatsApp: 0772 053 562 · Petru & Inés · CUI 52403391',80,1660);
-referLine(c,'Document informativ, nu rezervare confirmată. Eligibilitatea, prețul și programarea se stabilesc după verificare.',80,1701,1080,20,25,'#40564a');
-const pdf=buildPdf([cn.toDataURL('image/jpeg',.76).split(',')[1]]);const blob=new Blob([pdf],{type:'application/pdf'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='Petru-si-Ines-Black-Clean-Week-2026.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),15000);referStatus('✓ PDF-ul de prezentare este pregătit pentru descărcare.');
-}catch(e){referStatus('PDF-ul nu a putut fi generat pe acest dispozitiv. Poți distribui linkul.')}finally{btn.disabled=false;btn.textContent=previous}}
+
+/* Text-native PDF (selectable Romanian text and clickable links).
+   Uses pdfmake 0.2.20 with embedded Roboto, loaded only when requested.
+   PDF content is independent of visitor inputs. */
+let pdfMakeReadyPromise;
+function loadPdfScript(url){
+  return new Promise((resolve,reject)=>{
+    const el=document.createElement('script');
+    el.async=true;el.src=url;
+    el.onload=()=>resolve();
+    el.onerror=()=>{el.remove();reject(new Error('Nu s-a încărcat biblioteca PDF'))};
+    document.head.appendChild(el);
+  });
+}
+async function loadPdfAsset(name){
+  let lastError;
+  for(const host of ['https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/','https://unpkg.com/pdfmake@0.2.20/build/']){
+    try{await loadPdfScript(host+name);return}catch(e){lastError=e}
+  }
+  throw lastError||new Error('Biblioteca PDF nu este disponibilă.');
+}
+async function getTextPdfMake(){
+  if(window.pdfMake&&window.pdfMake.createPdf&&window.pdfMake.vfs)return window.pdfMake;
+  if(!pdfMakeReadyPromise)pdfMakeReadyPromise=(async()=>{
+    if(!window.pdfMake||!window.pdfMake.createPdf)await loadPdfAsset('pdfmake.min.js');
+    if(!window.pdfMake.vfs)await loadPdfAsset('vfs_fonts.js');
+    if(!window.pdfMake.vfs)throw new Error('Fonturile PDF nu sunt disponibile');
+    return window.pdfMake;
+  })().catch(e=>{pdfMakeReadyPromise=null;throw e});
+  return pdfMakeReadyPromise;
+}
+async function pdfBrandImage(){
+  try {
+    const img=new Image();
+    img.src='/assets/img/brandmark.webp';
+    await img.decode();
+    const c=document.createElement('canvas');c.width=148;c.height=148;
+    const g=c.getContext('2d');if(!g) return null;
+    const ratio=Math.min(136/img.naturalWidth,136/img.naturalHeight);
+    const w=img.naturalWidth*ratio,h=img.naturalHeight*ratio;
+    g.drawImage(img,(148-w)/2,(148-h)/2,w,h);
+    return c.toDataURL('image/png');
+  }catch(e){return null}
+}
+function blackShareDoc(logo){
+  const GREEN='#187445',DARK='#161B1B',GOLD='#EFCB5A',GREY='#5E6D64',PAPER='#F7F8F5',WHITE='#FFFFFF';
+  const list=(items,color=GREY)=>({ul:items.map(item=>({text:item,margin:[0,0,0,6]})),color:color,margin:[2,7,0,13]});
+  const link=(label,url)=>({text:label,link:url,color:GREEN,decoration:'underline'});
+  const heading=(text,n)=>({text:(n?n+'  /  ':'')+text,style:'sectionTitle',margin:[0,0,0,14]});
+  const priceCard=(rooms,cap,price)=>({fillColor:'#FFF5D6',margin:[0,0,0,0],stack:[
+    {text:rooms+' CAMERE',fontSize:11,bold:true,color:'#394135',margin:[0,0,0,6]},
+    {text:price+' lei',fontSize:32,bold:true,color:DARK,margin:[0,0,0,6]},
+    {text:'Până la '+cap+' m²',fontSize:10,color:GREY,margin:[0,0,0,7]},
+    {text:'Deep Clean + canapea textilă eligibilă',fontSize:9,bold:true,color:'#404E42'}]});
+  const leadSlogan=[
+    {text:'Vrei casa albă\n',fontSize:27,bold:true,color:WHITE},
+    {text:'de Black Friday?',fontSize:27,bold:true,color:GOLD}
+  ];
+  const heroHeader={table:{widths:['*'],body:[[{stack:[
+    {text:'BLACK CLEAN WEEK · PETRU & INÉS',style:'goldKicker',margin:[0,0,0,12]},
+    {text:leadSlogan,margin:[0,0,0,12]},
+    {text:'Îți facem reducere ca să ai bani albi pentru zile negre.',fontSize:13,bold:true,color:WHITE,margin:[0,0,0,16]},
+    {text:'REZERVĂRI DESCHISE ACUM  ·  INTERVENȚII EXCLUSIV 5–9 NOIEMBRIE 2026',fontSize:9.5,bold:true,color:GOLD}
+  ],fillColor:DARK}]]},layout:{hLineWidth:()=>0,vLineWidth:()=>0,paddingLeft:()=>21,paddingRight:()=>19,paddingTop:()=>19,paddingBottom:()=>20},margin:[0,0,0,18]};
+  const brand={columns:[
+    ...(logo?[{image:logo,width:38,height:38,margin:[0,0,8,0]}]:[]),
+    {width:'*',stack:[{text:'PETRU & INÉS',bold:true,fontSize:15,color:DARK,characterSpacing:.7},
+      {text:'SERVICII DE CURĂȚENIE · BUCUREȘTI & ILFOV',fontSize:8.5,color:GREY,margin:[0,4,0,0]}]},
+    {width:'auto',text:'OFERTĂ INFORMATIVĂ',fontSize:8,bold:true,color:GREEN,alignment:'right',margin:[0,10,0,0]}
+  ],margin:[0,0,0,18]};
+  const content=[
+    brand,heroHeader,
+    {text:'Curățenie generală Deep Clean, cu un serviciu suplimentar inclus',style:'intro',margin:[0,0,0,14]},
+    {columns:[priceCard(2,60,599),priceCard(3,80,749)],columnGap:13,margin:[0,0,0,17]},
+    {text:'Canapea inclusă în pachet*',fontSize:12,bold:true,color:GREEN,margin:[0,0,0,6]},
+    {text:'O canapea textilă standard, de maximum trei locuri, numai după verificarea materialului, a dimensiunilor și a gradului de murdărie pe baza fotografiilor.',fontSize:10.3,margin:[0,0,0,14]},
+    {text:'Perioada este clară: poți cere rezervarea de acum, dar intervențiile acestei ediții se desfășoară numai între 5 și 9 noiembrie 2026, în limita locurilor disponibile și a zilelor de lucru confirmate.',fillColor:PAPER,margin:[0,0,0,14],fontSize:10.1,bold:true},
+    {text:'Petru și Inés vin personal, cu produsele și echipamentele necesare. Deplasarea în București și Ilfov este gratuită, se emite factură, iar plata se face exclusiv prin transfer bancar.',fontSize:10.3,margin:[0,0,0,13]},
+    {text:[{text:'Ofertă și calculator online: ',bold:true},link('petruandines.com/black-friday/','https://petruandines.com/black-friday/')],fontSize:10.2,margin:[0,3,0,9]},
+    {text:'* Canapelele din piele/ecopiele, materialele mixte, colțarele sau murdăria severă nu sunt incluse automat.',color:GREY,fontSize:8.8,italics:true},
+    {text:'Ce include curățenia generală',style:'pageHead',pageBreak:'before'},
+    {text:'Oferta se adresează locuințelor cu murdărie obișnuită sau moderată. Operațiunile sunt adaptate suprafețelor accesibile și condițiilor reale ale locuinței.',fontSize:10.5,margin:[0,0,0,16]},
+    heading('SERVICII INCLUSE','01'),
+    list([
+      'Curățenie generală în camere, hol, bucătărie și baie: îndepărtarea prafului, ștergerea suprafețelor accesibile, aspirarea și spălarea pardoselilor.',
+      'Curățarea și igienizarea uzuală a obiectelor sanitare, faianței și a zonelor accesibile din baie.',
+      'Degresarea obișnuită a suprafețelor accesibile din bucătărie.',
+      'Curățarea geamurilor accesibile, a ramelor și pervazurilor, precum și a exteriorului mobilierului și electrocasnicelor.',
+      'Curățarea unei canapele textile standard eligibile, maximum trei locuri, în limitele descrise în acest document.',
+      'Intervenție realizată de Petru și Inés, cu produsele și echipamentele proprii; deplasare gratuită în București și Ilfov.'
+    ]),
+    heading('CE NU ESTE INCLUS AUTOMAT','02'),
+    list([
+      'Curățenie după constructor; îndepărtare de vopsea, adezivi, mucegai; intervenții la înălțime și eliminarea garantată a petelor permanente.',
+      'Interiorul cuptorului sau frigiderului, interiorul dulapurilor pline, spălarea veselei și organizarea hainelor.',
+      'Mutarea mobilierului greu, lucrări de reparații și servicii care nu au fost convenite înaintea programării.',
+      'Tratamente speciale pentru murdărie severă, depuneri persistente ori suprafețe care necesită produse sau metode suplimentare.',
+      'Suprafața care depășește limita inclusă în pachet; aceasta se calculează separat conform formulei de mai jos.'
+    ]),
+    {text:'Canapeaua: eligibilitate și limitări',style:'pageHead',pageBreak:'before'},
+    heading('CANAPEA TEXTILĂ INCLUSĂ ÎN PACHET','03'),
+    {text:'Cadoul Black Friday nu este o curățare nelimitată. Înaintea confirmării solicităm fotografii din care să se vadă toate suprafețele tapițate, materialul și gradul de murdărie.',fontSize:10.5,margin:[0,0,0,12]},
+    list([
+      'Inclusă: o singură canapea standard, textilă, de maximum trei locuri, cu murdărie normală sau moderată și material compatibil cu metoda folosită.',
+      'Nu sunt incluse automat: pielea naturală sau ecologică, materialele mixte, colțarele, extensiile, tabureții, pernele decorative separate sau suprafețele tapițate suplimentare.',
+      'Canapelele foarte murdare, contaminate biologic sau care necesită tratamente speciale sunt evaluate și ofertate separat.',
+      'Curățarea unei canapele poate dura aproximativ 1–1,5 ore; eligibilitatea și posibilitatea efectuării lucrării se confirmă înainte de programare.',
+      'Nu putem garanta îndepărtarea completă a petelor vechi, a decolorărilor sau a deteriorărilor permanente.'
+    ]),
+    heading('CALCULUL PREȚULUI PENTRU SUPRAFAȚĂ SUPLIMENTARĂ','04'),
+    {text:'Limite incluse: 60 m² pentru pachetul de 2 camere și 80 m² pentru pachetul de 3 camere. Dacă suprafața este mai mare, suplimentul se calculează proporțional față de prețul de bază, cu o majorare de 10% aplicată exclusiv suprafeței suplimentare.',fontSize:10.5,margin:[0,0,0,10]},
+    {text:'Formula: preț final = preț pachet + (m² suplimentari × preț pachet / m² incluși) + 10% din supliment.',fontSize:10,bold:true,color:GREEN,margin:[0,0,0,11]},
+    {table:{widths:['*','auto'],body:[
+      [{text:'EXEMPLU: 3 CAMERE, 100 m²',bold:true,color:DARK},{text:'lei',bold:true,color:DARK}],
+      ['Preț de bază pentru 80 m²','749,00'],
+      ['Suprafață suplimentară: 20 m² × 749 / 80','187,25'],
+      ['Majorare 10% exclusiv pentru suprafața suplimentară','18,73'],
+      [{text:'TOTAL ORIENTATIV',bold:true,color:DARK},{text:'954,98',bold:true,color:DARK}]
+    ]},layout:{fillColor:(i)=>i===0?'#F7E7AB':i===4?'#EAF3ED':null,hLineColor:()=> '#DFE7DF',vLineColor:()=> '#DFE7DF',paddingTop:()=>9,paddingBottom:()=>9,paddingLeft:()=>10,paddingRight:()=>10},fontSize:9,margin:[0,0,0,12]},
+    {text:'Exemplul este orientativ. În simulatorul online poți alege pachetul și introduce suprafața exactă; toate componentele calculului apar separat.',fontSize:9.3,color:GREY},
+    {text:'Programare, documente și contacte',style:'pageHead',pageBreak:'before'},
+    heading('CUM SOLICIȚI OFERTA','05'),
+    list([
+      'Accesezi pagina Black Friday și selectezi pachetul de 2 sau 3 camere.',
+      'Completezi suprafața totală, sectorul/localitatea, materialul și gradul de murdărie al canapelei.',
+      'Vezi estimarea defalcată, apoi trimiți solicitarea direct pe WhatsApp.',
+      'Ne trimiți fotografii relevante; Petru și Inés verifică serviciile, eligibilitatea și disponibilitatea.',
+      'Confirmăm în scris programarea și prețul final. Solicitarea transmisă prin WhatsApp sau PDF-ul informativ nu constituie, singure, o rezervare confirmată.'
+    ]),
+    heading('TRANSPARENȚĂ ȘI DOCUMENTE','06'),
+    list([
+      'La locație vin personal două persoane: Petru și Inés.',
+      'Produsele, consumabilele și echipamentele pentru serviciile incluse sunt aduse de prestator.',
+      'Deplasarea este gratuită în București și Ilfov.',
+      'Se emite factură. Plata se efectuează exclusiv în cont bancar, fără numerar.',
+      'După confirmarea colaborării, clientul poate primi acces personalizat în Portalul Petru & Inés pentru programare, checklist, progres și documentele disponibile.'
+    ]),
+    heading('LINKURI UTILE','07'),
+    {stack:[
+      {text:[{text:'Pagina campaniei: ',bold:true},link('Black Clean Week','https://petruandines.com/black-friday/')]},
+      {text:[{text:'Solicitare directă: ',bold:true},link('WhatsApp Petru & Inés','https://wa.me/40772053562')]},
+      {text:[{text:'Catalog și prețuri: ',bold:true},link('Tarife standard','https://petruandines.com/preturi/')]},
+      {text:[{text:'Condiții de prestare: ',bold:true},link('Condiții de prestare servicii','https://petruandines.com/conditii-prestare-servicii/')]},
+      {text:[{text:'Acces și deplasare: ',bold:true},link('Politica de acces și deplasare','https://petruandines.com/politica-acces-deplasare/')]},
+      {text:[{text:'Informații comerciale: ',bold:true},link('Informații comerciale','https://petruandines.com/informatii-comerciale/')]},
+      {text:[{text:'Portal clienți: ',bold:true},link('Portal Petru & Inés','https://petruandines.com/portal-clienti/')]},
+      {text:[{text:'Site principal: ',bold:true},link('petruandines.com','https://petruandines.com/')]}
+    ],fontSize:10,margin:[0,0,0,15]},
+    {text:'PRESTATOR',style:'sectionTitle',margin:[0,0,0,8]},
+    {text:'Măcriș Petru Ionatan – Persoană Fizică Autorizată\nCUI: 52403391\nTelefon / WhatsApp: 0772 053 562\nBucurești și Ilfov · Program obișnuit: luni–vineri, 05:00–20:00',fontSize:10.2,margin:[0,0,0,13]},
+    {text:'DOCUMENT CU CARACTER EXCLUSIV INFORMATIV',bold:true,color:GREEN,fontSize:10.2,margin:[0,0,0,5]},
+    {text:'Prețurile și serviciile prezentate nu constituie o ofertă contractuală fermă și nu confirmă o programare. Condițiile, accesul, gradul de murdărie, materialele, disponibilitatea și costul final sunt verificate înainte de confirmare. Oferta Black Clean Week 2026 vizează exclusiv intervențiile confirmate pentru 5–9 noiembrie 2026.',fontSize:9.2,color:GREY}
+  ];
+  return{
+    info:{title:'Black Clean Week 2026 – Petru & Inés | Oferta de curățenie',author:'Petru & Inés',subject:'Ofertă informativă de curățenie generală Black Friday, București și Ilfov',keywords:'Black Friday, curățenie, Petru & Inés, București, Ilfov'},
+    pageSize:'A4',pageMargins:[44,48,44,53],
+    footer:(current,total)=>({columns:[{text:'PETRU & INÉS  •  BLACK CLEAN WEEK 2026',fontSize:7.5,color:GREY},{text:'Pagina '+current+' / '+total,alignment:'right',fontSize:7.5,color:GREY}],margin:[44,10,44,0]}),
+    content,
+    styles:{goldKicker:{fontSize:9.4,bold:true,color:GOLD,characterSpacing:1.3},intro:{fontSize:14,bold:true,color:DARK},pageHead:{fontSize:21,bold:true,color:DARK,margin:[0,0,0,18]},sectionTitle:{fontSize:11,bold:true,color:GREEN}},
+    defaultStyle:{font:'Roboto',fontSize:10.2,color:'#29362D',lineHeight:1.23}
+  };
+}
+async function referPdf(){
+  if(referClosed())return;
+  const btn=$('refer-pdf');if(btn.disabled)return;
+  btn.disabled=true;const oldLabel=btn.textContent;
+  btn.textContent='Pregătim documentul PDF…';
+  referStatus('Generăm documentul cu text selectabil și linkuri active.');
+  try{
+    const pdfMake=await getTextPdfMake();
+    const brand=await pdfBrandImage();
+    const definition=blackShareDoc(brand);
+    pdfMake.createPdf(definition).download('Petru-si-Ines_Black-Clean-Week_Oferta-completa_2026.pdf');
+    referStatus('✓ PDF-ul complet este pregătit. Textul este selectabil, iar linkurile sunt active.');
+  }catch(e){referStatus('Nu s-a putut genera PDF-ul. Verifică conexiunea la internet sau distribuie linkul paginii.')}
+  finally{btn.disabled=referClosed();btn.textContent=oldLabel}
+}
 $('refer-share').addEventListener('click',referShare);
 $('refer-wa').addEventListener('click',e=>{if(referClosed())e.preventDefault()});
 $('refer-copy').addEventListener('click',referCopy);
