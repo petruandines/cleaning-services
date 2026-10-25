@@ -163,19 +163,17 @@ function loadPdfScript(url){
     document.head.appendChild(el);
   });
 }
-async function loadPdfAsset(name){
-  let lastError;
-  for(const host of ['https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/','https://unpkg.com/pdfmake@0.2.20/build/']){
-    try{await loadPdfScript(host+name);return}catch(e){lastError=e}
-  }
-  throw lastError||new Error('Biblioteca PDF nu este disponibilă.');
-}
 async function getTextPdfMake(){
-  if(window.pdfMake&&window.pdfMake.createPdf&&window.pdfMake.vfs)return window.pdfMake;
+  // pdfmake 0.2.20 calls addVirtualFileSystem(vfs) and does NOT set pdfMake.vfs.
+  // Both scripts are hosted locally: no third-party CDN and no legacy .vfs check.
+  if(window.pdfMake&&window.pdfMake.createPdf&&window.__petruPdfFontsLoaded)return window.pdfMake;
   if(!pdfMakeReadyPromise)pdfMakeReadyPromise=(async()=>{
-    if(!window.pdfMake||!window.pdfMake.createPdf)await loadPdfAsset('pdfmake.min.js');
-    if(!window.pdfMake.vfs)await loadPdfAsset('vfs_fonts.js');
-    if(!window.pdfMake.vfs)throw new Error('Fonturile PDF nu sunt disponibile');
+    if(!window.pdfMake||!window.pdfMake.createPdf)await loadPdfScript('/assets/vendor/pdfmake-0.2.20.min.js');
+    if(!window.pdfMake||typeof window.pdfMake.addVirtualFileSystem!=='function')throw new Error('Biblioteca PDF este incompatibilă');
+    if(!window.__petruPdfFontsLoaded){
+      await loadPdfScript('/assets/vendor/pdfmake-0.2.20-vfs-fonts.js');
+      window.__petruPdfFontsLoaded=true;
+    }
     return window.pdfMake;
   })().catch(e=>{pdfMakeReadyPromise=null;throw e});
   return pdfMakeReadyPromise;
