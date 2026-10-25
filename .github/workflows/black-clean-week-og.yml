@@ -32,6 +32,24 @@ jobs:
           path = Path('black-friday/social-preview.svg')
           raster = cairosvg.svg2png(url=str(path), output_width=1200, output_height=630)
           im = Image.open(BytesIO(raster)).convert('RGB')
+
+          # Use original, unmodified Petru & Inés logo artwork from the website.
+          # The official stacked logo has the symbol above the wordmark;
+          # use its genuine symbol and genuine cropped wordmark side by side
+          # so the compact Open Graph banner remains legible on mobile.
+          original_symbol = Image.open('assets/img/brandmark.png').convert('RGB')
+          original_logo = Image.open('assets/img/logo.webp').convert('RGB')
+          lw, lh = original_logo.size
+          wordmark = original_logo.crop((
+              round(lw * 0.035), round(lh * 0.615),
+              round(lw * 0.970), round(lh * 0.870)
+          ))
+          symbol = original_symbol.copy()
+          symbol.thumbnail((58, 58), Image.Resampling.LANCZOS)
+          im.paste(symbol, (91 + (58 - symbol.width)//2, 18 + (58 - symbol.height)//2))
+          wordmark = wordmark.resize((333, 61), Image.Resampling.LANCZOS)
+          im.paste(wordmark, (162, 17))
+
           target = Path('black-friday/social-preview.jpg')
           im.save(target, format='JPEG', quality=87, optimize=True, subsampling=0)
           assert im.size == (1200, 630)
