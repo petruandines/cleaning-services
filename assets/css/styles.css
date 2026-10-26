@@ -389,17 +389,33 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
 
 /* Black Clean Week 2026 — compact banner linked to the dedicated campaign.
    Kept separate from the existing Reset de Toamnă campaign. */
-.home-offer-section--with-followup{padding-bottom:12px}
-.bf-mini-section{padding:0 0 36px;background:#fff}
-.bf-mini-section--hero{padding-top:22px}
+.home-offer-section--with-followup{padding-bottom:16px}
+.bf-mini-section{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  padding:32px 0 42px;
+  color:#fff;
+  background:
+    radial-gradient(circle at 86% 15%,rgba(255,226,114,.14),transparent 34%),
+    radial-gradient(circle at 14% 90%,rgba(240,75,47,.085),transparent 42%),
+    linear-gradient(135deg,#0e1014 0%,#17191e 58%,#24221f 100%);
+}
+.bf-mini-section::before{
+  content:"";
+  position:absolute;inset:0;z-index:-1;pointer-events:none;
+  opacity:.50;
+  background:repeating-linear-gradient(-22deg,transparent 0 34px,rgba(255,255,255,.027) 34px 35px,transparent 35px 68px);
+}
+.bf-mini-section--hero{padding-top:32px}
 .bf-mini-card{
   position:relative;isolation:isolate;overflow:hidden;
   display:grid;grid-template-columns:minmax(0,1fr) 225px;
   align-items:center;gap:24px;
   padding:30px 34px;
-  border-radius:25px;border:1px solid #414041;
-  background:radial-gradient(circle at 92% 12%,rgba(255,226,114,.12),transparent 38%),linear-gradient(125deg,#0f1115,#181b20 66%,#242322);
-  color:#fff;box-shadow:0 20px 46px rgba(15,17,21,.16);
+  border-radius:25px;border:1px solid rgba(255,227,132,.28);
+  background:linear-gradient(110deg,rgba(255,255,255,.060),rgba(255,255,255,.016));
+  color:#fff;box-shadow:0 14px 38px rgba(0,0,0,.16);
 }
 .bf-mini-card::before{
   content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
@@ -440,5 +456,6 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
   .bf-mini-card{padding:23px 19px}
   .bf-mini-card h2{font-size:clamp(1.76rem,8vw,2.25rem)}
   .bf-mini-link{width:100%}
-  .bf-mini-section--hero{padding-top:15px}
+  .bf-mini-section{padding:22px 0 29px}
+  .bf-mini-section--hero{padding-top:22px}
 }
