@@ -441,13 +441,13 @@ p{margin:.2rem 0 1rem;color:var(--muted)}
   background:linear-gradient(145deg,rgba(255,227,132,.15),rgba(255,227,132,.045));
   color:#ffe384;text-align:center}
 .bf-mini-date-label{font-size:.71rem;font-weight:950;letter-spacing:.19em}
-.bf-mini-date strong{font-size:clamp(3.8rem,7vw,5.7rem);line-height:1.12;font-weight:950;letter-spacing:-.065em;color:#ffe384}
+.bf-mini-date strong{font-size:clamp(2.6rem,4.2vw,3.4rem);line-height:1.16;font-weight:900;letter-spacing:0;white-space:nowrap;color:#ffe384}
 .bf-mini-date-month{font-size:.92rem;font-weight:950;letter-spacing:.105em}
 .bf-mini-date-year{font-size:.75rem;margin-top:4px;color:#f3f0e4;letter-spacing:.12em}
 @media(max-width:760px){
   .bf-mini-card{grid-template-columns:1fr;gap:22px;padding:25px 22px;border-radius:20px}
   .bf-mini-date{min-height:auto;padding:13px 18px;flex-direction:row;gap:12px;flex-wrap:wrap;border-radius:16px;justify-content:center}
-  .bf-mini-date strong{font-size:2.9rem}
+  .bf-mini-date strong{font-size:2.35rem}
   .bf-mini-date-label{display:none}
   .bf-mini-date-month{font-size:.8rem}
   .bf-mini-date-year{margin:0}
