@@ -71,7 +71,7 @@ const publicIndexRoutes = [...new Set(included
   .map(path => '/' + path.slice(0, -'index.html'.length)))].sort();
 const htmlRouteHeaders = ['/', ...publicIndexRoutes]
   .flatMap(path => [path, '  Cache-Control: no-store']);
-const headerRuleCount = 1 + 1 + 1 + publicIndexRoutes.length + 3 + 1;
+const headerRuleCount = 1 + 1 + 1 + publicIndexRoutes.length + 1 + 3 + 1;
 if (headerRuleCount > 100) throw new Error('Cloudflare Pages _headers rule limit exceeded');
 writeFileSync(join(out, '_headers'), [
   '/*',
@@ -80,6 +80,11 @@ writeFileSync(join(out, '_headers'), [
   '/*.html',
   '  Cache-Control: no-store',
   ...htmlRouteHeaders,
+  // Opt-in one-time recovery URL for browsers holding an old copy of the
+  // homepage. Only the HTTP cache is cleared: never cookies or storage.
+  '/actualizare/*',
+  '  Cache-Control: no-store',
+  '  Clear-Site-Data: "cache"',
   // Revalidate mutable CSS/JS at every request, without making image
   // downloads unnecessarily expensive. Pages uses ETags for 304 responses.
   '/*.css',
