@@ -63,10 +63,31 @@ writeFileSync(join(out, '_redirects'), [
   '/portal-v2-frontend/* /portal/:splat 301',
   '',
 ].join('\n'));
+// HTML must never be served from a previously stored browser copy. Cloudflare
+// Pages exposes directory index files at clean URLs such as /black-friday/,
+// which must be listed explicitly in addition to the *.html rule.
+const publicIndexRoutes = [...new Set(included
+  .filter(path => path.endsWith('/index.html') && !path.startsWith('portal/'))
+  .map(path => '/' + path.slice(0, -'index.html'.length)))].sort();
+const htmlRouteHeaders = ['/', ...publicIndexRoutes]
+  .flatMap(path => [path, '  Cache-Control: no-store']);
+const headerRuleCount = 1 + 1 + 1 + publicIndexRoutes.length + 3 + 1;
+if (headerRuleCount > 100) throw new Error('Cloudflare Pages _headers rule limit exceeded');
 writeFileSync(join(out, '_headers'), [
   '/*',
   '  X-Content-Type-Options: nosniff',
   '  Referrer-Policy: strict-origin-when-cross-origin',
+  '/*.html',
+  '  Cache-Control: no-store',
+  ...htmlRouteHeaders,
+  // Revalidate mutable CSS/JS at every request, without making image
+  // downloads unnecessarily expensive. Pages uses ETags for 304 responses.
+  '/*.css',
+  '  Cache-Control: no-cache, max-age=0, must-revalidate',
+  '/*.js',
+  '  Cache-Control: no-cache, max-age=0, must-revalidate',
+  '/*.mjs',
+  '  Cache-Control: no-cache, max-age=0, must-revalidate',
   '/portal/*',
   '  Cache-Control: no-store',
   '  X-Robots-Tag: noindex, nofollow',
