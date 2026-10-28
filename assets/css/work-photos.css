@@ -1,0 +1,28 @@
+/* Fotografii originale din interventii Petru & Ines - galerii responsive */
+.work-gallery{margin:0 auto 44px}
+.work-gallery .section-head{margin-bottom:24px}
+.work-gallery .section-head p{max-width:830px}
+.work-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
+.work-grid--two{grid-template-columns:repeat(2,minmax(0,1fr));max-width:920px}
+.work-card{min-width:0;margin:0;border:1px solid var(--line,#e1e8e4);border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 5px 22px rgba(10,36,27,.05)}
+.work-card-media{display:grid;grid-template-columns:1fr;gap:4px;background:#edf2ee}
+.work-card-media--two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.work-card-media>a{display:flex;min-width:0;align-items:center;justify-content:center;height:280px;background:#edf2ee;overflow:hidden;text-decoration:none}
+.work-card-media--two>a{height:280px}
+.work-card-media img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}
+.work-card figcaption{padding:17px 18px 20px}
+.work-card figcaption h3{font-size:1.07rem;line-height:1.35;margin:0 0 8px}
+.work-card figcaption p{font-size:.94rem;line-height:1.55;color:var(--muted,#50665a);margin:0}
+.work-photo-label{display:inline-block;margin:0 0 9px;color:var(--brand-dark,#147838);font-weight:800;font-size:.77rem;letter-spacing:.04em;text-transform:uppercase}
+.work-gallery-note{color:var(--muted,#50665a);font-size:.95rem;margin:18px 0 0}
+.work-gallery .work-cta{margin-top:20px}
+.work-inline{display:grid;grid-template-columns:minmax(150px,225px) minmax(0,1fr);gap:18px;align-items:center;margin-top:22px;padding:14px;border:1px solid var(--line,#e1e8e4);border-radius:16px;background:#fff}
+.work-inline a{display:block;min-width:0}
+.work-inline img{display:block;width:100%;height:auto;max-height:310px;object-fit:contain;border-radius:12px}
+.work-inline strong{display:block;margin-bottom:8px}
+.work-inline p{margin:0}
+.work-card a:focus-visible,.work-inline a:focus-visible{outline:3px solid var(--brand,#21aa3a);outline-offset:-3px}
+@media(max-width:940px){.work-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.work-grid,.work-grid--two{grid-template-columns:1fr;gap:16px}.work-card-media>a,.work-card-media--two>a{height:250px}.work-card figcaption{padding:16px}.work-inline{grid-template-columns:1fr}.work-inline img{max-height:420px}.work-gallery{margin-bottom:28px}}
+@media(max-width:380px){.work-card-media--two>a{height:205px}}
+@media(prefers-reduced-motion:reduce){.work-card-media img{transition:none}}
