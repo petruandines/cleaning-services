@@ -70,15 +70,22 @@ const publicIndexRoutes = [...new Set(included
   .filter(path => path.endsWith('/index.html') && !path.startsWith('portal/'))
   .map(path => '/' + path.slice(0, -'index.html'.length)))].sort();
 const htmlRouteHeaders = ['/', ...publicIndexRoutes]
-  .flatMap(path => [path, '  Cache-Control: no-store']);
-const headerRuleCount = 1 + 1 + 1 + publicIndexRoutes.length + 1 + 3 + 1;
+  .flatMap(path => [
+    path,
+    '  Cache-Control: no-store, no-cache, max-age=0, must-revalidate',
+    '  Pragma: no-cache',
+    '  Expires: 0',
+  ]);
+const headerRuleCount = 1 + 1 + 1 + publicIndexRoutes.length + 1 + 3 + 1 + 1;
 if (headerRuleCount > 100) throw new Error('Cloudflare Pages _headers rule limit exceeded');
 writeFileSync(join(out, '_headers'), [
   '/*',
   '  X-Content-Type-Options: nosniff',
   '  Referrer-Policy: strict-origin-when-cross-origin',
   '/*.html',
-  '  Cache-Control: no-store',
+  '  Cache-Control: no-store, no-cache, max-age=0, must-revalidate',
+  '  Pragma: no-cache',
+  '  Expires: 0',
   ...htmlRouteHeaders,
   // Opt-in one-time recovery URL for browsers holding an old copy of the
   // homepage. Only the HTTP cache is cleared: never cookies or storage.
@@ -91,6 +98,11 @@ writeFileSync(join(out, '_headers'), [
   '  Cache-Control: no-cache, max-age=0, must-revalidate',
   '/*.js',
   '  Cache-Control: no-cache, max-age=0, must-revalidate',
+  // Main public-site script includes campaign dates. Do not reuse a stale copy.
+  '/assets/js/main.js',
+  '  Cache-Control: no-store, no-cache, max-age=0, must-revalidate',
+  '  Pragma: no-cache',
+  '  Expires: 0',
   '/*.mjs',
   '  Cache-Control: no-cache, max-age=0, must-revalidate',
   '/portal/*',
