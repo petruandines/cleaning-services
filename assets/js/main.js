@@ -54,32 +54,21 @@
   openExtraPanelFromHash();
   window.addEventListener('hashchange', openExtraPanelFromHash);
 
-  // Reset de Toamnă countdown (Romania time).
+  // Current November offer; booking opens on 1 November, interventions 2–30 November.
   const offerCountdowns = [...document.querySelectorAll('[data-offer-countdown]')];
   if (offerCountdowns.length) {
-    const offerStartsAt = new Date('2026-10-14T00:00:00+03:00').getTime();
-    const offerEndsAt = new Date('2026-11-01T00:00:00+02:00').getTime();
+    const offerStartsAt = new Date('2026-11-01T00:00:00+02:00').getTime();
+    const offerEndsAt = new Date('2026-12-01T00:00:00+02:00').getTime();
+    const correctDescription = 'Curățenie generală cu un bonus la alegere: rosturi în baie, bucătărie sau hol, frigider, hotă ori dulapuri. Calculezi transparent și suprafața suplimentară.';
+    const correctTopline = '<span class="home-offer-badge">OFERTA LUNII</span><span>Intervenții 2–30 noiembrie 2026</span>';
+    const correctPrices = '<div><span>2 camere</span><strong>549 lei</strong></div><div><span>3 camere</span><strong>699 lei</strong></div>';
 
     const updateOfferCountdowns = () => {
       const now = Date.now();
-      let label = '';
-      let diff = 0;
-      let state = '';
-
-      if (now < offerStartsAt) {
-        label = 'Oferta va începe în:';
-        diff = offerStartsAt - now;
-        state = 'before';
-      } else if (now < offerEndsAt) {
-        label = 'Oferta expiră în:';
-        diff = offerEndsAt - now;
-        state = 'active';
-      } else {
-        label = 'Oferta a expirat';
-        state = 'expired';
-      }
-
-      const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+      const state = now < offerStartsAt ? 'before' : now < offerEndsAt ? 'active' : 'expired';
+      const label = state === 'expired' ? 'Oferta a expirat' : state === 'before' ? 'Oferta lunii începe în:' : 'Oferta lunii se încheie în:';
+      const diff = Math.max(0, (state === 'before' ? offerStartsAt : offerEndsAt) - now);
+      const totalSeconds = Math.floor(diff / 1000);
       const days = Math.floor(totalSeconds / 86400);
       const hours = Math.floor((totalSeconds % 86400) / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -90,43 +79,64 @@
         const labelEl = countdown.querySelector('[data-offer-countdown-label]');
         const valuesEl = countdown.querySelector('[data-offer-countdown-values]');
         if (labelEl) labelEl.textContent = label;
-        if (valuesEl) valuesEl.hidden = state === 'expired';
-
-        const dayEl = countdown.querySelector('[data-offer-days]');
-        const hourEl = countdown.querySelector('[data-offer-hours]');
-        const minuteEl = countdown.querySelector('[data-offer-minutes]');
-        const secondEl = countdown.querySelector('[data-offer-seconds]');
-        if (dayEl) dayEl.textContent = String(days);
-        if (hourEl) hourEl.textContent = String(hours).padStart(2, '0');
-        if (minuteEl) minuteEl.textContent = String(minutes).padStart(2, '0');
-        if (secondEl) secondEl.textContent = String(seconds).padStart(2, '0');
-
-        countdown.setAttribute(
-          'aria-label',
-          state === 'expired'
-            ? 'Oferta a expirat'
-            : `${label} ${days} zile, ${hours} ore, ${minutes} minute, ${seconds} secunde`
-        );
+        if (valuesEl) {
+          valuesEl.hidden = state === 'expired';
+          valuesEl.style.display = state === 'expired' ? 'none' : '';
+        }
+        const fields = {
+          '[data-offer-days]': String(days),
+          '[data-offer-hours]': String(hours).padStart(2, '0'),
+          '[data-offer-minutes]': String(minutes).padStart(2, '0'),
+          '[data-offer-seconds]': String(seconds).padStart(2, '0')
+        };
+        Object.entries(fields).forEach(([selector, value]) => {
+          const el = countdown.querySelector(selector);
+          if (el) el.textContent = value;
+        });
+        countdown.setAttribute('aria-label', state === 'expired'
+          ? 'Oferta lunii noiembrie a expirat'
+          : `${label} ${days} zile, ${hours} ore, ${minutes} minute, ${seconds} secunde`);
       });
 
       const homeOfferBanner = document.querySelector('.home-offer-banner');
-      if (homeOfferBanner) {
-        const topline = homeOfferBanner.querySelector('.home-offer-topline');
-        const title = homeOfferBanner.querySelector('.home-offer-copy h2');
-        const description = homeOfferBanner.querySelector('.home-offer-copy p');
-        const prices = homeOfferBanner.querySelector('.home-offer-prices');
-        const countdown = homeOfferBanner.querySelector('.home-offer-countdown');
-        const cta = homeOfferBanner.querySelector('.home-offer-cta');
+      if (!homeOfferBanner) return;
 
-        if (state === 'expired') {
-          homeOfferBanner.href = '/cleaning-services/preturi/';
-          homeOfferBanner.setAttribute('aria-label', 'Campania s-a încheiat — vezi tarifele actuale');
-          if (topline) topline.innerHTML = '<span class="home-offer-badge">CAMPANIE ÎNCHEIATĂ</span>';
-          if (title) title.textContent = 'Campania s-a încheiat — vezi tarifele actuale';
-          if (description) description.textContent = 'Consultă prețurile și pachetele actuale Petru & Inés.';
-          if (prices) prices.hidden = true;
-          if (countdown) countdown.hidden = true;
-          if (cta) cta.innerHTML = 'Vezi tarifele actuale <span aria-hidden="true">→</span>';
+      const topline = homeOfferBanner.querySelector('.home-offer-topline');
+      const title = homeOfferBanner.querySelector('.home-offer-copy h2');
+      const description = homeOfferBanner.querySelector('.home-offer-copy p');
+      const prices = homeOfferBanner.querySelector('.home-offer-prices');
+      const countdown = homeOfferBanner.querySelector('.home-offer-countdown');
+      const cta = homeOfferBanner.querySelector('.home-offer-cta');
+
+      // Repair even an older, browser-cached HTML card when current JS loads.
+      if (state !== 'expired') {
+        homeOfferBanner.href = '/cleaning-services/oferte/';
+        homeOfferBanner.setAttribute('aria-label', 'Descoperă oferta Noiembrie, Casa Lună!');
+        if (topline && topline.innerHTML !== correctTopline) topline.innerHTML = correctTopline;
+        if (title && title.textContent !== 'Noiembrie, Casa Lună!') title.textContent = 'Noiembrie, Casa Lună!';
+        if (description && description.textContent !== correctDescription) description.textContent = correctDescription;
+        if (prices) {
+          if (prices.innerHTML !== correctPrices) prices.innerHTML = correctPrices;
+          prices.hidden = false;
+          prices.style.display = '';
+        }
+        if (countdown) {
+          countdown.hidden = false;
+          countdown.style.display = '';
+        }
+        if (cta && !cta.textContent.includes('Alege pachetul')) {
+          cta.innerHTML = 'Alege pachetul și bonusul <span aria-hidden="true">→</span>';
+        }
+      } else {
+        homeOfferBanner.href = '/cleaning-services/preturi/';
+        homeOfferBanner.setAttribute('aria-label', 'Oferta lunii s-a încheiat — vezi tarifele actuale');
+        if (topline) topline.innerHTML = '<span class="home-offer-badge">OFERTĂ ÎNCHEIATĂ</span>';
+        if (title) title.textContent = 'Oferta lunii s-a încheiat';
+        if (description) description.textContent = 'Consultă pachetele și prețurile actuale Petru & Inés.';
+        if (prices) { prices.hidden = true; prices.style.display = 'none'; }
+        if (countdown) { countdown.hidden = true; countdown.style.display = 'none'; }
+        if (cta && !cta.textContent.includes('Vezi tarifele actuale')) {
+          cta.innerHTML = 'Vezi tarifele actuale <span aria-hidden="true">→</span>';
         }
       }
     };
