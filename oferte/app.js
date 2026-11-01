@@ -4,6 +4,14 @@
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
   const $ = (selector, root = document) => root.querySelector(selector);
 
+  // Recovery for browsers that still display the cached October 2026 offer.
+  // The November page does not load this legacy script.
+  const oldOfferMarkup = document.querySelector('[data-live-offer], [data-expired-panel]');
+  if (oldOfferMarkup && !new URLSearchParams(location.search).has('nov2026')) {
+    location.replace('/oferte/?nov2026=1');
+    return;
+  }
+
   const campaign = {
     active: true,
     startsAt: '2026-10-14T00:00:00+03:00',
