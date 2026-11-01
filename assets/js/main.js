@@ -144,6 +144,12 @@
     updateOfferCountdowns();
     window.setInterval(updateOfferCountdowns, 1000);
     window.addEventListener('pageshow', updateOfferCountdowns);
+    // Chrome/Android may restore a frozen tab without a network navigation.
+    // Re-check the offer whenever that tab becomes visible or receives focus.
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) updateOfferCountdowns();
+    });
+    window.addEventListener('focus', updateOfferCountdowns);
   }
 
   // Current year.
