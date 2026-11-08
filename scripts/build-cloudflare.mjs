@@ -131,6 +131,14 @@ for (const path of included.filter(p => p.endsWith('.html'))) {
 if (existsSync(join(out, '_worker.js')) || existsSync(join(out, '_routes.json'))) {
   throw new Error('Static Pages build must not contain _worker.js or _routes.json');
 }
+// Keep all private portal HTML out of search results; fail a deployment if this regresses.
+const privatePortalPages = included.filter(path => path.startsWith('portal/') && path.endsWith('.html'));
+for (const path of privatePortalPages) {
+  const html = readFileSync(join(out, path), 'utf8');
+  if (!/<meta\s+name=["']robots["']\s+content=["']noindex\b/i.test(html)) {
+    throw new Error('Private portal page missing noindex: ' + path);
+  }
+}
 const portalIndex = readFileSync(join(out, 'portal/index.html'), 'utf8');
 const portalConfig = readFileSync(join(out, 'portal/config.js'), 'utf8');
 const portalApp = readFileSync(join(out, 'portal/app.js'), 'utf8');
