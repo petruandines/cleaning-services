@@ -36,6 +36,10 @@ jobs:
         run: node --test .deployment/site-router.test.mjs
       - name: Build public site and verify local links
         run: node scripts/build-cloudflare.mjs
+      - name: Install pinned public-image optimizer
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund sharp@0.34.5
+      - name: Optimize oversized public illustrations without changing original assets
+        run: node scripts/optimize-cloudflare-images.mjs
       - name: Verify existing target resources (read only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_MIGRATION_TOKEN }}
