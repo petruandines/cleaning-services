@@ -247,8 +247,7 @@ line('Estimare orientativă',fmt(p.labor+p.equipment)), '',line('Detalii',$('boo
 '',equipment.value!=='both'?'Înțeleg că echipamentele (+50 lei) sunt furnizate numai după confirmare.':'Voi pune la dispoziție fierul și masa de călcat.',
 'Înțeleg că aceasta este o solicitare, nu o programare confirmată.'];
 var url='https://wa.me/40772053562?text='+encodeURIComponent(lines.join('\n'));
-var popup=window.open(url,'_blank','noopener,noreferrer');
-if(!popup)window.location.assign(url);
+window.location.assign(url);
 });
 })();
 </script><footer class="site-footer">
