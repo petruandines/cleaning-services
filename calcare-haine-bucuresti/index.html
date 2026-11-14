@@ -132,7 +132,7 @@
 <div class="ip-output" id="calc-equipment-line" hidden><span>Furnizare echipamente</span><strong>50,00 lei</strong></div>
 <div class="ip-output"><strong>Total estimativ</strong><strong class="ip-total" id="calc-total" aria-live="polite">150,00 lei</strong></div>
 <p class="ip-quiet">După prima oră, fiecare minut se calculează fără rotunjire la jumătăți de oră sau ore întregi.</p>
-<a class="btn btn-primary" href="#programare" style="width:100%">Continuă spre programare</a>
+<a class="btn btn-primary" href="#programare" data-calc-to-book style="width:100%">Continuă spre programare</a>
 </div></div></section>
 <section class="section section-soft" aria-labelledby="tipuri-title"><div class="container"><div class="section-head"><div><span class="eyebrow">Ce putem călca</span>
 <h2 id="tipuri-title">Haine și textile potrivite pentru călcare</h2><p>Prelucrăm articole curate și uscate, în limitele permise de eticheta fiecăruia.</p></div></div>
@@ -218,6 +218,7 @@ paintCalculator(false);
 var form=$('ironing-booking-form'),equipment=$('book-equipment'),duration=$('book-estimate');
 function bookingPrice(){var p=price(duration.value||60,equipment.value!=='both');$('book-summary').textContent=fmt(p.labor+p.equipment);}
 equipment.addEventListener('change',bookingPrice);duration.addEventListener('input',bookingPrice);bookingPrice();
+document.querySelector('[data-calc-to-book]')?.addEventListener('click',function(){duration.value=mins.value;if(equip.checked && equipment.value==='both')equipment.value='neither';bookingPrice();});
 function line(name,value){return name+": "+value;}
 form.addEventListener('submit',function(e){
 e.preventDefault();
