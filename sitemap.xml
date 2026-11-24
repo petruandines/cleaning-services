@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://petruandines.com/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/oferte/</loc>
@@ -13,59 +14,84 @@
   </url>
   <url>
     <loc>https://petruandines.com/curatare-tapiterie-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/curatare-canapele-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/curatare-saltele-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/curatare-tapiterie-auto-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/curatenie-apartamente-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/curatenie-birouri-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/curatare-vitrine-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/igienizare-aer-conditionat-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/ozonificare-bucuresti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/pentru-companii/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/preturi/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/informatii-comerciale/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/conditii-prestare-servicii/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/politica-acces-deplasare/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/despre-noi/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/contact/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/portal-clienti/</loc>
+    <lastmod>2026-11-24</lastmod>
   </url>
   <url>
     <loc>https://petruandines.com/calcare-haine-bucuresti/</loc>
-    <lastmod>2026-11-14</lastmod>
+    <lastmod>2026-11-24</lastmod>
   </url>
-  <url><loc>https://petruandines.com/noiembrie-casa-luna/</loc><lastmod>2026-11-24</lastmod></url>
-  <url><loc>https://petruandines.com/decembrie-luna-zero/</loc><lastmod>2026-11-24</lastmod></url>
+  <url>
+    <loc>https://petruandines.com/noiembrie-casa-luna/</loc>
+    <lastmod>2026-11-24</lastmod>
+    <image:image><image:loc>https://petruandines.com/assets/img/oferte/noiembrie-casa-luna.webp</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://petruandines.com/decembrie-luna-zero/</loc>
+    <lastmod>2026-11-24</lastmod>
+    <image:image><image:loc>https://petruandines.com/assets/img/oferte/decembrie-luna-zero.webp</image:loc></image:image>
+  </url>
 </urlset>
