@@ -5,14 +5,6 @@
   const navDrop = document.querySelector('.nav-drop');
   const dropButton = navDrop?.querySelector(':scope > button');
 
-  // Add only the new service to the existing Services menu; retain all current links and handlers.
-  const serviceMenu = navDrop?.querySelector('.nav-drop-menu');
-  if (serviceMenu && !serviceMenu.querySelector('a[href$="/calcare-haine-bucuresti/"]')) {
-    const ironingLink = document.createElement('a');
-    ironingLink.href = '/cleaning-services/calcare-haine-bucuresti/';
-    ironingLink.textContent = 'Călcare haine la domiciliu';
-    serviceMenu.appendChild(ironingLink);
-  }
 
   if (toggle && header) {
     toggle.addEventListener('click', () => {
