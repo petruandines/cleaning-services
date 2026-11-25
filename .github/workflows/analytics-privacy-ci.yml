@@ -5,6 +5,7 @@ on:
       - 'assets/js/pi-analytics.js'
       - 'assets/css/pi-analytics.css'
       - 'scripts/analytics-privacy.test.mjs'
+      - 'scripts/analytics-browser.test.mjs'
       - 'scripts/build-cloudflare.mjs'
       - 'sitemap.xml'
       - '**/*.html'
@@ -25,3 +26,9 @@ jobs:
         run: node --test scripts/analytics-privacy.test.mjs
       - name: Verify static site build and portal exclusion
         run: node scripts/build-cloudflare.mjs
+      - name: Install pinned browser test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.51.1
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Verify browser consent and intercept GA4 events
+        run: node --test scripts/analytics-browser.test.mjs
