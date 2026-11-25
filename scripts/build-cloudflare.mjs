@@ -54,6 +54,8 @@ for (const path of included) {
   writeFileSync(dest, data);
 }
 writeFileSync(join(out, '_redirects'), [
+  '/black-riday /black-friday/ 301',
+  '/black-riday/ /black-friday/ 301',
   '/black-clean-week /black-friday/ 301',
   '/black-clean-week/ /black-friday/ 301',
   '/black-clean-week/index.html /black-friday/ 301',
