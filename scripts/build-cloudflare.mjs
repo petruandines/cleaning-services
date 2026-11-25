@@ -65,7 +65,7 @@ for (const path of included) {
         if (!/<\/head>/i.test(text) || !/<\/body>/i.test(text)) throw new Error('Analytics document structure missing: '+path);
         if (/googletagmanager\.com|google-analytics\.com\/(?:g\/collect|analytics\.js)|pi-analytics\.js/i.test(text)) throw new Error('Duplicate analytics source: '+path);
         const english = /<html\b[^>]*lang=["']en\b/i.test(text);
-        text = text.replace(/<\/head>/i, '<link rel="stylesheet" href="/assets/css/pi-analytics.css?v=1"><script defer src="/assets/js/pi-analytics.js?v=1"></script>\n</head>');
+        text = text.replace(/<\/head>/i, '<link rel="stylesheet" href="/assets/css/pi-analytics.css?v=2"><script defer src="/assets/js/pi-analytics.js?v=2"></script>\n</head>');
         text = text.replace(/<\/body>/i, '<div class="pi-privacy-links"><a href="/confidentialitate/'+(english?'#english':'')+'">'+(english?'Privacy &amp; cookies':'Confidențialitate și cookie-uri')+'</a><button type="button" id="pi-consent-preferences" hidden>'+(english?'Cookie preferences':'Preferințe cookie-uri')+'</button></div>\n</body>');
         analyticsPages.add(path);
       } else if (privateAnalytics.test(route) && /pi-analytics\.js|googletagmanager\.com|google-analytics\.com\/(?:g\/collect|analytics\.js)/i.test(text)) {

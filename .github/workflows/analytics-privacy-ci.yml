@@ -1,5 +1,13 @@
 name: Analytics privacy checks
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/js/pi-analytics.js'
+      - 'assets/css/pi-analytics.css'
+      - 'scripts/analytics-browser.test.mjs'
+      - 'scripts/analytics-privacy.test.mjs'
+      - 'scripts/build-cloudflare.mjs'
   pull_request:
     paths:
       - 'assets/js/pi-analytics.js'

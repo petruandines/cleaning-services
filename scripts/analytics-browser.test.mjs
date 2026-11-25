@@ -34,6 +34,13 @@ test('browser: real Google container, consent, sanitized GA payloads and private
     await page.goto(origin+'/?utm_source=chatgpt.com');
     await page.getByRole('button',{name:'Refuz analiza',exact:true}).waitFor();
     await page.waitForTimeout(500);
+    const consentBox=await page.locator('.pi-consent').boundingBox();
+    const contactBox=await page.locator('.mobile-actions').boundingBox();
+    assert.ok(consentBox && contactBox,'both mobile bars visible');
+    assert.ok(consentBox.height<=110,'compact consent banner height: '+consentBox.height);
+    assert.ok(consentBox.y+consentBox.height<=contactBox.y,'consent bar must not overlap contact bar');
+    assert.ok(contactBox.y-(consentBox.y+consentBox.height)<=10,'consent bar sits immediately above contact bar');
+    assert.ok(await page.locator('.pi-consent-policy-short').isVisible(),'short policy link visible');
     assert.equal(google.length,0,'no Google analytics traffic before consent');
     await page.getByRole('button',{name:'Refuz analiza',exact:true}).click();
     await page.reload();

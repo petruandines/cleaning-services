@@ -104,9 +104,11 @@
   const en = document.documentElement.lang.toLowerCase().startsWith('en');
   const copy = en ? {
     title:'Privacy preferences',body:'Optional analytics cookies help us understand visits and improve our services. We use them only with your consent. Refusing does not affect the website or bookings.',
+    compact:'Optional analytics cookies help improve the site. Only with your consent.',details:'Details',
     accept:'Accept analytics',reject:'Reject analytics',close:'Close',policy:'Privacy & cookies',prefs:'Cookie preferences'
   } : {
     title:'Preferințe de confidențialitate',body:'Cookie-urile opționale de analiză ne ajută să înțelegem vizitele și să îmbunătățim serviciile. Le folosim numai cu acordul tău. Refuzul nu afectează site-ul sau programările.',
+    compact:'Cookie-uri opționale de analiză pentru îmbunătățirea site-ului, doar cu acordul tău.',details:'Detalii',
     accept:'Accept analiza',reject:'Refuz analiza',close:'Închide',policy:'Confidențialitate și cookie-uri',prefs:'Preferințe cookie-uri'
   };
   const panel=document.createElement('section');
@@ -114,12 +116,31 @@
   panel.setAttribute('aria-labelledby','pi-consent-title');
   function element(tag,cls,value) {const x=document.createElement(tag);if(cls)x.className=cls;if(value)x.textContent=value;return x;}
   const title=element('h2','',copy.title);title.id='pi-consent-title';
-  const body=element('p','',copy.body);
+  const body=element('p','pi-consent-copy-full',copy.body);
+  const compactBody=element('p','pi-consent-copy-compact',copy.compact);
   const actions=element('div','pi-consent-actions');
   const accept=element('button','',copy.accept), reject=element('button','',copy.reject), close=element('button','pi-consent-close',copy.close);
   for(const b of [accept,reject,close]) b.type='button';
-  const policy=element('a','pi-consent-policy',copy.policy);policy.href='/confidentialitate/';
-  actions.append(accept,reject,close);panel.append(title,body,actions,policy);document.body.appendChild(panel);
+  const policy=element('a','pi-consent-policy');policy.href='/confidentialitate/';
+  policy.setAttribute('aria-label',copy.policy);
+  policy.append(element('span','pi-consent-policy-full',copy.policy),element('span','pi-consent-policy-short',copy.details));
+  actions.append(accept,reject,close);panel.append(title,body,compactBody,actions,policy);document.body.appendChild(panel);
+  // Keep the compact mobile consent bar immediately above the actual contact bar,
+  // including pages whose contact bar has a different height or is absent.
+  const mobileContact=document.querySelector('.mobile-actions');
+  if(mobileContact){
+    const positionConsent=()=>{
+      const r=mobileContact.getBoundingClientRect();
+      const bottom=r.height>0?Math.max(12,Math.ceil(window.innerHeight-r.top)+6):12;
+      panel.style.setProperty('--pi-consent-bottom',bottom+'px');
+    };
+    positionConsent();
+    window.addEventListener('resize',positionConsent);
+    if(typeof window.ResizeObserver==='function'){
+      const observer=new window.ResizeObserver(positionConsent);
+      observer.observe(mobileContact);
+    }
+  }
   const preference=document.getElementById('pi-consent-preferences');
   if(preference) {preference.hidden=false;preference.addEventListener('click',()=>{panel.hidden=false;close.hidden=false;accept.focus();});}
   function hide(){panel.hidden=true; if(preference)preference.focus({preventScroll:true});}
