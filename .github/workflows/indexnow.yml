@@ -1,0 +1,37 @@
+name: IndexNow - public page updates
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.html'
+      - 'sitemap.xml'
+      - '.github/workflows/indexnow.yml'
+      - 'scripts/indexnow.py'
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'URLs to notify'
+        type: choice
+        options: [offers, all]
+        default: offers
+permissions:
+  contents: read
+  deployments: read
+concurrency:
+  group: indexnow-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Notify IndexNow after publication
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          SUBMIT_SCOPE: ${{ inputs.scope || '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/indexnow.py
