@@ -1,12 +1,9 @@
 name: IndexNow - public page updates
 on:
-  push:
+  workflow_run:
+    workflows: ["Cloudflare site publication and verification"]
+    types: [completed]
     branches: [main]
-    paths:
-      - '**/*.html'
-      - 'sitemap.xml'
-      - '.github/workflows/indexnow.yml'
-      - 'scripts/indexnow.py'
   workflow_dispatch:
     inputs:
       scope:
@@ -16,22 +13,25 @@ on:
         default: offers
 permissions:
   contents: read
-  deployments: read
+  actions: read
 concurrency:
-  group: indexnow-${{ github.sha }}
+  group: indexnow-public
   cancel-in-progress: false
 jobs:
   notify:
+    if: github.repository == 'petruandines/cleaning-services' && (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 16
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
-      - name: Notify IndexNow after publication
+          persist-credentials: false
+      - name: Notify IndexNow after verified Cloudflare publication
         env:
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
+          AFTER_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          DEPLOY_RUN_ID: ${{ github.event.workflow_run.id || '' }}
           SUBMIT_SCOPE: ${{ inputs.scope || '' }}
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/indexnow.py
+        run: python3 -u scripts/indexnow.py

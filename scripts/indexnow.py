@@ -1,7 +1,6 @@
 """Notify IndexNow for changed public pages only; never submit private URLs."""
 import json
 import os
-import re
 import subprocess
 import time
 import urllib.error
@@ -17,7 +16,7 @@ KEY_URL = BASE + "/" + KEY + ".txt"
 OFFERS = [BASE + p for p in ("/oferte/", "/noiembrie-casa-luna/", "/decembrie-luna-zero/")]
 NS = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
 HEAD = os.environ.get("AFTER_SHA", "HEAD")
-BEFORE = os.environ.get("BEFORE_SHA", "")
+DEPLOY_RUN = os.environ.get("DEPLOY_RUN_ID", "")
 SCOPE = os.environ.get("SUBMIT_SCOPE", "")
 REPO = os.environ.get("GITHUB_REPOSITORY", "")
 TOKEN = os.environ.get("GH_TOKEN", "")
@@ -51,78 +50,68 @@ def request(url, method="GET", data=None, extra=None):
         print("Network error:", str(e))
         return 0, b""
 
-def deployment_ready():
+def successful_deployments():
     if not REPO or not TOKEN:
-        return False
-    url = f"https://api.github.com/repos/{REPO}/deployments?" + urllib.parse.urlencode({"sha": HEAD, "environment": "github-pages", "per_page": 10})
-    headers = {"Authorization": "Bearer " + TOKEN, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
-    status, body = request(url, extra=headers)
+        raise SystemExit("GitHub read-only Actions access is required.")
+    url = f"https://api.github.com/repos/{REPO}/actions/workflows/cloudflare-migration.yml/runs?" + urllib.parse.urlencode({"branch": "main", "status": "success", "per_page": 100})
+    status, body = request(url, extra={"Authorization": "Bearer " + TOKEN, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
     if status != 200:
-        return False
-    try:
-        deployments = json.loads(body)
-        for dep in deployments:
-            status, body = request(f"https://api.github.com/repos/{REPO}/deployments/{dep['id']}/statuses?per_page=1", extra=headers)
-            if status == 200 and any(x.get("state") == "success" for x in json.loads(body)):
-                return True
-    except (ValueError, KeyError, TypeError):
-        return False
-    return False
+        raise SystemExit(f"Cannot verify Cloudflare workflow history: HTTP {status}")
+    return json.loads(body)["workflow_runs"]
 
-def normalize_html(data):
-    # Ignore whitespace and the project base path rewritten by the CDN.
-    s = data.decode("utf-8", errors="replace")
-    s = s.replace("/cleaning-services/", "/")
-    return re.sub(r"\s+", " ", s).strip()
+def previous_deployment():
+    runs = successful_deployments()
+    if DEPLOY_RUN:
+        current = next((x for x in runs if str(x["id"]) == DEPLOY_RUN and x["head_sha"] == HEAD), None)
+    else:
+        current = next((x for x in runs if x["head_sha"] == HEAD), None)
+    if not current:
+        raise SystemExit("No successful Cloudflare deployment found for this revision. Run after publication.")
+    print("Cloudflare publication verified:", current["id"], HEAD)
+    prior = next((x for x in runs if x["run_number"] < current["run_number"]), None)
+    return prior["head_sha"] if prior else ""
 
 def main():
     current = sitemap(Path("sitemap.xml").read_bytes())
+    before = previous_deployment()
     old = set()
     changed = set()
-    if BEFORE and set(BEFORE) != {"0"}:
+    if before:
         try:
-            old = sitemap(git("show", BEFORE + ":sitemap.xml"))
-            changed = set(git("diff", "--name-only", "--no-renames", BEFORE, HEAD).splitlines())
-        except subprocess.CalledProcessError:
-            print("Previous revision unavailable; use manual workflow to submit offers.")
+            old = sitemap(git("show", before + ":sitemap.xml"))
+            changed = set(git("diff", "--name-only", "--no-renames", before, HEAD).splitlines())
+        except (subprocess.CalledProcessError, ET.ParseError):
+            print("Previous public revision unavailable; limiting initial submission to campaign URLs.")
     if SCOPE == "all":
         selected = current
     elif SCOPE == "offers":
         selected = set(OFFERS) & current
     else:
-        selected = {url for url in current | old if public_file(url) in changed} | (current ^ old)
-        if ".github/workflows/indexnow.yml" in changed or "scripts/indexnow.py" in changed:
+        selected = {url for url in current | old if public_file(url) in changed} | ((current ^ old) if old else set())
+        if not old or ".github/workflows/indexnow.yml" in changed or "scripts/indexnow.py" in changed:
             selected |= set(OFFERS) & current
+    # Never notify private portal routes or URLs outside the canonical site.
+    selected = {u for u in selected if not urllib.parse.urlsplit(u).path.startswith(("/portal/", "/portal-v2-"))}
     if not selected:
         print("No changed public pages to notify.")
         return
     print("URLs selected:", *sorted(selected), sep="\n")
-    # GitHub Pages can finish deploying after the push event.
-    time.sleep(45)
-    deadline = time.monotonic() + 600
+    deadline = time.monotonic() + 180
     pending = set(selected)
     key_ok = False
     while time.monotonic() < deadline:
         status, body = request(KEY_URL)
         key_ok = status == 200 and body.decode("utf-8", errors="replace").strip() == KEY
-        deployed = deployment_ready() if key_ok else False
+        print(f"Verification key: HTTP {status}; valid={key_ok}")
         if key_ok:
             for url in sorted(pending):
                 status, body = request(url)
-                if url not in current:
-                    if status in (404, 410) or deployed and status in (200, 301, 302, 308):
-                        pending.remove(url)
-                    continue
-                if status != 200:
-                    continue
-                file = Path(public_file(url))
-                matches = file.is_file() and normalize_html(body) == normalize_html(file.read_bytes())
-                if deployed or matches:
+                print(f"Public URL check: HTTP {status} {url}")
+                if (url in current and status == 200 and body) or (url not in current and status in (200, 404, 410)):
                     pending.remove(url)
         if key_ok and not pending:
             break
-        print("Awaiting public deployment; pending:", len(pending), "key verified:", key_ok)
-        time.sleep(25)
+        time.sleep(15)
     if not key_ok:
         raise SystemExit("IndexNow verification file is not publicly readable. No URLs submitted.")
     ready = selected - pending
@@ -134,7 +123,7 @@ def main():
             raise SystemExit("IndexNow did not accept the request.")
         print("Notification accepted for", len(ready), "URL(s). Indexing itself is not guaranteed.")
     if pending:
-        raise SystemExit("Public update could not be confirmed for: " + ", ".join(sorted(pending)) + ". Run manually after deployment.")
+        raise SystemExit("Public URLs not confirmed: " + ", ".join(sorted(pending)) + ". Run manually after publication.")
 
 if __name__ == "__main__":
     main()
