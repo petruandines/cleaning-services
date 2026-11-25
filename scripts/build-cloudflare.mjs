@@ -16,6 +16,12 @@ const included = files.filter(path => {
   if (/\/(test|tests|src)\//.test(path) || /(^|\/)(README[^/]*|package[^/]*)$/.test(path)) return false;
   return !['.md','.yml','.yaml','.sql'].includes(extname(path));
 });
+// Analytics is opt-in for indexable, canonical public pages in the sitemap.
+const sitemap = readFileSync(join(root, 'sitemap.xml'), 'utf8');
+const analyticsRoutes = new Set([...sitemap.matchAll(/<loc>https:\/\/petruandines\.com(\/[^<]*)<\/loc>/g)].map(m => m[1]));
+analyticsRoutes.add('/confidentialitate/');
+const privateAnalytics = /(?:^|\/)(?:portal|portal-v2[^/]*|admin|login|account|projects?|actualizare|vector-studio|catalog)(?:\/|$)/i;
+const analyticsPages = new Set();
 rmSync(out, {recursive:true, force:true});
 mkdirSync(out, {recursive:true});
 for (const path of included) {
@@ -49,10 +55,33 @@ for (const path of included) {
       text = text.replace(accountNeedle,
         " + accountState + '&portal_origin=' + encodeURIComponent(window.location.origin), 'petru-ines-account");
     }
+    if (path.endsWith('.html')) {
+      const route = path === 'index.html' ? '/' : path.endsWith('/index.html') ? '/' + path.slice(0,-10) : '/' + path;
+      const isPublicAnalytics = analyticsRoutes.has(route) && !privateAnalytics.test(route) &&
+        !/<meta\b[^>]*name=["']robots["'][^>]*content=["'][^"']*noindex/i.test(text);
+      if (isPublicAnalytics) {
+        const canonical = text.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)/i);
+        if (!canonical || canonical[1] !== newBase + route) throw new Error('Analytics public canonical mismatch: '+path);
+        if (!/<\/head>/i.test(text) || !/<\/body>/i.test(text)) throw new Error('Analytics document structure missing: '+path);
+        if (/googletagmanager\.com|google-analytics\.com\/(?:g\/collect|analytics\.js)|pi-analytics\.js/i.test(text)) throw new Error('Duplicate analytics source: '+path);
+        const english = /<html\b[^>]*lang=["']en\b/i.test(text);
+        text = text.replace(/<\/head>/i, '<link rel="stylesheet" href="/assets/css/pi-analytics.css?v=1"><script defer src="/assets/js/pi-analytics.js?v=1"></script>\n</head>');
+        text = text.replace(/<\/body>/i, '<div class="pi-privacy-links"><a href="/confidentialitate/'+(english?'#english':'')+'">'+(english?'Privacy &amp; cookies':'Confidențialitate și cookie-uri')+'</a><button type="button" id="pi-consent-preferences" hidden>'+(english?'Cookie preferences':'Preferințe cookie-uri')+'</button></div>\n</body>');
+        analyticsPages.add(path);
+      } else if (privateAnalytics.test(route) && /pi-analytics\.js|googletagmanager\.com|google-analytics\.com\/(?:g\/collect|analytics\.js)/i.test(text)) {
+        throw new Error('Analytics on private/excluded page: '+path);
+      }
+    }
     data = Buffer.from(text);
   }
   writeFileSync(dest, data);
 }
+for (const route of analyticsRoutes) {
+  if (privateAnalytics.test(route)) continue;
+  const path = route === '/' ? 'index.html' : route.endsWith('/') ? route.slice(1)+'index.html' : route.slice(1);
+  if (!analyticsPages.has(path)) throw new Error('Sitemap public page not instrumented: '+path);
+}
+console.log('Analytics:', analyticsPages.size, 'canonical public pages; consent-gated; private routes excluded.');
 writeFileSync(join(out, '_redirects'), [
   '/black-riday /black-friday/ 301',
   '/black-riday/ /black-friday/ 301',

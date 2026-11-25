@@ -1,0 +1,34 @@
+name: Analytics privacy checks
+on:
+  pull_request:
+    paths:
+      - 'assets/js/pi-analytics.js'
+      - 'assets/css/pi-analytics.css'
+      - 'scripts/analytics-privacy.test.mjs'
+      - 'scripts/analytics-browser.test.mjs'
+      - 'scripts/build-cloudflare.mjs'
+      - 'sitemap.xml'
+      - '**/*.html'
+      - '.github/workflows/analytics-privacy-ci.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test analytics consent and event handling
+        run: node --test scripts/analytics-privacy.test.mjs
+      - name: Verify static site build and portal exclusion
+        run: node scripts/build-cloudflare.mjs
+      - name: Install pinned browser test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.51.1
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Verify browser consent and intercept GA4 events
+        run: node --test scripts/analytics-browser.test.mjs
