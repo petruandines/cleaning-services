@@ -475,6 +475,7 @@
       lines.push('', 'Dacă este util, pot atașa fotografii direct în WhatsApp. Mulțumesc!');
       const url = `https://wa.me/40772053562?text=${encodeURIComponent(lines.join('\n'))}`;
       if (status) status.textContent = 'Se deschide WhatsApp cu mesajul pregătit.';
+      window.PIAnalytics?.quote('quote_form');
       window.open(url, '_blank', 'noopener,noreferrer');
     });
   }
