@@ -1,0 +1,27 @@
+name: Analytics privacy checks
+on:
+  pull_request:
+    paths:
+      - 'assets/js/pi-analytics.js'
+      - 'assets/css/pi-analytics.css'
+      - 'scripts/analytics-privacy.test.mjs'
+      - 'scripts/build-cloudflare.mjs'
+      - 'sitemap.xml'
+      - '**/*.html'
+      - '.github/workflows/analytics-privacy-ci.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test analytics consent and event handling
+        run: node --test scripts/analytics-privacy.test.mjs
+      - name: Verify static site build and portal exclusion
+        run: node scripts/build-cloudflare.mjs
