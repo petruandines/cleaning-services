@@ -17,19 +17,23 @@
       normalized(page.pathname) !== normalized(location.pathname)) return;
   // Fail closed on arbitrary URL parameters. Only a small set of known attribution
   // values can reach the tag, which can independently read the browser URL.
-  const safeSources = /^(?:chatgpt(?:\.com)?|chat\.openai\.com|openai(?:\.com)?|google(?:\.com)?|bing(?:\.com)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|claude(?:\.ai)?|grok(?:\.com)?|facebook(?:\.com)?|instagram(?:\.com)?|linkedin(?:\.com)?|newsletter|google_business_profile)$/i;
-  const safeMedia = /^(?:referral|organic|social|email|cpc|ai|organic_social|organic_search)$/i;
-  const safeCampaign = /^(?:noiembrie-casa-luna|decembrie-luna-zero|black-friday|google-business-profile|oferte)$/i;
-  function safeUrl(raw) {
+  const safeSources = /^(?:chatgpt(?:\.com)?|chat\.openai\.com|openai(?:\.com)?|google(?:\.com)?|bing(?:\.com)?|gemini(?:\.google\.com)?|copilot(?:\.microsoft\.com)?|perplexity(?:\.ai)?|claude(?:\.ai)?|grok(?:\.com)?|facebook(?:\.com)?|instagram(?:\.com)?|linkedin(?:\.com)?|newsletter|google_business_profile|whatsapp|email|qr)$/i;
+  const safeMedia = /^(?:referral|organic|social|email|cpc|ai|organic_social|organic_search|messaging|offline)$/i;
+  const safeCampaign = /^(?:noiembrie-casa-luna|decembrie-luna-zero|black-friday|google-business-profile|oferte|(?:ianuarie|februarie|martie|aprilie|mai|iunie|iulie|august|septembrie|octombrie|noiembrie|decembrie)[_-]20[0-9]{2}|campaign_[0-9]{1,6})$/i;
+  const safeContent = /^(?:(?:postare|grup|mesaj|email|qr|varianta|link)_[0-9]{1,6}|status|profil|grupuri|mesaje|bio|story|newsletter)$/i;
+  function safeUrl(raw, allowFacebookClick = false) {
     const u = new URL(raw);
-    if (u.origin !== ORIGIN || privatePath(u.pathname)) return false;
+    if (u.origin !== ORIGIN || u.username || u.password || privatePath(u.pathname)) return false;
     const seen = new Set();
     for (const [key,value] of u.searchParams) {
       if (seen.has(key)) return false;
       seen.add(key);
+      // The click identifier is allowed only during local URL cleanup, never at tag load.
+      if (allowFacebookClick && key === 'fbclid') continue;
       if (!(key === 'utm_source' && safeSources.test(value) ||
           key === 'utm_medium' && safeMedia.test(value) ||
-          key === 'utm_campaign' && safeCampaign.test(value))) return false;
+          key === 'utm_campaign' && safeCampaign.test(value) ||
+          key === 'utm_content' && safeContent.test(value))) return false;
     }
     if (u.hash && (!/^#[a-z0-9_-]{1,80}$/i.test(u.hash) || !document.getElementById(u.hash.slice(1)))) return false;
     return true;
@@ -37,6 +41,13 @@
   let referrer = '';
   let eligible = false;
   try {
+    // Remove the opaque Facebook identifier before any third-party tag can read it.
+    // Unknown parameters and duplicates remain blocked; history failure is fail-closed.
+    const landing = new URL(location.href);
+    if (landing.searchParams.has('fbclid') && safeUrl(landing.href, true)) {
+      landing.searchParams.delete('fbclid');
+      window.history.replaceState(window.history.state, '', landing.href);
+    }
     eligible = safeUrl(location.href);
     if (document.referrer) {
       const r = new URL(document.referrer);

@@ -86,6 +86,19 @@ test('browser: real Google container, consent, sanitized GA payloads and private
     assert.deepEqual(blockedRequests,[],'private portal must not issue measurement requests');
     assert.ok(collect.every(x=>!/(?:fake-secret|fake@example\.com|phone=0700000000)/i.test(decodeURIComponent(x.url+' '+x.body))));
     await blockedPage.close();
+    // A Facebook landing must retain UTM values, but not the click identifier.
+    const marketing=await context.newPage();
+    const marker=collect.length;
+    await marketing.goto(origin+'/decembrie-luna-zero/?utm_source=facebook&utm_medium=organic_social&utm_campaign=decembrie_2026&utm_content=postare_01&fbclid=fake-secret');
+    await marketing.waitForFunction(()=>!!window.dataLayer?.find(x=>x[0]==='set'));
+    const marketingLocation=await marketing.evaluate(()=>window.dataLayer.find(x=>x[0]==='set')[1].page_location);
+    assert.ok(marketingLocation.includes('utm_content=postare_01'));
+    assert.ok(!marketingLocation.includes('fbclid'));
+    assert.ok(!marketing.url().includes('fbclid'));
+    for(let i=0;i<40 && !collect.slice(marker).some(x=>decodeURIComponent(x.url+' '+x.body).includes('postare_01'));i++)await marketing.waitForTimeout(250);
+    assert.ok(collect.slice(marker).some(x=>decodeURIComponent(x.url+' '+x.body).includes('postare_01')),'GA request retains campaign content');
+    assert.ok(collect.slice(marker).every(x=>!/fake-secret|fbclid/i.test(decodeURIComponent(x.url+' '+x.body))),'no Facebook click identifier in GA payload');
+    await marketing.close();
     const settings=await context.newPage();
     await settings.goto(origin+'/contact/');
     await settings.waitForTimeout(500);
