@@ -1,0 +1,63 @@
+name: Remove exactly two authorized synthetic portal projects
+on:
+  push:
+    branches: [portal-assistant-cleanup-two-fixtures]
+    paths: ['.github/workflows/portal-assistant-cleanup-two-fixtures.yml']
+permissions: {}
+concurrency:
+  group: portal-assistant-two-fixtures-cleanup
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/portal-assistant-cleanup-two-fixtures' && github.actor_id == '235442213'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      D1_TOKEN: ${{ secrets.PORTAL_REPORTS_CF_TOKEN || secrets.PORTAL_ONE_TIME_D1_TOKEN }}
+    steps:
+      - name: Validate exact synthetic IDs, remove only their rows, verify absence
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const ids=['portal-assistant-test-v1','pa-4954ceba-2fdb-48ec-8dc0-a9cde5093f06'];
+          const quoted=s=>"'"+s.replaceAll("'","''")+"'";
+          const scope=ids.map(quoted).join(',');
+          const predicates=[
+            "id="+quoted(ids[0])+" AND name='TEST – Deep Clean 3 camere' AND client_name='Andreea Test (FICTIV)'",
+            "id="+quoted(ids[1])+" AND name='TEST – Portal Assistant permanent' AND client_name='Client FICTIV – test permanent'"
+          ];
+          const exact="("+predicates.map(p=>"("+p+")").join(" OR ")+") AND status='draft' AND phone='0000000000' AND email='' AND started_at IS NULL AND completed_at IS NULL AND invoice_url=''";
+          const table='one_time_projects';
+          const children=['one_time_project_service_options','one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'];
+          const reportTables=['one_time_project_reports','one_time_project_report_files'];
+          const base='https://api.cloudflare.com/client/v4/accounts/47b9f8498a9865c0fbbaca8f0f5cf59d/d1/database/6816004b-dc95-48c9-be52-9bd4131d157e/query';
+          async function query(sql){
+            assert.ok(process.env.D1_TOKEN,'Missing deployment credential');
+            const r=await fetch(base,{method:'POST',headers:{authorization:'Bearer '+process.env.D1_TOKEN,'content-type':'application/json'},body:JSON.stringify({sql}),signal:AbortSignal.timeout(25000),redirect:'error'});
+            const j=await r.json();assert.ok(r.ok&&j.success&&j.result.every(x=>x.success),'Scoped D1 operation failed');return j.result.flatMap(x=>x.results||[]);
+          }
+          async function count(sql){const v=await query(sql);assert.equal(v.length,1);assert.ok(Number.isInteger(v[0].n));return v[0].n;}
+          try{
+            const before=await count("SELECT COUNT(*) n FROM "+table+" WHERE id IN ("+scope+")");
+            const matches=await count("SELECT COUNT(*) n FROM "+table+" WHERE "+exact);
+            assert.equal(before,matches,'Target identity or state changed; no deletion permitted');
+            for(const t of reportTables)assert.equal(await count("SELECT COUNT(*) n FROM "+t+" WHERE project_id IN ("+scope+")"),0,'Report metadata present; use existing authenticated admin deletion instead');
+            // Every write is additionally guarded by the exact target identity and draft state.
+            // No arbitrary input, no client-wide predicate, no recurrent data or auth tables.
+            const safe="SELECT id FROM "+table+" WHERE "+exact+" AND NOT EXISTS(SELECT 1 FROM one_time_project_reports r WHERE r.project_id=one_time_projects.id) AND NOT EXISTS(SELECT 1 FROM one_time_project_report_files r WHERE r.project_id=one_time_projects.id)";
+            if(before>0){
+              const commands=[
+                "DELETE FROM one_time_project_rate_limits WHERE key IN (SELECT 'token:'||token FROM one_time_project_access WHERE project_id IN ("+safe+"))",
+                ...children.map(t=>"DELETE FROM "+t+" WHERE project_id IN ("+safe+")"),
+                "DELETE FROM "+table+" WHERE id IN ("+safe+")"
+              ];
+              await query(commands.join(';\n')+';');
+            }
+            assert.equal(await count("SELECT COUNT(*) n FROM "+table+" WHERE id IN ("+scope+")"),0,'Target project remains');
+            for(const t of [...children,...reportTables])assert.equal(await count("SELECT COUNT(*) n FROM "+t+" WHERE project_id IN ("+scope+")"),0,'Target child rows remain');
+            // Preserve the assistant idempotency ledger by design, even after project deletion.
+            console.log('Verified exact synthetic projects absent: 2 of 2; removed during this run: '+before+'.');
+            console.log('Only target-scoped one-time project rows were eligible for deletion; no other project, recurrent record, account or agenda block was modified.');
+          }catch(e){console.error('Cleanup stopped: '+(['Target identity or state changed; no deletion permitted','Report metadata present; use existing authenticated admin deletion instead','Target project remains','Target child rows remain','Missing deployment credential','Scoped D1 operation failed'].includes(e.message)?e.message:'verification failed'));process.exitCode=1}
+          JS
