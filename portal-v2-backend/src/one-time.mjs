@@ -1,4 +1,4 @@
-import {verifyGitHubIdentity} from './github-identity.mjs';
+import {verifySyntheticGitHubIdentity} from './github-identity.mjs';
 import {ReportFault,reportsConfigured,reportMeta,reportAvailable,completionReportSnapshot,captureCompletion,reportDownload,reportAdmin,purgeProjectReportMetadata} from './one-time-reports.mjs';
 import {SERVICE_DEFAULTS,readService,validateService,writeService,billingView} from './one-time-service.mjs';
 import {DISPLAY_DEFAULTS,ACCESS_POLICY,SERVICE_TERMS,SUPPLIER,validateDisplay,readDisplay,writeDisplay} from './one-time-display.mjs';
@@ -308,9 +308,9 @@ export async function handleOneTime(request,context) {
 
 // Isolated test operation: never accepts personal data or production commands.
 export async function handleAssistantTest(request,c){
- const {db,passwordSecret,now=new Date().toISOString(),enabled=false,identityVerifier=verifyGitHubIdentity}=c;
+ const {db,passwordSecret,now=new Date().toISOString(),enabled=false,identityVerifier=verifySyntheticGitHubIdentity}=c;
  try{
-  if(!enabled||Date.parse(now)>=Date.parse('2026-11-29T00:00:00.000Z'))fail(404,'not_found');
+  if(!enabled||Date.parse(now)>=Date.parse('2026-11-28T13:00:00.000Z'))fail(404,'not_found');
   const url=new URL(request.url);
   if(url.pathname!=='/api/portal-assistant/v1/test-create'||url.search)fail(404,'not_found');
   if(request.method!=='POST')fail(405,'method_not_allowed');
