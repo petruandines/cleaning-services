@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     env:
-      D1_READ_TOKEN: ${{ secrets.PORTAL_D1_READ_TOKEN }}
+      D1_READ_TOKEN: ${{ secrets.PORTAL_D1_READ_TOKEN || secrets.PORTAL_REPORTS_CF_TOKEN || secrets.PORTAL_ONE_TIME_D1_TOKEN }}
     steps:
       - name: Check only existence of the synthetic test ID
         shell: bash
