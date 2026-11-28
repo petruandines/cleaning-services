@@ -344,6 +344,7 @@ export async function handleAssistantCommand(request,c){
  let input;try{input=await verifyAssistantRequest(request,publicJwk,Date.parse(now)/1000)}catch{return json({error:'unauthorized'},401)}
  try{
   await rate(db,'portal-assistant-command',12,now);
+  if(input.operation==='list_upcoming')return await assistantUpcoming(input,db,now);
   if(input.operation==='check_day'){
    allowedObject(input,['operation','date']);
    const cal=await assistantCalendar(db,bucket,input.date);
@@ -549,4 +550,39 @@ async function assistantMaintenance(input,c,now){
   if(service){const d=await readService(db,id);if(Object.keys(service).some(k=>d[k]!==service[k]))throw Error('verification_failed')}
   return json({ok:true,operation:'edit',id,version:saved.version,verified:true,access_preserved:true,changed:Object.keys(changes),project:await maintenanceSnapshot(db,saved)});
  }catch{return json({ok:false,updated:true,verified:false,id,error:'updated_unverified'},500)}
+}
+
+// Read-only financial projection of future one-time projects. No access or contact data.
+async function assistantUpcoming(input,db,now){
+ allowedObject(input,['operation','from_date','to_date','as_of','cursor','limit','include_name']);
+ const limit=input.limit===undefined?100:input.limit;
+ if(!Number.isSafeInteger(limit)||limit<1||limit>100||input.include_name!==undefined&&typeof input.include_name!=='boolean')fail(400,'invalid_report_options');
+ const canonical=value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString()===value;
+ const asOf=input.as_of===undefined?new Date(now).toISOString():input.as_of;
+ if(!canonical(asOf)||Date.parse(asOf)>Date.parse(now)||Date.parse(now)-Date.parse(asOf)>30*60000)fail(400,'invalid_report_as_of');
+ let lo=asOf,hi=null;
+ if(input.from_date!==undefined){const [start]=dayRange(input.from_date);if(start>lo)lo=start;}
+ if(input.to_date!==undefined){[hi]=dayRange(input.to_date);}
+ if(input.from_date!==undefined&&input.to_date!==undefined&&input.to_date<=input.from_date)fail(400,'invalid_report_range');
+ const cursor=input.cursor;
+ if(cursor!==undefined&&cursor!==null){
+  allowedObject(cursor,['scheduled_at','id']);
+  if(input.as_of===undefined||!canonical(cursor.scheduled_at)||typeof cursor.id!=='string'||!ID.test(cursor.id)||cursor.scheduled_at<lo||hi&&cursor.scheduled_at>=hi)fail(400,'invalid_report_cursor');
+ }
+ const where="p.status IN ('draft','scheduled','confirmed','in_progress') AND p.scheduled_at>=?"+(hi?" AND p.scheduled_at<?":"")+" AND p.id<>'portal-assistant-test-v1' AND NOT (p.name='TEST – Portal Assistant permanent' AND p.client_name='Client FICTIV – test permanent' AND p.phone='0000000000')";
+ const args=hi?[lo,hi]:[lo];
+ const join=" FROM one_time_projects p LEFT JOIN one_time_project_service_options s ON s.project_id=p.id WHERE ";
+ const mode="COALESCE(s.billing_mode,'fixed')";
+ const summaryRows=await rows(db,"SELECT p.status,"+mode+" AS billing_mode,COUNT(*) AS count,SUM(CASE WHEN "+mode+"='fixed' THEN p.price_bani ELSE 0 END) AS fixed_bani,SUM(CASE WHEN "+mode+"='hourly' THEN COALESCE(s.minimum_bani,10000) ELSE 0 END) AS hourly_minimum_bani"+join+where+" GROUP BY p.status,"+mode,...args);
+ const byStatus=Object.fromEntries(['draft','scheduled','confirmed','in_progress'].map(status=>[status,{count:0,fixed_count:0,hourly_count:0,fixed_bani:0,hourly_minimum_bani:0}]));
+ for(const r of summaryRows){
+  const v=byStatus[r.status];v.count+=r.count;v[r.billing_mode+'_count']+=r.count;v.fixed_bani+=r.fixed_bani;v.hourly_minimum_bani+=r.hourly_minimum_bani;
+ }
+ const sum=(list)=>{const a={count:0,fixed_count:0,hourly_count:0,fixed_bani:0,hourly_minimum_bani:0};for(const v of list)for(const k of Object.keys(a))a[k]+=v[k];return {...a,minimum_projected_bani:a.fixed_bani+a.hourly_minimum_bani,average_fixed_bani:a.fixed_count?Math.round(a.fixed_bani/a.fixed_count):null,average_minimum_projected_bani:a.count?Math.round((a.fixed_bani+a.hourly_minimum_bani)/a.count):null}};
+ const summary={all:sum(Object.values(byStatus)),confirmed:sum([byStatus.confirmed]),not_confirmed:sum([byStatus.draft,byStatus.scheduled]),in_progress:sum([byStatus.in_progress]),by_status:byStatus};
+ const pageWhere=where+(cursor?" AND (p.scheduled_at>? OR (p.scheduled_at=? AND p.id>?))":"");
+ const data=await rows(db,"SELECT p.id,p.scheduled_at,p.status,p.price_bani,"+mode+" AS billing_mode,CASE WHEN "+mode+"='hourly' THEN COALESCE(s.minimum_bani,10000) ELSE NULL END AS minimum_bani"+(input.include_name?",p.name":"")+join+pageWhere+" ORDER BY p.scheduled_at,p.id LIMIT ?",...args,...(cursor?[cursor.scheduled_at,cursor.scheduled_at,cursor.id]:[]),limit+1);
+ const items=data.slice(0,limit).map(r=>({id:r.id,scheduled_at:r.scheduled_at,local_date:localClock(Date.parse(r.scheduled_at)).slice(0,10),status:r.status,billing_mode:r.billing_mode,fixed_bani:r.billing_mode==='fixed'?r.price_bani:null,hourly_rate_bani:r.billing_mode==='hourly'?r.price_bani:null,hourly_minimum_bani:r.minimum_bani,...(input.include_name?{name:r.name}:{})}));
+ const last=items.at(-1),next_cursor=data.length>limit?{scheduled_at:last.scheduled_at,id:last.id}:null;
+ return json({ok:true,operation:'list_upcoming',currency:'RON',timezone:'Europe/Bucharest',as_of:asOf,read_at:now,from_at:lo,to_at:hi,summary,items,next_cursor,warning:'Projected bookings, not receipts. Hourly final amounts are unknown; minimums are contractual floor only. Separate confirmed, unconfirmed and in-progress. Pages may change if projects are edited.'});
 }

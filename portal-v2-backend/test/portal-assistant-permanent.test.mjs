@@ -80,3 +80,30 @@ test('maintenance: reschedule excludes self, rejects overlaps, protects document
  assert.equal((await s.invoke({operation:'prepare_delete',id,version:3})).status,409);
  assert.ok(s.sqlite.prepare('SELECT id FROM one_time_projects WHERE id=?').get(id));
  }finally{s.sqlite.close()}});
+
+test('upcoming report: private read-only projections, status, hourly, exact pagination and local dates',async()=>{const s=fixture();try{
+ const add=(id,date,status,price,name='Private label',client='Private customer',phone='0712345678')=>s.sqlite.prepare("INSERT INTO one_time_projects(id,name,client_name,phone,email,location,scheduled_at,price_bani,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(id,name,client,phone,'private@example.com','Private address',date,price,status,now,now);
+ add('a','2026-11-30T22:30:00.000Z','confirmed',69900);
+ add('b','2026-11-30T22:30:00.000Z','scheduled',15000);
+ add('c','2026-12-01T10:00:00.000Z','draft',50000);
+ add('d','2026-12-01T11:00:00.000Z','cancelled',99000);
+ add('e','2026-11-27T10:00:00.000Z','confirmed',99900);
+ add('f','2026-12-01T12:00:00.000Z','completed',99000);
+ add('portal-assistant-test-v1','2026-12-02T10:00:00.000Z','draft',69900);
+ add('synthetic','2026-12-02T10:00:00.000Z','draft',69900,'TEST – Portal Assistant permanent','Client FICTIV – test permanent','0000000000');
+ add('g','2026-12-31T22:00:00.000Z','confirmed',30000);
+ s.sqlite.prepare("INSERT INTO one_time_project_service_options(project_id,billing_mode,minimum_bani,minimum_agreement) VALUES(?,'hourly',?,?)").run('b',30000,'Synthetic minimum');
+ const before=JSON.stringify(s.sqlite.prepare('SELECT * FROM one_time_projects ORDER BY id').all());
+ const optionsBefore=JSON.stringify(s.sqlite.prepare('SELECT * FROM one_time_project_service_options').all());
+ const req={operation:'list_upcoming',from_date:'2026-12-01',to_date:'2027-01-01',limit:1};
+ assert.equal((await s.invoke(req,{noSig:true})).status,401);
+ const r=await s.invoke(req);assert.equal(r.status,200,await r.clone().text());const x=await r.json();
+ assert.equal(x.summary.all.count,3);assert.equal(x.summary.all.fixed_bani,119900);assert.equal(x.summary.all.hourly_minimum_bani,30000);assert.equal(x.summary.all.minimum_projected_bani,149900);assert.equal(x.summary.confirmed.count,1);assert.equal(x.summary.not_confirmed.count,2);assert.equal(x.summary.all.average_fixed_bani,59950);assert.equal(x.items[0].id,'a');assert.equal(x.items[0].local_date,'2026-12-01');
+ assert.equal(JSON.stringify(x).includes('Private customer'),false);assert.equal(JSON.stringify(x).includes('Private address'),false);assert.equal(JSON.stringify(x).includes('Private label'),false);
+ const y=await(await s.invoke({...req,as_of:x.as_of,cursor:x.next_cursor})).json();assert.equal(y.items[0].id,'b');assert.equal(y.items[0].hourly_rate_bani,15000);assert.equal(y.items[0].fixed_bani,null);assert.equal(y.items[0].hourly_minimum_bani,30000);
+ const z=await(await s.invoke({...req,as_of:y.as_of,cursor:y.next_cursor,include_name:true})).json();assert.equal(z.items[0].id,'c');assert.equal(z.items[0].name,'Private label');assert.equal(z.next_cursor,null);
+ assert.equal((await s.invoke({...req,limit:101})).status,400);
+ assert.equal((await s.invoke({...req,cursor:x.next_cursor})).status,400);
+ assert.equal((await s.invoke({...req,from_date:'2027-01-01'})).status,400);
+ assert.equal(JSON.stringify(s.sqlite.prepare('SELECT * FROM one_time_projects ORDER BY id').all()),before);assert.equal(JSON.stringify(s.sqlite.prepare('SELECT * FROM one_time_project_service_options').all()),optionsBefore);
+ }finally{s.sqlite.close()}});
