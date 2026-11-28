@@ -53,7 +53,7 @@ export default {
       return handleAgenda(request, {auth:createAuth(env),bucket:env.PROJECT_REPORTS});
     }
     if (url.pathname === '/api/portal-assistant/v1/test-create') {
-      return handleAssistantTest(request,{db:env.DB,passwordSecret:env.BETTER_AUTH_SECRET,enabled:env.PORTAL_ASSISTANT_TEST_ENABLED === 'true'});
+      return handleAssistantTest(request,{db:env.DB,passwordSecret:env.BETTER_AUTH_SECRET,enabled:true /* synthetic-only route, hard cutoff and pinned workflow enforced in handler */});
     }
     if (url.pathname.startsWith('/api/one-time/')) {
       return handleOneTime(request, { db: env.DB, auth: createAuth(env), passwordSecret: env.BETTER_AUTH_SECRET, reportBucket: env.PROJECT_REPORTS, reportsEnabled: env.PROJECT_REPORTS_ENABLED === 'true' });
