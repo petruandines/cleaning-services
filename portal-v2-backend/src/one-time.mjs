@@ -317,7 +317,7 @@ export async function handleAssistantTest(request,c){
   if(request.headers.has('origin')||request.headers.has('cookie'))fail(403,'service_only');
   const authorization=request.headers.get('authorization')||'';
   if(!authorization.startsWith('Bearer '))fail(401,'unauthorized');
-  let identity;try{identity=await identityVerifier(authorization.slice(7));}catch{fail(401,'unauthorized');}
+  let identity;try{identity=await identityVerifier(authorization.slice(7));}catch(e){const allowed=['identity_format','identity_claims','identity_time','identity_jwks_fetch','identity_jwks_keys','identity_key_import','identity_signature'];return json({error:'unauthorized',...(allowed.includes(e?.diagnostic)?{diagnostic:e.diagnostic}:{})},401);}
   const input=await body(request);
   if(Object.keys(input).sort().join(',')!=='operation,request_id'||input.operation!=='create_test'||typeof input.request_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(input.request_id))fail(400,'invalid_test_request');
   // One fixed synthetic draft prevents duplicates even across different requests/runs.
