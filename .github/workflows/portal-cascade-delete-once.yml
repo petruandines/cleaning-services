@@ -36,7 +36,7 @@ jobs:
       - name: Read verified backend source
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.module.outputs.enabled == 'true' && 'e11eaa619227c793a476228190b1d1141baf017a' || '2060d84af71fa271c7c69031dfd8b4ced2134e48' }}
+          ref: ${{ steps.module.outputs.enabled == 'true' && 'cf36d29635f3dafb3f50563a5626dc25191b1379' || '2060d84af71fa271c7c69031dfd8b4ced2134e48' }}
           path: .backend-source
           persist-credentials: false
       - name: Read production policy
