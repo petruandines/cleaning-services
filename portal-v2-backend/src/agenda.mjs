@@ -122,3 +122,26 @@ export async function handleAgenda(request,context){
  }
  return new Response(response.body,{status:response.status,headers});
 }
+
+
+// Assistant calendar summary: only intervals and counts; no names, titles or addresses.
+export async function assistantAgendaForDay(bucket,date){
+ if(!bucket||!validDate(date))fail(503,'agenda_unavailable');
+ const catalog=await readCatalog(bucket),out=[];
+ const epoch=d=>Date.parse(d+'T12:00:00Z');
+ for(const b of catalog.rows){
+  if(b.deleted)continue;
+  const start=b.start.slice(0,10),end=b.end.slice(0,10);
+  if(b.repeat==='none'){
+   if(date>=start&&date<=end)out.push({start:date===start?b.start:date+'T00:00',end:date===end?b.end:date+'T23:59'});
+   continue;
+  }
+  if(date<start||(b.repeat_until&&date>b.repeat_until))continue;
+  const diff=(epoch(date)-epoch(start))/86400000;
+  const occurrence=b.repeat==='daily'||b.repeat==='weekly'&&diff%7===0||b.repeat==='monthly'&&date.slice(8)===start.slice(8);
+  if(!occurrence)continue;
+  const override=b.exceptions?.[date];if(override===null)continue;
+  out.push(override?{start:override.start,end:override.end}:{start:date+b.start.slice(10),end:date+b.end.slice(10)});
+ }
+ return out;
+}

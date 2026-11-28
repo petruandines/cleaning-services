@@ -1,3 +1,5 @@
+import {verifyAssistantRequest} from './assistant-auth.mjs';
+import {assistantAgendaForDay} from './agenda.mjs';
 import {ReportFault,reportsConfigured,reportMeta,reportAvailable,completionReportSnapshot,captureCompletion,reportDownload,reportAdmin,purgeProjectReportMetadata} from './one-time-reports.mjs';
 import {SERVICE_DEFAULTS,readService,validateService,writeService,billingView} from './one-time-service.mjs';
 import {DISPLAY_DEFAULTS,ACCESS_POLICY,SERVICE_TERMS,SUPPLIER,validateDisplay,readDisplay,writeDisplay} from './one-time-display.mjs';
@@ -303,4 +305,94 @@ export async function handleOneTime(request,context) {
  }
  if(response.status===429) headers.set('retry-after','60');
  return new Response(response.body,{status:response.status,headers});
+}
+
+
+// Only the narrowly scoped signed service may use this route. No admin session is fabricated.
+const assistantDayFormat=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Bucharest',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const localClock=ms=>assistantDayFormat.format(new Date(ms)).replace(' ','T');
+const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+function dayRange(date){
+ if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T12:00Z'))||new Date(date+'T12:00Z').toISOString().slice(0,10)!==date)fail(400,'invalid_day');
+ const next=new Date(Date.parse(date+'T12:00Z')+day).toISOString().slice(0,10);
+ function midnight(d){for(const offset of [2,3]){const ms=Date.parse(d+'T00:00Z')-offset*3600000;if(localClock(ms)===d+'T00:00')return new Date(ms).toISOString()}fail(400,'invalid_day')}
+ return [midnight(date),midnight(next)];
+}
+const activeOTP="status IN ('draft','scheduled','confirmed','in_progress') AND id <> 'portal-assistant-test-v1'";
+const activeRecurring="deleted_at IS NULL AND status IN ('draft','requested','confirmed','in_progress')";
+async function assistantCalendar(db,bucket,date){
+ const [lo,hi]=dayRange(date);
+ const [projects,appointments,blocks]=await Promise.all([
+  rows(db,'SELECT scheduled_at FROM one_time_projects WHERE '+activeOTP+' AND scheduled_at>=? AND scheduled_at<? ORDER BY scheduled_at',lo,hi),
+  rows(db,'SELECT starts_at,ends_at FROM appointments WHERE '+activeRecurring+' AND starts_at<? AND ends_at>? ORDER BY starts_at',hi,lo),
+  assistantAgendaForDay(bucket,date)
+ ]);
+ return {date,lo,hi,one_time:projects.map(x=>({start:x.scheduled_at})),recurring:appointments.map(x=>({start:x.starts_at,end:x.ends_at})),blocks};
+}
+function allowedObject(value,keys){if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!keys.includes(k)))fail(400,'invalid_fields')}
+function checkedCalendar(cal,start,end,reviewed){
+ const t=Date.parse(start),e=end?Date.parse(end):t+1;
+ const localStart=localClock(t),localEnd=end?localClock(e):localStart;
+ if(cal.one_time.some(x=>Date.parse(x.start)>=t&&Date.parse(x.start)<e)||
+ cal.recurring.some(x=>Date.parse(x.start)<e&&Date.parse(x.end)>t)||
+ cal.blocks.some(x=>end?x.start<localEnd&&x.end>localStart:x.start<=localStart&&x.end>localStart))fail(409,'calendar_conflict');
+ if((cal.one_time.length||cal.recurring.length||cal.blocks.length)&&reviewed!==true)fail(409,'calendar_review_required');
+}
+export async function handleAssistantCommand(request,c){
+ const {db,bucket,passwordSecret,publicJwk,now=new Date().toISOString()}=c;
+ if(!publicJwk)return json({error:'not_found'},404);
+ let input;try{input=await verifyAssistantRequest(request,publicJwk,Date.parse(now)/1000)}catch{return json({error:'unauthorized'},401)}
+ try{
+  await rate(db,'portal-assistant-command',12,now);
+  if(input.operation==='check_day'){
+   allowedObject(input,['operation','date']);
+   const cal=await assistantCalendar(db,bucket,input.date);
+   return json({ok:true,date:cal.date,one_time:cal.one_time,recurring:cal.recurring,blocks:cal.blocks,warning:'One-time projects store start times only; review duration and travel manually.'});
+  }
+  allowedObject(input,['operation','request_id','project','calendar_reviewed','estimated_end_at']);
+  if(input.operation!=='create'||!uuid.test(input.request_id||'')||typeof input.calendar_reviewed!=='boolean')fail(400,'invalid_operation');
+  const id='pa-'+input.request_id;
+  if(await first(db,'SELECT request_id FROM one_time_assistant_requests WHERE request_id=?',input.request_id))fail(409,'request_already_processed');
+  const data=input.project;
+  allowedObject(data,[...fields,'status','tasks','display_options','service_options']);
+  validate(data);
+  const synthetic=data.status==='draft'&&data.name==='TEST – Portal Assistant permanent'&&data.client_name==='Client FICTIV – test permanent'&&data.phone==='0000000000'&&data.email===''&&data.location==='Locație fictivă – test tehnic'&&data.show_location===0;
+  if((!synthetic&&!['scheduled','confirmed'].includes(data.status))||Date.parse(data.scheduled_at)<=Date.parse(now))fail(400,'invalid_schedule');
+  if(data.invoice_url!=='')fail(400,'invoice_not_allowed');
+  if(data.expiry_days===null||data.expiry_days>365)fail(400,'invalid_expiry');
+  if(!Array.isArray(data.tasks)||data.tasks.length<1||data.tasks.length>150||data.tasks.some(t=>!t||Object.keys(t).some(k=>!['title','done'].includes(k))||t.done!==false||typeof t.title!=='string'||!/^\[[^\]\r\n]{1,80}\]\s+\S/.test(t.title)))fail(400,'invalid_tasks');
+  const titles=data.tasks.map(t=>t.title.trim().toLocaleLowerCase('ro'));if(new Set(titles).size!==titles.length)fail(400,'duplicate_tasks');
+  const display=data.display_options===undefined?{...DISPLAY_DEFAULTS}:checkedDisplay(data.display_options);
+  let service;try{service=data.service_options===undefined?{...SERVICE_DEFAULTS}:validateService(data.service_options,SERVICE_DEFAULTS,now)}catch{fail(400,'invalid_service_options')}
+  if(service.en_route)fail(400,'travel_not_allowed');
+  let end=null;if(input.estimated_end_at!==null&&input.estimated_end_at!==undefined){
+   if(typeof input.estimated_end_at!=='string'||!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(input.estimated_end_at)||!Number.isFinite(Date.parse(input.estimated_end_at)))fail(400,'invalid_end');
+   end=new Date(input.estimated_end_at).toISOString();
+   if(Date.parse(end)<=Date.parse(data.scheduled_at)||localClock(Date.parse(end)).slice(0,10)!==localClock(Date.parse(data.scheduled_at)).slice(0,10))fail(400,'invalid_end');
+  }
+  const cal=await assistantCalendar(db,bucket,localClock(Date.parse(data.scheduled_at)).slice(0,10));
+  checkedCalendar(cal,data.scheduled_at,end,input.calendar_reviewed);
+  const pass=Array.from(crypto.getRandomValues(new Uint8Array(18)),b=>b.toString(16).padStart(2,'0')).join(''),token=random();
+  const hash=await hashPassword(password(pass)),sealed=await sealPassword(pass,passwordSecret,id,hash);
+  // Recheck D1 in the atomic insert, so concurrent assistant requests cannot silently double-book.
+  // R2 manual blocks are read just before writing; there is no cross-storage transaction.
+  const rangeEnd=end||new Date(Date.parse(data.scheduled_at)+1).toISOString();
+  const conflictSQL="EXISTS(SELECT 1 FROM one_time_projects WHERE "+activeOTP+" AND scheduled_at>=? AND scheduled_at<?) OR EXISTS(SELECT 1 FROM appointments WHERE "+activeRecurring+" AND starts_at<? AND ends_at>?) OR (?=0 AND (EXISTS(SELECT 1 FROM one_time_projects WHERE "+activeOTP+" AND scheduled_at>=? AND scheduled_at<?) OR EXISTS(SELECT 1 FROM appointments WHERE "+activeRecurring+" AND starts_at<? AND ends_at>?)))";
+  const statements=[
+   q(db,'INSERT INTO one_time_assistant_requests(request_id,project_id,created_at) VALUES(?,?,?)',input.request_id,id,now),
+   q(db,`INSERT INTO one_time_projects(id,${fields.join(',')},status,created_at,updated_at,version) VALUES(${Array(15).fill('?').join(',')},CASE WHEN ${conflictSQL} THEN -1 ELSE 1 END)`,id,...fields.map(k=>data[k]),data.status,now,now,data.scheduled_at,rangeEnd,rangeEnd,data.scheduled_at,input.calendar_reviewed?1:0,cal.lo,cal.hi,cal.hi,cal.lo),
+   ...taskChanges(db,id,data.tasks,[],now),writeService(db,id,service),writeDisplay(db,id,display),
+   q(db,'INSERT INTO one_time_project_access(project_id,token,password_hash,created_at) VALUES(?,?,?,?)',id,token,hash,now),
+   q(db,'INSERT INTO one_time_project_passwords(project_id,ciphertext) VALUES(?,?)',id,sealed),
+   log(db,id,'project_created','portal-assistant',now,input.request_id),log(db,id,'access_generate','portal-assistant',now)
+  ];
+  try{await db.batch(statements)}catch(e){if(await first(db,'SELECT request_id FROM one_time_assistant_requests WHERE request_id=?',input.request_id))fail(409,'request_already_processed');if(/CHECK constraint/i.test(e.message))fail(409,'calendar_changed_review');throw e}
+  // Verify committed rows and password copy without creating a client login/session.
+  try{
+   const saved=await first(db,'SELECT p.id,p.status,p.price_bani,p.scheduled_at,a.token,a.password_hash,a.active,a.last_login_at,v.ciphertext FROM one_time_projects p JOIN one_time_project_access a ON a.project_id=p.id JOIN one_time_project_passwords v ON v.project_id=p.id WHERE p.id=?',id);
+   const savedTasks=await tasks(db,id);
+   if(!saved||saved.status!==data.status||saved.price_bani!==data.price_bani||saved.scheduled_at!==data.scheduled_at||saved.token!==token||saved.password_hash!==hash||saved.active!==1||saved.last_login_at!==null||savedTasks.length!==data.tasks.length||savedTasks.some((t,i)=>t.title!==data.tasks[i].title.trim()||t.done!==0)||await openPassword(saved.ciphertext,passwordSecret,id,hash)!==pass)throw Error('verification_failed');
+  }catch{return json({ok:false,created:true,verified:false,id,error:'created_unverified'},500)}
+  return json({ok:true,id,status:data.status,task_count:data.tasks.length,client_url:'https://petruandines.com/portal/project/?token='+token,password:pass,verified:true},201);
+ }catch(e){return json({error:e instanceof Fault?e.message:'assistant_command_failed'},e instanceof Fault?e.status:500);}
 }
