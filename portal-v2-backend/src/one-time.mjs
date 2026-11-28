@@ -1,3 +1,4 @@
+import {verifyGitHubIdentity} from './github-identity.mjs';
 import {ReportFault,reportsConfigured,reportMeta,reportAvailable,completionReportSnapshot,captureCompletion,reportDownload,reportAdmin,purgeProjectReportMetadata} from './one-time-reports.mjs';
 import {SERVICE_DEFAULTS,readService,validateService,writeService,billingView} from './one-time-service.mjs';
 import {DISPLAY_DEFAULTS,ACCESS_POLICY,SERVICE_TERMS,SUPPLIER,validateDisplay,readDisplay,writeDisplay} from './one-time-display.mjs';
@@ -303,4 +304,48 @@ export async function handleOneTime(request,context) {
  }
  if(response.status===429) headers.set('retry-after','60');
  return new Response(response.body,{status:response.status,headers});
+}
+
+// Isolated test operation: never accepts personal data or production commands.
+export async function handleAssistantTest(request,c){
+ const {db,passwordSecret,now=new Date().toISOString(),enabled=false,identityVerifier=verifyGitHubIdentity}=c;
+ try{
+  if(!enabled||Date.parse(now)>=Date.parse('2026-11-29T00:00:00.000Z'))fail(404,'not_found');
+  const url=new URL(request.url);
+  if(url.pathname!=='/api/portal-assistant/v1/test-create'||url.search)fail(404,'not_found');
+  if(request.method!=='POST')fail(405,'method_not_allowed');
+  if(request.headers.has('origin')||request.headers.has('cookie'))fail(403,'service_only');
+  const authorization=request.headers.get('authorization')||'';
+  if(!authorization.startsWith('Bearer '))fail(401,'unauthorized');
+  let identity;try{identity=await identityVerifier(authorization.slice(7));}catch{fail(401,'unauthorized');}
+  const input=await body(request);
+  if(Object.keys(input).sort().join(',')!=='operation,request_id'||input.operation!=='create_test'||typeof input.request_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(input.request_id))fail(400,'invalid_test_request');
+  // One fixed synthetic draft prevents duplicates even across different requests/runs.
+  const id='portal-assistant-test-v1';
+  if(await first(db,'SELECT id FROM one_time_projects WHERE id=?',id))fail(409,'test_already_exists');
+  const actor='github-actions:'+identity.runId;
+  const data={name:'TEST – Deep Clean 3 camere',client_name:'Andreea Test (FICTIV)',phone:'0000000000',email:'',location:'Locație fictivă – București',show_location:false,scheduled_at:new Date(Date.parse(now)+7*day).toISOString(),price_bani:69900,description:'TEST tehnic. Nu reprezintă o rezervare reală. Bonus fictiv: Fridge Refresh.',invoice_url:'',expiry_days:30,status:'draft'};
+  validate(data);
+  const checklist=[
+   '[Living] Ștergere praf și suprafețe accesibile','[Living] Aspirare și spălare pardoseală','[Living] Curățare plinte și calorifere accesibile',
+   '[Dormitor 1] Ștergere praf și fronturi accesibile','[Dormitor 1] Aspirare și spălare pardoseală',
+   '[Dormitor 2] Ștergere praf și fronturi accesibile','[Dormitor 2] Aspirare și spălare pardoseală',
+   '[Bucătărie] Degresare exterior mobilier și blat','[Bucătărie] Curățare plită și chiuvetă','[Bucătărie] Aspirare și spălare pardoseală',
+   '[Baie] Detartrare obiecte sanitare','[Baie] Curățare cadă, chiuvetă și WC','[Baie] Curățare oglindă și pardoseală',
+   '[Hol] Curățare suprafețe accesibile și pardoseală','[Geamuri] Curățare geamuri și tâmplărie accesibilă',
+   '[Bonus – Fridge Refresh] Curățare interior frigider golit în prealabil','[Bonus – Fridge Refresh] Curățare rafturi și sertare',
+   '[Verificare finală] Control vizual al operațiunilor efectuate'
+  ].map(title=>({title,done:false}));
+  const pass=Array.from(crypto.getRandomValues(new Uint8Array(18)),b=>b.toString(16).padStart(2,'0')).join('');
+  const token=random(),hashed=await hashPassword(password(pass)),sealed=await sealPassword(pass,passwordSecret,id,hashed);
+  const statements=[
+   q(db,`INSERT INTO one_time_projects(id,${fields.join(',')},status,created_at,updated_at) VALUES(${Array(15).fill('?').join(',')})`,id,...fields.map(k=>data[k]),data.status,now,now),
+   ...taskChanges(db,id,checklist,[],now),writeService(db,id,{...SERVICE_DEFAULTS}),writeDisplay(db,id,{...DISPLAY_DEFAULTS,invoice_enabled:0}),
+   q(db,'INSERT INTO one_time_project_access(project_id,token,password_hash,created_at) VALUES(?,?,?,?)',id,token,hashed,now),
+   q(db,'INSERT INTO one_time_project_passwords(project_id,ciphertext) VALUES(?,?)',id,sealed),
+   log(db,id,'project_created',actor,now,input.request_id),log(db,id,'access_generate',actor,now)
+  ];
+  try{await db.batch(statements);}catch(e){if(await first(db,'SELECT id FROM one_time_projects WHERE id=?',id))fail(409,'test_already_exists');throw e;}
+  return json({ok:true,id,status:'draft',task_count:checklist.length,client_url:'https://petruandines.com/portal/project/?token='+token,password:pass},201);
+ }catch(e){return json({error:e instanceof Fault?e.message:'assistant_test_failed'},e instanceof Fault?e.status:500);}
 }

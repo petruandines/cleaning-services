@@ -4,7 +4,7 @@ import { isPortalOrigin, corsOrigin } from './origins.mjs';
 import { authOptions } from './auth-options.mjs';
 import { guardAdminPassword } from './admin-password.mjs';
 import { handleAdminDeviceSession } from './admin-device-session.mjs';
-import { handleOneTime } from './one-time.mjs';
+import { handleOneTime, handleAssistantTest } from './one-time.mjs';
 import { handleAgenda } from './agenda.mjs';
 
 const CANONICAL_PORTAL_ORIGIN = 'https://petruandines.com';
@@ -51,6 +51,9 @@ export default {
     }
     if (url.pathname.startsWith('/api/agenda/')) {
       return handleAgenda(request, {auth:createAuth(env),bucket:env.PROJECT_REPORTS});
+    }
+    if (url.pathname === '/api/portal-assistant/v1/test-create') {
+      return handleAssistantTest(request,{db:env.DB,passwordSecret:env.BETTER_AUTH_SECRET,enabled:env.PORTAL_ASSISTANT_TEST_ENABLED === 'true'});
     }
     if (url.pathname.startsWith('/api/one-time/')) {
       return handleOneTime(request, { db: env.DB, auth: createAuth(env), passwordSecret: env.BETTER_AUTH_SECRET, reportBucket: env.PROJECT_REPORTS, reportsEnabled: env.PROJECT_REPORTS_ENABLED === 'true' });
