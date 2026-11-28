@@ -1,0 +1,26 @@
+name: Synthetic assistant draft read-only diagnostic
+on:
+  push:
+    branches: [portal-assistant-diagnostic-v1]
+    paths: ['.github/workflows/portal-assistant-diagnostic.yml']
+permissions: {}
+jobs:
+  inspect:
+    if: github.repository == 'petruandines/cleaning-services' && github.ref == 'refs/heads/portal-assistant-diagnostic-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      D1_READ_TOKEN: ${{ secrets.PORTAL_D1_READ_TOKEN }}
+    steps:
+      - name: Check only existence of the synthetic test ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$D1_READ_TOKEN" ]]; then echo 'Read-only credential unavailable'; exit 1; fi
+          response=$(curl --silent --show-error --max-time 20 --request POST \
+            --header "Authorization: Bearer $D1_READ_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data '{"sql":"SELECT COUNT(*) AS n FROM one_time_projects WHERE id = ?","params":["portal-assistant-test-v1"]}' \
+            'https://api.cloudflare.com/client/v4/accounts/47b9f8498a9865c0fbbaca8f0f5cf59d/d1/database/6816004b-dc95-48c9-be52-9bd4131d157e/query')
+          n=$(jq -er 'if .success == true and .result[0].success == true then .result[0].results[0].n else error("Read-only query denied") end' <<< "$response")
+          case "$n" in 0) echo 'Synthetic draft absent';; 1) echo 'Synthetic draft exists';; *) echo 'Unexpected count'; exit 1;; esac
