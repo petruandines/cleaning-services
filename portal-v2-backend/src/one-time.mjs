@@ -320,10 +320,10 @@ function dayRange(date){
 }
 const activeOTP="status IN ('draft','scheduled','confirmed','in_progress') AND id <> 'portal-assistant-test-v1'";
 const activeRecurring="deleted_at IS NULL AND status IN ('draft','requested','confirmed','in_progress')";
-async function assistantCalendar(db,bucket,date){
+async function assistantCalendar(db,bucket,date,excludeId=''){
  const [lo,hi]=dayRange(date);
  const [projects,appointments,blocks]=await Promise.all([
-  rows(db,'SELECT scheduled_at FROM one_time_projects WHERE '+activeOTP+' AND scheduled_at>=? AND scheduled_at<? ORDER BY scheduled_at',lo,hi),
+  rows(db,'SELECT scheduled_at FROM one_time_projects WHERE '+activeOTP+' AND id<>? AND scheduled_at>=? AND scheduled_at<? ORDER BY scheduled_at',excludeId,lo,hi),
   rows(db,'SELECT starts_at,ends_at FROM appointments WHERE '+activeRecurring+' AND starts_at<? AND ends_at>? ORDER BY starts_at',hi,lo),
   assistantAgendaForDay(bucket,date)
  ]);
@@ -349,6 +349,7 @@ export async function handleAssistantCommand(request,c){
    const cal=await assistantCalendar(db,bucket,input.date);
    return json({ok:true,date:cal.date,one_time:cal.one_time,recurring:cal.recurring,blocks:cal.blocks,warning:'One-time projects store start times only; review duration and travel manually.'});
   }
+  if(['find_project','get_project','edit','prepare_delete','delete'].includes(input.operation))return await assistantMaintenance(input,c,now);
   allowedObject(input,['operation','request_id','project','calendar_reviewed','estimated_end_at']);
   if(input.operation!=='create'||!uuid.test(input.request_id||'')||typeof input.calendar_reviewed!=='boolean')fail(400,'invalid_operation');
   const id='pa-'+input.request_id;
@@ -395,4 +396,157 @@ export async function handleAssistantCommand(request,c){
   }catch{return json({ok:false,created:true,verified:false,id,error:'created_unverified'},500)}
   return json({ok:true,id,status:data.status,task_count:data.tasks.length,client_url:'https://petruandines.com/portal/project/?token='+token,password:pass,verified:true},201);
  }catch(e){return json({error:e instanceof Fault?e.message:'assistant_command_failed'},e instanceof Fault?e.status:500);}
+}
+
+// Signed maintenance surface: exact identity, version checks, no credentials returned on read/edit.
+const maintenanceFields=['name','client_name','phone','email','location','show_location','scheduled_at','price_bani','description','expiry_days','status','tasks','display_options','service_options'];
+const mutableStates=['draft','scheduled','confirmed','cancelled'];
+const protectedSQL="status IN ('draft','scheduled','confirmed','cancelled') AND started_at IS NULL AND completed_at IS NULL AND invoice_url='' AND NOT EXISTS(SELECT 1 FROM one_time_project_service_options s WHERE s.project_id=one_time_projects.id AND s.en_route=1) AND NOT EXISTS(SELECT 1 FROM one_time_project_reports r WHERE r.project_id=one_time_projects.id) AND NOT EXISTS(SELECT 1 FROM one_time_project_report_files r WHERE r.project_id=one_time_projects.id)";
+const maintenanceChildren=['one_time_project_service_options','one_time_project_display_options','one_time_project_passwords','one_time_project_sessions','one_time_project_activity','one_time_project_tasks','one_time_project_access'];
+const maintenanceSummary=p=>({id:p.id,name:p.name,client_name:p.client_name,scheduled_at:p.scheduled_at,status:p.status,version:p.version});
+async function maintenanceSnapshot(db,p){
+ const access=await first(db,'SELECT active,expires_at FROM one_time_project_access WHERE project_id=?',p.id);
+ return {...maintenanceSummary(p),...Object.fromEntries(fields.filter(k=>k!=='invoice_url').map(k=>[k,p[k]])),has_invoice:!!p.invoice_url,started_at:p.started_at,completed_at:p.completed_at,tasks:await tasks(db,p.id),service_options:await readService(db,p.id),display_options:await readDisplay(db,p.id),access_exists:!!access,access_active:!!access?.active,maintenance_allowed:!!await first(db,'SELECT id FROM one_time_projects WHERE id=? AND '+protectedSQL,p.id)};
+}
+function exactMaintenanceId(id){if(typeof id!=='string'||!ID.test(id))fail(400,'invalid_project_id');return id}
+function exactVersion(v){if(!Number.isSafeInteger(v)||v<1)fail(400,'invalid_version');return v}
+async function assertMaintainable(db,p,v){
+ if(p.version!==v)fail(409,'project_changed_reload');
+ if(!await first(db,'SELECT id FROM one_time_projects WHERE id=? AND version=? AND '+protectedSQL,p.id,v))fail(409,'protected_project_use_admin');
+}
+async function deleteMac(secret,id,version,expires){
+ if(typeof secret!=='string'||secret.length<32)fail(503,'assistant_confirmation_unavailable');
+ const enc=new TextEncoder(),raw=await crypto.subtle.importKey('raw',enc.encode(secret),'HKDF',false,['deriveKey']);
+ const key=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:enc.encode('petru-ines/portal-assistant/v1'),info:enc.encode('delete-confirmation')},raw,{name:'HMAC',hash:'SHA-256',length:256},false,['sign','verify']);
+ return {key,bytes:enc.encode('delete\n'+id+'\n'+version+'\n'+expires)};
+}
+async function makeDeleteToken(secret,id,v,now){
+ const exp=Math.floor(Date.parse(now)/1000)+600,{key,bytes}=await deleteMac(secret,id,v,exp);
+ const mac=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,bytes)),x=>x.toString(16).padStart(2,'0')).join('');
+ return exp+'.'+mac;
+}
+async function verifyDeleteToken(secret,id,v,now,token){
+ if(typeof token!=='string'||!/^\d{10}\.[0-9a-f]{64}$/.test(token))fail(400,'confirmation_required');
+ const [exp,mac]=token.split('.'),sec=Math.floor(Date.parse(now)/1000);
+ if(+exp<=sec||+exp>sec+600)fail(409,'confirmation_expired');
+ const {key,bytes}=await deleteMac(secret,id,v,+exp);
+ if(!await crypto.subtle.verify('HMAC',key,Uint8Array.from(mac.match(/../g),x=>parseInt(x,16)),bytes))fail(409,'confirmation_mismatch');
+}
+function maintenanceGuard(db,input,id,v,now,extra='1=1',params=[]){
+ // This NOT NULL guard obtains the write transaction and aborts even if the target vanished.
+ return q(db,'INSERT INTO one_time_assistant_mutations(request_id,project_id,operation,created_at) VALUES(?,CASE WHEN EXISTS(SELECT 1 FROM one_time_projects WHERE id=? AND version=? AND '+protectedSQL+' AND ('+extra+')) THEN ? ELSE NULL END,?,?)',input.request_id,id,v,...params,id,input.operation,now);
+}
+async function mutationBatch(db,input,statements){
+ try{await db.batch(statements)}catch(e){
+  if(await first(db,'SELECT request_id FROM one_time_assistant_mutations WHERE request_id=?',input.request_id))fail(409,'request_already_processed');
+  if(/CHECK constraint|NOT NULL constraint/i.test(e.message))fail(409,'project_or_calendar_changed_reload');
+  throw e;
+ }
+}
+function maintenanceEnd(start,value){
+ if(value===undefined||value===null)return null;
+ if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value)||!Number.isFinite(Date.parse(value)))fail(400,'invalid_end');
+ const end=new Date(value).toISOString();
+ if(Date.parse(end)<=Date.parse(start)||localClock(Date.parse(end)).slice(0,10)!==localClock(Date.parse(start)).slice(0,10))fail(400,'invalid_end');
+ return end;
+}
+function maintenanceTaskList(input,existing){
+ if(!Array.isArray(input)||input.length<1||input.length>150)fail(400,'invalid_tasks');
+ const old=new Map(existing.map(t=>[t.id,t])),ids=new Set(),titles=new Set();
+ const list=input.map(t=>{
+  allowedObject(t,['id','title','done']);
+  if(typeof t.title!=='string'||!t.title.trim()||t.title.length>300||typeof t.done!=='boolean')fail(400,'invalid_task');
+  const title=t.title.trim(),normalized=title.toLocaleLowerCase('ro');
+  if(titles.has(normalized))fail(400,'duplicate_tasks');titles.add(normalized);
+  if(t.id!==undefined){
+   if(typeof t.id!=='string'||!old.has(t.id)||ids.has(t.id))fail(400,'invalid_task');
+   ids.add(t.id);const prior=old.get(t.id);
+   if(t.done!==!!prior.done||(prior.done&&title!==prior.title))fail(409,'completed_task_protected');
+   return {id:t.id,title,done:t.done};
+  }
+  if(t.done||!/^\[[^\]\r\n]{1,80}\]\s+\S/.test(title))fail(400,'invalid_task');
+  return {title,done:false};
+ });
+ if(existing.some(t=>t.done&&!ids.has(t.id)))fail(409,'completed_task_protected');
+ return list;
+}
+async function accessFingerprint(db,id){
+ const a=await first(db,'SELECT a.token,a.password_hash,a.active,a.generation,a.expires_at,p.ciphertext FROM one_time_project_access a LEFT JOIN one_time_project_passwords p ON p.project_id=a.project_id WHERE a.project_id=?',id);
+ return a?JSON.stringify(a):null;
+}
+async function assistantMaintenance(input,c,now){
+ const {db,bucket,passwordSecret}=c;
+ if(input.operation==='find_project'){
+  allowedObject(input,['operation','client_name','date','phone']);
+  if(typeof input.client_name!=='string'||!input.client_name.trim()||input.client_name.length>160||(input.phone!==undefined&&(typeof input.phone!=='string'||!input.phone.trim()||input.phone.length>40)))fail(400,'invalid_lookup');
+  const [lo,hi]=dayRange(input.date);
+  const hits=await rows(db,'SELECT id,name,client_name,scheduled_at,status,version FROM one_time_projects WHERE client_name=? COLLATE NOCASE AND scheduled_at>=? AND scheduled_at<?'+(input.phone!==undefined?' AND phone=?':'')+' ORDER BY scheduled_at,id LIMIT 11',input.client_name.trim(),lo,hi,...(input.phone!==undefined?[input.phone.trim()]:[]));
+  if(hits.length>10)fail(409,'ambiguous_project');
+  return json({ok:true,operation:'find_project',matches:hits});
+ }
+ const id=exactMaintenanceId(input.id);
+ if(input.operation==='get_project'){
+  allowedObject(input,['operation','id']);
+  return json({ok:true,operation:'get_project',project:await maintenanceSnapshot(db,await project(db,id))});
+ }
+ const version=exactVersion(input.version);
+ if(input.operation==='prepare_delete'){
+  allowedObject(input,['operation','id','version']);
+  const p=await project(db,id);await assertMaintainable(db,p,version);
+  return json({ok:true,operation:'prepare_delete',project:maintenanceSummary(p),confirmation_token:await makeDeleteToken(passwordSecret,id,version,now),expires_in_seconds:600});
+ }
+ if(!['edit','delete'].includes(input.operation)||typeof input.request_id!=='string'||!uuid.test(input.request_id))fail(400,'invalid_operation');
+ if(await first(db,'SELECT request_id FROM one_time_assistant_mutations WHERE request_id=?',input.request_id))fail(409,'request_already_processed');
+ const p=await project(db,id);await assertMaintainable(db,p,version);
+ if(input.operation==='delete'){
+  allowedObject(input,['operation','id','version','request_id','confirm','confirmation_token']);
+  if(input.confirm!==true)fail(400,'confirmation_required');
+  await verifyDeleteToken(passwordSecret,id,version,now,input.confirmation_token);
+  const statements=[maintenanceGuard(db,input,id,version,now),
+   q(db,"DELETE FROM one_time_project_rate_limits WHERE key IN (SELECT 'token:'||token FROM one_time_project_access WHERE project_id=?)",id),
+   ...maintenanceChildren.map(t=>q(db,'DELETE FROM '+t+' WHERE project_id=?',id)),q(db,'DELETE FROM one_time_projects WHERE id=?',id)];
+  await mutationBatch(db,input,statements);
+  try{
+   if(await first(db,'SELECT id FROM one_time_projects WHERE id=?',id))throw Error('remaining');
+   for(const t of [...maintenanceChildren,'one_time_project_reports','one_time_project_report_files'])if(await first(db,'SELECT project_id FROM '+t+' WHERE project_id=? LIMIT 1',id))throw Error('remaining');
+  }catch{return json({ok:false,deleted:true,verified:false,id,error:'deleted_unverified'},500)}
+  return json({ok:true,operation:'delete',id,deleted:true,verified:true});
+ }
+ allowedObject(input,['operation','id','version','request_id','changes','calendar_reviewed','estimated_end_at']);
+ const changes=input.changes;allowedObject(changes,maintenanceFields);
+ if(!Object.keys(changes).length||typeof input.calendar_reviewed!=='boolean')fail(400,'invalid_fields');
+ const updated={...p,...Object.fromEntries(Object.entries(changes).filter(([k])=>fields.includes(k)||k==='status'))};validate(updated);
+ if(!mutableStates.includes(updated.status))fail(400,'invalid_status');
+ const reschedule=updated.scheduled_at!==p.scheduled_at||(!['draft','scheduled','confirmed'].includes(p.status)&&['draft','scheduled','confirmed'].includes(updated.status))||input.estimated_end_at!==undefined&&input.estimated_end_at!==null;
+ let extra='1=1',params=[];
+ if(reschedule&&updated.status!=='cancelled'){
+  if(Date.parse(updated.scheduled_at)<=Date.parse(now))fail(400,'invalid_schedule');
+  const end=maintenanceEnd(updated.scheduled_at,input.estimated_end_at),cal=await assistantCalendar(db,bucket,localClock(Date.parse(updated.scheduled_at)).slice(0,10),id);
+  checkedCalendar(cal,updated.scheduled_at,end,input.calendar_reviewed);
+  const upper=end||new Date(Date.parse(updated.scheduled_at)+1).toISOString();
+  extra="NOT (EXISTS(SELECT 1 FROM one_time_projects other WHERE other.id<>? AND other.status IN ('draft','scheduled','confirmed','in_progress') AND other.id<>'portal-assistant-test-v1' AND other.scheduled_at>=? AND other.scheduled_at<?) OR EXISTS(SELECT 1 FROM appointments WHERE "+activeRecurring+" AND starts_at<? AND ends_at>?) OR (?=0 AND (EXISTS(SELECT 1 FROM one_time_projects other WHERE other.id<>? AND other.status IN ('draft','scheduled','confirmed','in_progress') AND other.id<>'portal-assistant-test-v1' AND other.scheduled_at>=? AND other.scheduled_at<?) OR EXISTS(SELECT 1 FROM appointments WHERE "+activeRecurring+" AND starts_at<? AND ends_at>?))))";
+  params=[id,updated.scheduled_at,upper,upper,updated.scheduled_at,input.calendar_reviewed?1:0,id,cal.lo,cal.hi,cal.hi,cal.lo];
+ }
+ const oldTasks=await tasks(db,id),priorAccess=await accessFingerprint(db,id);
+ const nextTasks=changes.tasks===undefined?null:maintenanceTaskList(changes.tasks,oldTasks);
+ const display=changes.display_options===undefined?null:checkedDisplay(changes.display_options,await readDisplay(db,id));
+ const oldService=await readService(db,id);let service=null;
+ if(changes.service_options!==undefined){
+  allowedObject(changes.service_options,['billing_mode','minimum_bani','minimum_agreement']);
+  try{service=validateService(changes.service_options,oldService,now)}catch{fail(400,'invalid_service_options')}
+ }
+ const statements=[maintenanceGuard(db,input,id,version,now,extra,params),q(db,`UPDATE one_time_projects SET ${fields.map(k=>k+'=?').join(',')},status=?,updated_at=?,version=version+1 WHERE id=? AND version=?`,...fields.map(k=>updated[k]),updated.status,now,id,version)];
+ if(nextTasks)statements.push(...taskChanges(db,id,nextTasks,oldTasks,now,'portal-assistant'));
+ if(display)statements.push(writeDisplay(db,id,display),log(db,id,'display_options_changed','portal-assistant',now));
+ if(service)statements.push(writeService(db,id,service),log(db,id,'billing_options_changed','portal-assistant',now));
+ statements.push(log(db,id,'project_edited','portal-assistant',now,input.request_id));
+ if(p.status!==updated.status)statements.push(log(db,id,'status_changed','portal-assistant',now,updated.status));
+ await mutationBatch(db,input,statements);
+ try{
+  const saved=await project(db,id),savedTasks=await tasks(db,id),expectedTasks=nextTasks||oldTasks.map(t=>({...t,done:!!t.done}));
+  if(saved.version!==version+1||[...fields,'status'].some(k=>saved[k]!==updated[k])||await accessFingerprint(db,id)!==priorAccess||savedTasks.length!==expectedTasks.length||savedTasks.some((t,i)=>t.title!==expectedTasks[i].title||!!t.done!==expectedTasks[i].done||expectedTasks[i].id&&t.id!==expectedTasks[i].id))throw Error('verification_failed');
+  if(display){const d=await readDisplay(db,id);if(Object.keys(display).some(k=>d[k]!==display[k]))throw Error('verification_failed')}
+  if(service){const d=await readService(db,id);if(Object.keys(service).some(k=>d[k]!==service[k]))throw Error('verification_failed')}
+  return json({ok:true,operation:'edit',id,version:saved.version,verified:true,access_preserved:true,changed:Object.keys(changes),project:await maintenanceSnapshot(db,saved)});
+ }catch{return json({ok:false,updated:true,verified:false,id,error:'updated_unverified'},500)}
 }
